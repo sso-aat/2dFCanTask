@@ -1,0 +1,97 @@
+/*		d m a k e f i l e
+ * File:
+  	dmakefile
+ * Function:
+  	Drama makefile source for 2DFCANTASK sub system
+  
+ * Description:
+  	The program dmkmf should be run in the directory containing this
+  	file to generate a Makefile or descrip.mms file for the desired
+  	target
+
+  
+ * Author: {author}
+ 
+ *  Copyright (c) Anglo-Australian Telescope Board, 2018.
+    Not to be used for commercial purposes without AATB permission.
+  
+
+ * "@(#) $Id: ACMM:2dFCanTask/dmakefile,v 1.0 02-Mar-2018 13:28:55+11 ks $"
+
+ * History:
+     02-Mar-2018 - KS - Original version
+	
+			
+ */
+ 
+#BeginConfig 
+ACMM_RELEASE=1_0$(ACMMBUILDVER)
+RELEASE=r$(ACMM_RELEASE)
+SYSTEM=2dfcantask			/* System name (for release	*/
+INCLUDES =  DramaIncl		/* Include directories to use */
+
+USERCCOPTIONS = AnsiCFull()	/* Enable Full Ansi C		*/
+
+
+#EndConfig
+LIBS=LinkLib(2dfcantask)		/* Libraries to link against */
+
+NormalCRules()			/* Include normal c rules	*/
+/*
+ *	Objects to be put in the 2DFCANTASK library.
+ */
+OBJECTS = Obj(2dfcantask) Obj(2dfcantask_$(RELEASE))
+
+/*
+ *	Sources for makedepend.
+ */
+SRC1=  2dfcantaskmain.c 2dfcantask.c 
+
+/*
+ * The target All will build the 2DFCANTASK library and program.
+ */
+DummyTarget(All,  NotVms(checktarget) includes Lib(2dfcantask) Exe(2dfcantask))
+
+DramaCheckTarget()
+
+/*
+ * We use an includes target for include files which need to be built.  This
+ * is only realy necessary if makedepnds has not been run.
+ */
+DummyTarget(includes, 2dfcantask_err.h 2dfcantask_err_msgt.h)
+/*
+* Generate the error code include file.
+ */
+ErrorIncludeFiles(2dfcantask_err)
+
+2dfcantask_$(RELEASE).o : 2dfcantaskversion.c
+	@ echo Compiling 2dfcantaskversion to $@
+	$(CC) -c $(CFLAGS) StringDefine(2DFCANTASK_VER,$(RELEASE)) -D2DFCANTASK_DATE=$(DATE_CMD) 2dfcantaskversion.c
+	mv 2dfcantaskversion.o $@
+
+
+/*
+ * The 2DFCANTASK object library
+ */
+ObjectLibraryTarget(2dfcantask, $(OBJECTS),)
+
+
+/*
+ * The 2DFCANTASK program itself
+ */
+DramaProgramTarget(2dfcantask, Obj(2dfcantaskmain), Lib(2dfcantask), $(LIBS),)
+
+/*
+ * Release targets
+ */
+DramaReleaseCheck()
+DramaReleaseCommon(2dfcantask_err.h 2dfcantask_err_msgt.h 2dfcantask.h)
+DramaReleaseTarget(2dfcantask,Lib(2dfcantask),,))
+DramaReleaseDramaStart()
+
+/*
+ * Target to enableGIT.
+ */
+DramaEnable()
+DramaDirs()
+
