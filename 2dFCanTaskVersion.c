@@ -7,7 +7,7 @@
      Provides the build time date and version for the 2DFCANTASK module.
 
  * Description:
-     Just sets the values of the variables 2dFCanTaskVersion and 2dFCanTaskVerDate
+     Just sets the values of the variables TdFCanTaskVersion and TdFCanTaskVerDate
 
  * Language:
       C
@@ -16,7 +16,7 @@
 
  *-
 
- * "@(#) $Id: ACMM:2dFCanTask/2dfcantaskversion.c,v 1.0 02-Mar-2018 13:28:55+11 ks $"
+ * "@(#) $Id: ACMM:2dFCanTask/2dFCanTaskVersion.c,v 1.1 26-Mar-2018 08:48:13+10 ks $"
 
  * History:
      02-Mar-2018 - KS - Original version
@@ -29,13 +29,13 @@
 /*
  * RCS id
  */
-static const char *rcsId="@(#) $Id: ACMM:2dFCanTask/2dfcantaskversion.c,v 1.0 02-Mar-2018 13:28:55+11 ks $";
+static const char *rcsId="@(#) $Id: ACMM:2dFCanTask/2dFCanTaskVersion.c,v 1.1 26-Mar-2018 08:48:13+10 ks $";
 static void *use_rcsId = (0 ? (void *)(&use_rcsId) : (void *) &rcsId);
 /*
  * Variables defining the version and date.
  */
-const char * const 2dFCanTaskVersion= 2DFCANTASK_VER;
-const char * const 2dFCanTaskDate   = 2DFCANTASK_DATE;
+const char * const TdFCanTaskVersion= TDFCANTASK_VER;
+const char * const TdFCanTaskDate   = TDFCANTASK_DATE;
 
 
 

@@ -9,10 +9,10 @@
 !     02-Mar-2018 - KS - Original version
 !    
 !
-! "@(#) $Id: ACMM:2dFCanTask/2dfcantask_err.msg,v 1.0 02-Mar-2018 13:28:55+11 ks $"
+! "@(#) $Id: ACMM:2dFCanTask/2dfcantask_err.msg,v 1.1 26-Mar-2018 08:48:13+10 ks $"
 !
 .TITLE   2DFCANTASK_ERR  template DRAMA Task 
-.FACILITY 2DFCANTASK,1092/PREFIX=2DFCANTASK__
+.FACILITY TDFCANTASK,1092/PREFIX=TDFCANTASK__
 .SEVERITY ERROR
 .BASE 2
 MALLOCERR "Malloc error"

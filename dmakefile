@@ -16,7 +16,7 @@
     Not to be used for commercial purposes without AATB permission.
   
 
- * "@(#) $Id: ACMM:2dFCanTask/dmakefile,v 1.0 02-Mar-2018 13:28:55+11 ks $"
+ * "@(#) $Id: ACMM:2dFCanTask/dmakefile,v 1.1 26-Mar-2018 08:48:13+10 ks $"
 
  * History:
      02-Mar-2018 - KS - Original version
@@ -25,32 +25,49 @@
  */
  
 #BeginConfig 
-ACMM_RELEASE=1_0$(ACMMBUILDVER)
+ACMM_RELEASE=1_1$(ACMMBUILDVER)
 RELEASE=r$(ACMM_RELEASE)
-SYSTEM=2dfcantask			/* System name (for release	*/
-INCLUDES =  DramaIncl		/* Include directories to use */
+SYSTEM=2dFCanTask			/* System name (for release	*/
+CONFIGURATOR_DIR = ../AAOCANBusIniConfigurator
+CML_DIR = ../CANopen_CML
+SIM_CAN_OPEN_DIR = ../SimCanOpen
+XWING_DIR = ../XWing
+TCS_UTIL_DIR = ../TcsUtil
+INCLUDES =  -I. DramaIncl IDir(DRAMA2_DIR) -I $(CONFIGURATOR_DIR) -I $(CML_DIR)/inc \
+             -I $(SIM_CAN_OPEN_DIR) -I $(XWING_DIR) -I $(TCS_UTIL_DIR)
 
-USERCCOPTIONS = AnsiCFull()	/* Enable Full Ansi C		*/
+/*
+ * Enable Ansi C++ V11/V14 full warnings.  If we have C++14, then we
+ * use it, otherwise we presume we have C++11
+ */
+#if HasCPlusPlus14
+USERCCCOPTIONS = AnsiCC14Full()
+#else
+USERCCCOPTIONS = AnsiCC11Full()
+#endif
+
 
 
 #EndConfig
-LIBS=LinkLib(2dfcantask)		/* Libraries to link against */
+LIBS=LinkLibDir(DRAMA2_LIB,drama2) $(CONFIGURATOR_DIR)/libAAOCANBusConfigurator.a \
+          $(CML_DIR)/c/libcml.a $(SIM_CAN_OPEN_DIR)/libSimCanOpen.a \
+          $(XWING_DIR)/libXWing.a $(TCS_UTIL_DIR)/libTcsUtil.a
 
 NormalCRules()			/* Include normal c rules	*/
 /*
  *	Objects to be put in the 2DFCANTASK library.
  */
-OBJECTS = Obj(2dfcantask) Obj(2dfcantask_$(RELEASE))
+OBJECTS = Obj(CanAccess) Obj(2dFCanTask) Obj(2dFCanTask_$(RELEASE))
 
 /*
  *	Sources for makedepend.
  */
-SRC1=  2dfcantaskmain.c 2dfcantask.c 
+SRC1=  2dFCanTask.cpp CanAccess.cpp
 
 /*
  * The target All will build the 2DFCANTASK library and program.
  */
-DummyTarget(All,  NotVms(checktarget) includes Lib(2dfcantask) Exe(2dfcantask))
+DummyTarget(All,  NotVms(checktarget) includes Lib(2dFCanTask) Exe(2dFCanTask))
 
 DramaCheckTarget()
 
@@ -58,35 +75,36 @@ DramaCheckTarget()
  * We use an includes target for include files which need to be built.  This
  * is only realy necessary if makedepnds has not been run.
  */
-DummyTarget(includes, 2dfcantask_err.h 2dfcantask_err_msgt.h)
+DummyTarget(includes, 2dFCanTask_err.h 2dFCanTask_err_msgt.h)
 /*
 * Generate the error code include file.
  */
-ErrorIncludeFiles(2dfcantask_err)
+ErrorIncludeFiles(2dFCanTask_err)
 
-2dfcantask_$(RELEASE).o : 2dfcantaskversion.c
-	@ echo Compiling 2dfcantaskversion to $@
-	$(CC) -c $(CFLAGS) StringDefine(2DFCANTASK_VER,$(RELEASE)) -D2DFCANTASK_DATE=$(DATE_CMD) 2dfcantaskversion.c
-	mv 2dfcantaskversion.o $@
+2dFCanTask_$(RELEASE).o : 2dFCanTaskversion.c
+	@ echo Compiling 2dFCanTaskversion to $@
+	$(CC) -c $(CFLAGS) StringDefine(TDFCANTASK_VER,$(RELEASE)) -DTDFCANTASK_DATE=$(DATE_CMD) 2dFCanTaskversion.c
+	mv 2dFCanTaskversion.o $@
 
+CanAccess.o : CanAccess.cpp CanAccess.h
 
 /*
  * The 2DFCANTASK object library
  */
-ObjectLibraryTarget(2dfcantask, $(OBJECTS),)
+ObjectLibraryTarget(2dFCanTask, $(OBJECTS),)
 
 
 /*
  * The 2DFCANTASK program itself
  */
-DramaProgramTarget(2dfcantask, Obj(2dfcantaskmain), Lib(2dfcantask), $(LIBS),)
+DramaCPPProgramTarget(2dFCanTask, Obj(2dFCanTask) Obj(CanAccess), Lib(2dFCanTask), $(LIBS),)
 
 /*
  * Release targets
  */
 DramaReleaseCheck()
-DramaReleaseCommon(2dfcantask_err.h 2dfcantask_err_msgt.h 2dfcantask.h)
-DramaReleaseTarget(2dfcantask,Lib(2dfcantask),,))
+DramaReleaseCommon(2dFCanTask_err.h 2dFCanTask_err_msgt.h 2dFCanTask.h)
+DramaReleaseTarget(2dFCanTask,Lib(2dFCanTask),,))
 DramaReleaseDramaStart()
 
 /*
