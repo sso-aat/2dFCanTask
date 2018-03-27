@@ -1,4 +1,4 @@
-# "@(#) $Id: ACMM:2dFCanTask/README.txt,v 1.1 26-Mar-2018 08:48:12+10 ks $"
+# "@(#) $Id: ACMM:2dFCanTask/README.txt,v 1.2 28-Mar-2018 08:58:40+10 ks $"
 
 This sub-system was created from the ACMM DRAMA Template.  Please modify
 as required to create your DRAMA task.

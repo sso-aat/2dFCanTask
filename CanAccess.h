@@ -51,7 +51,7 @@
 //  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 //  RCS id:
-//     "@(#) $Id: ACMM:2dFCanTask/CanAccess.h,v 1.1 26-Mar-2018 08:48:12+10 ks $"
+//     "@(#) $Id: ACMM:2dFCanTask/CanAccess.h,v 1.2 28-Mar-2018 08:58:39+10 ks $"
 
 #include "CANNetworkConfigurator.h"
 #include "CML.h"

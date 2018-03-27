@@ -40,7 +40,7 @@
 //  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 //  RCS id:
-//     "@(#) $Id: ACMM:2dFCanTask/CanAccess.cpp,v 1.1 26-Mar-2018 08:48:13+10 ks $"
+//     "@(#) $Id: ACMM:2dFCanTask/CanAccess.cpp,v 1.2 28-Mar-2018 08:58:40+10 ks $"
 
 #include "CanAccess.h"
 
@@ -268,6 +268,7 @@ bool CanAccess::Initialise(const std::string& FileName) {
                   I_ErrorString += Err->toString();
                   throw std::exception();
                }
+               
                I_AmpMap[Config.Name] = NewAmpPtr;
                //DEBUG ("Amp %s created at %p\n",Config.Name.c_str(),(void*)NewAmpPtr);
             }

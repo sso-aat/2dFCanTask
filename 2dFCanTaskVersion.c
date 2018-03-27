@@ -16,7 +16,7 @@
 
  *-
 
- * "@(#) $Id: ACMM:2dFCanTask/2dFCanTaskVersion.c,v 1.1 26-Mar-2018 08:48:13+10 ks $"
+ * "@(#) $Id: ACMM:2dFCanTask/2dFCanTaskVersion.c,v 1.2 28-Mar-2018 08:58:40+10 ks $"
 
  * History:
      02-Mar-2018 - KS - Original version
@@ -29,7 +29,7 @@
 /*
  * RCS id
  */
-static const char *rcsId="@(#) $Id: ACMM:2dFCanTask/2dFCanTaskVersion.c,v 1.1 26-Mar-2018 08:48:13+10 ks $";
+static const char *rcsId="@(#) $Id: ACMM:2dFCanTask/2dFCanTaskVersion.c,v 1.2 28-Mar-2018 08:58:40+10 ks $";
 static void *use_rcsId = (0 ? (void *)(&use_rcsId) : (void *) &rcsId);
 /*
  * Variables defining the version and date.

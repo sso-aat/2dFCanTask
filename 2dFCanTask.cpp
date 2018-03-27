@@ -33,7 +33,7 @@
 //  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 //  RCS id:
-//     "@(#) $Id: ACMM:2dFCanTask/2dFCanTask.cpp,v 1.1 26-Mar-2018 08:48:13+10 ks $"
+//     "@(#) $Id: ACMM:2dFCanTask/2dFCanTask.cpp,v 1.2 28-Mar-2018 08:58:41+10 ks $"
 
 //  ------------------------------------------------------------------------------------------------
 
@@ -204,7 +204,8 @@ private:
    //  Return a pointer to the amplifier corresponding to a specified axis/amp.
    CML::Amp* GetAmp (AmpId AxisId);
    //  Perform standard setup for a linkage, given a list of amplifiers to link.
-   bool SetupLinkage (CML::Linkage& TheLinkage, unsigned int NumberAmps, CML::Amp* LinkedAmps[]);
+   bool SetupLinkage (CML::Linkage& TheLinkage, unsigned int NumberAmps,
+                                         CML::Amp* LinkedAmps[], double Limits[] = NULL);
    //  The action handler for the INITIALISE action.
    InitialiseAction I_InitialiseActionObj;
    //  The action handler for the G_INIT action.
@@ -710,12 +711,15 @@ public:
       DEBUG ("Kicked\n");
       
       if (I_LinkagePtr) {
+         /*
          int Ampct = I_LinkagePtr->GetAmpCount();
          DEBUG ("Disabling %d amps\n",Ampct);
          for (int I = 0; I < Ampct; I++) {
             I_LinkagePtr->GetAmp(I).Disable();
          }
-         //I_LinkagePtr->HaltMove();
+         */
+         DEBUG ("Halting move\n");
+         I_LinkagePtr->HaltMove();
       }
       
       return false;
@@ -1057,7 +1061,7 @@ CML::Amp* TdFCanTask::GetAmp (AmpId AxisId) {
 //  MoveAxes(). The Linkage is set up and each amplifier is enabled.
 
 bool TdFCanTask::SetupLinkage (
-   CML::Linkage& TheLinkage, unsigned int NumberAmps, CML::Amp* LinkedAmps[])
+   CML::Linkage& TheLinkage, unsigned int NumberAmps, CML::Amp* LinkedAmps[], double Limits[])
 {
    const CML::Error* Err = NULL;
    
@@ -1087,13 +1091,21 @@ bool TdFCanTask::SetupLinkage (
       //  We set up movement limits for the home. At the moment, these are taken from
       //  Shannon's test code in circle-demo.cpp. Really, we should be getting these from
       //  the configurator(s). It does seem to suggest that the move limits for all amps
-      //  in a linkage need to be the same. (See programming notes.)
+      //  in a linkage need to be the same. (See programming notes.) We have default
+      //  limits set here, but these can be overriden by those supplied in the call.
       
       DEBUG ("Setting move limits\n");
       double VelLimit   = 2000000;    // velocity (encoder counts / second)
       double AccelLimit = 2000000;    // acceleration (cts/sec/sec)
       double DecelLimit = 2000000;    // deceleration (cts/sec/sec)
       double JerkLimit  = 2000000;    // jerk (cts/sec/sec/sec)
+      if (Limits != NULL) {
+         VelLimit = Limits[0];
+         AccelLimit = Limits[1];
+         DecelLimit = Limits[2];
+         JerkLimit = Limits[3];
+      }
+      DEBUG ("Setting move limits %f %f %f %f\n",VelLimit, AccelLimit, DecelLimit, JerkLimit);
       Err = TheLinkage.SetMoveLimits( VelLimit, AccelLimit, DecelLimit, JerkLimit );
       if (Err) {
          I_ErrorString = "Error setting linkage move limits. ";
@@ -1146,7 +1158,29 @@ bool TdFCanTask::MoveAxes (const std::vector<AxisDemand>& AxisDemands,
    
       const CML::Error* Err = NULL;
       CML::Linkage MoveLinkage;
-      if (SetupLinkage(MoveLinkage,NumberAmps,LinkedAmps)) {
+
+      //  We set up movement limits for the home. At the moment, these are taken from
+      //  Shannon's test code in circle-demo.cpp. Really, we should be getting these from
+      //  the configurator(s). It does seem to suggest that the move limits for all amps
+      //  in a linkage need to be the same. (See programming notes.) The units are encoder
+      //  counts and seconds. We take the specified velocity as a scale from 0 to 1, but
+      //  have to use that from the first axis and ignore the others.
+      
+      double Scale = AxisDemands[0].Velocity;
+      DEBUG ("Scale = %f\n",Scale);
+      if (Scale > 1.0) Scale = 1.0;
+      if (Scale < 0.001) Scale = 0.001;
+      DEBUG ("Scale = %f\n",Scale);
+
+      double Limits[4];
+      Limits[0] = 2000000 * Scale;    // velocity (encoder counts / second)
+      Limits[1] = 2000000;    // acceleration (cts/sec/sec)
+      Limits[2] = 2000000;    // deceleration (cts/sec/sec)
+      Limits[3] = 2000000;    // jerk (cts/sec/sec/sec)
+
+      if (SetupLinkage(MoveLinkage,NumberAmps,LinkedAmps,Limits)) {
+
+         DEBUG ("Setting target point\n");
          CML::uunit Targets[MAX_TDF_AMPS];
          CML::Point<MAX_TDF_AMPS> TargetPoint;
          for (unsigned int Index = 0; Index < NumberAmps; Index++) {
@@ -1160,6 +1194,7 @@ bool TdFCanTask::MoveAxes (const std::vector<AxisDemand>& AxisDemands,
          //  needs to be understood - and preferably fixed. Tentatively, it seems that moving
          //  to the latest version of KickNotifier (Mar 23) and using a version of CML that
          //  doesn't use signals at all, produces a version that works.
+         DEBUG ("Establishing kick handler\n");
          LinkageKicker KickHandler(ThisAction);
          KickHandler.SetLinkage(&MoveLinkage);
          
@@ -1178,6 +1213,10 @@ bool TdFCanTask::MoveAxes (const std::vector<AxisDemand>& AxisDemands,
             I_ErrorString += Err->toString();
             OKSoFar = false;
          }
+         for (unsigned int Index = 0; Index < NumberAmps; Index++) {
+            LinkedAmps[Index]->ClearFaults();
+         }
+
       
       }
       UnblockSIGUSR2();
