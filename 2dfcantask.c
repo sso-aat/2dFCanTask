@@ -16,7 +16,7 @@
 
  *-
 
- * "@(#) $Id: ACMM:2dFCanTask/2dfcantask.c,v 1.2 28-Mar-2018 08:58:41+10 ks $"
+ * "@(#) $Id: ACMM:2dFCanTask/2dfcantask.c,v 1.3 29-Mar-2018 12:49:45+10 ks $"
 
  * History:
      02-Mar-2018 - KS - Original version
@@ -29,7 +29,7 @@
 /*
  * RCS id
  */
-static const char *rcsId="@(#) $Id: ACMM:2dFCanTask/2dfcantask.c,v 1.2 28-Mar-2018 08:58:41+10 ks $";
+static const char *rcsId="@(#) $Id: ACMM:2dFCanTask/2dfcantask.c,v 1.3 29-Mar-2018 12:49:45+10 ks $";
 static void *use_rcsId = (0 ? (void *)(&use_rcsId) : (void *) &rcsId);
 /*
  *  Include files

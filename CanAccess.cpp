@@ -40,7 +40,7 @@
 //  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 //  RCS id:
-//     "@(#) $Id: ACMM:2dFCanTask/CanAccess.cpp,v 1.2 28-Mar-2018 08:58:40+10 ks $"
+//     "@(#) $Id: ACMM:2dFCanTask/CanAccess.cpp,v 1.3 29-Mar-2018 12:49:45+10 ks $"
 
 #include "CanAccess.h"
 
@@ -90,6 +90,7 @@ CanAccess::CanAccess(void) {
    I_NetworkConfigurator = NULL;
    I_ExceptionList.clear();
    I_SimulateByDefault = true;
+   I_Linkage = NULL;
 }
 
 //  ------------------------------------------------------------------------------------------------
@@ -136,6 +137,11 @@ void CanAccess::Release (void) {
       if (Iter->IOModulePtr) delete Iter->IOModulePtr;
    }
    I_ModuleDetailsList.clear();
+   
+   //  The Linkage
+   
+   if (I_Linkage) delete I_Linkage;
+   I_Linkage = NULL;
 }
 
 //  ------------------------------------------------------------------------------------------------
@@ -558,6 +564,80 @@ CML::IOModule* CanAccess::GetModule(const std::string& IOItemName) {
    }
    return TheIOModule;
 }
+
+//  ------------------------------------------------------------------------------------------------
+
+//                     C a n  A c c e s s  : :  G e t  L i n k a g e
+//
+//  Returns a CML Linkage object that links all the named amplifiers. Once an amplifier has
+//  been added to a Linkage, it cannot be removed, nor can it be added to another Linkage.
+//  If you don't want to move an amplifier that's linked other amps that you do want to move,
+//  you have to set its target position to its current position. If this routine succeeds, it
+//  returns a pointer to the linkage. If it fails, it returns NULL.
+//
+//  (It may be possible to explicitly disable an amplifier in a Linkage - I'm not sure if that
+//  works.)
+
+CML::Linkage* CanAccess::GetLinkage (int NumberAmps, const std::string AmpNameList[]) {
+   
+   CML::Linkage* LinkagePtr = NULL;
+   
+   bool Valid = true;
+   CML::Amp* LinkedAmps[CML_MAX_AMPS_PER_LINK];
+   if (NumberAmps > CML_MAX_AMPS_PER_LINK) {
+      I_ErrorString = "Too many amplifiers specified for Linkage.";
+   } else {
+      for (int I = 0; I < NumberAmps; I++) {
+         LinkedAmps[I] = GetAmp(AmpNameList[I]);
+         if (LinkedAmps[I] == NULL) {
+            I_ErrorString = "Amp " + AmpNameList[I] + " does not exist.";
+            Valid = false;
+            break;
+         }
+      }
+   }
+   
+   if (Valid) {
+
+      //  For the moment, we just keep one linkage internally and use that. We assume
+      //  - a bad assumption! - that all requests will be for the same set of amps (this is
+      //  true in the initial stages of gantry testing, but won't be later), so if the
+      //  linkage exists, it's the one we want. (I should at least check the set of names.)
+   
+      if (I_Linkage != NULL) {
+         LinkagePtr = I_Linkage;
+      } else {
+   
+         //  Here we create the new linkage - this will be done the first time this is called,
+         //  but not after that.
+         
+         I_Linkage = new CML::Linkage;
+         DEBUG ("Initialising linkage\n");
+         const Error* Err = I_Linkage->Init(NumberAmps,LinkedAmps);
+         if (Err) {
+            I_ErrorString = "Error initialising linkage. ";
+            I_ErrorString += Err->toString();
+         } else {
+            DEBUG ("Configuring linkage\n");
+            CML::LinkSettings LinkConfig;
+            LinkConfig.haltOnPosWarn = true;  // halt all amps if position following error detected
+            LinkConfig.haltOnVelWin = false;  // halt all amps if velocity following error detected
+            Err = I_Linkage->Configure (LinkConfig);
+            if (Err) {
+               I_ErrorString = "Error configuring linkage. ";
+               I_ErrorString += Err->toString();
+            }
+         }
+         if (Err) {
+            delete I_Linkage;
+         } else {
+            LinkagePtr = I_Linkage;
+         }
+      }
+   }
+   return LinkagePtr;
+}
+
 
 //  ------------------------------------------------------------------------------------------------
 

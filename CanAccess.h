@@ -51,7 +51,7 @@
 //  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 //  RCS id:
-//     "@(#) $Id: ACMM:2dFCanTask/CanAccess.h,v 1.2 28-Mar-2018 08:58:39+10 ks $"
+//     "@(#) $Id: ACMM:2dFCanTask/CanAccess.h,v 1.3 29-Mar-2018 12:49:45+10 ks $"
 
 #include "CANNetworkConfigurator.h"
 #include "CML.h"
@@ -118,6 +118,8 @@ public:
    ~CanAccess();
    //  Initialise, given a file consting a description of the CANBus and simulation details.
    bool Initialise(const std::string& FileName);
+   //  Get a CML::Linkage object that links all the named amplifiers.
+   CML::Linkage* GetLinkage (int NumberAmps, const std::string AmpNameList[]);
    //  Get a CML::Amp object that can be used to access a named amplifier.
    CML::Amp* GetAmp(const std::string& AmpName);
    //  Get a CML::IOModule object that can be used to access a named I/O item.
@@ -141,6 +143,8 @@ private:
    std::map<std::string,CML::Amp*> I_AmpMap;
    //  A list of structures holding details of all the CML::IOModules in use.
    std::list<CanAccessModuleDetails> I_ModuleDetailsList;
+   //  The single CML::Linkage supported at the moment.
+   CML::Linkage* I_Linkage;
    //  True if CANBus items are simulated by default.
    bool I_SimulateByDefault;
    //  A list of CANBus named items that are exceptions to the default simulation.

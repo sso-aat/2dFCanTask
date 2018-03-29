@@ -33,7 +33,7 @@
 //  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 //  RCS id:
-//     "@(#) $Id: ACMM:2dFCanTask/2dFCanTask.cpp,v 1.2 28-Mar-2018 08:58:41+10 ks $"
+//     "@(#) $Id: ACMM:2dFCanTask/2dFCanTask.cpp,v 1.3 29-Mar-2018 12:49:45+10 ks $"
 
 //  ------------------------------------------------------------------------------------------------
 
@@ -82,7 +82,8 @@
 
 //  The maximum number of amplifiers we handle - two X amplifiers, one each for Y,Z,Theta,Jaw.
 
-#define MAX_TDF_AMPS 6
+//#define MAX_TDF_AMPS 6
+#define MAX_TDF_AMPS 4
 
 //  A convenient enum that we can use for the different amps. These can be used as indexes into
 //  arrays.
@@ -94,7 +95,8 @@ enum AmpId {X1_AMP = 0, X2_AMP, Y_AMP, Z_AMP, THETA_AMP, JAW_AMP};
 
 static const std::string G_AmpNames[MAX_TDF_AMPS] = {
    "2dFsimGantryX1","2dFsimGantryX2","2dFsimGantryY",
-   "2dFsimGantryZ","2dFsimGantryTheta","2dFsimGantryJaw"
+   //"2dFsimGantryZ","2dFsimGantryTheta","2dFsimGantryJaw"
+   "2dFsimGantryZ"
 };
 
 //  The configuration file that defines the set of CANBuses and simulation settings to be used.
@@ -628,13 +630,17 @@ const CML::Error* WaitLinkedHome (
       DEBUG ("Wait event returns\n");
       if (err != &CML::ThreadError::Timeout) break;
       DEBUG ("That was a timeout\n");
+      int HomedCount = 0;
       for (int i = 0; i < ampct; i++) {
-         if (!Homed[i]) {
+         if (Homed[i]) {
+            HomedCount++;
+         } else {
             CML::EVENT_STATUS status;
             TheLinkage->GetAmp(i).GetEventStatus(status);
             if (!(status & CML::ESTAT_MOVING)) {
                printf ("Amp %d has finished its move\n",i);
                Homed[i] = true;
+               HomedCount++;
             } else {
                CML::uunit value;
                TheLinkage->GetAmp(i).GetPositionActual(value);
@@ -658,6 +664,10 @@ const CML::Error* WaitLinkedHome (
                AmpPositions[i] = value;
             }
          }
+      }
+      if (HomedCount == ampct) {
+         printf ("All amps homed\n");
+         break;
       }
       if (Halt) break;
       timeWaited += pollTimeout;
@@ -826,29 +836,21 @@ bool TdFCanTask::SetupAmps(void) {
          }
       }
       
-      //  Access the CML::Amp objects used to control the specified axes. OK, this might be
-      //  neater if driven from a list of names and variable addresses. But this is clear.
+      DEBUG ("Setting amp addrs\n");
       
+      //  Access the CML::Amp objects used to control the specified axes.
+
+      static CML::Amp** AmpAddrs[MAX_TDF_AMPS] =
+                        //{ &I_X1Amp, &I_X2Amp, &I_YAmp, &I_ZAmp, &I_ThetaAmp, &I_JawAmp };
+                        { &I_X1Amp, &I_X2Amp, &I_YAmp, &I_ZAmp };
+
       if (I_CanAccessInitialised) {
-         I_X1Amp = I_CanAccess.GetAmp(G_AmpNames[X1_AMP]);
-         if (I_X1Amp) {
-            I_X2Amp = I_CanAccess.GetAmp(G_AmpNames[X2_AMP]);
-            if (I_X2Amp) {
-               I_YAmp = I_CanAccess.GetAmp(G_AmpNames[Y_AMP]);
-               if (I_YAmp) {
-                  I_ZAmp = I_CanAccess.GetAmp(G_AmpNames[Z_AMP]);
-                  if (I_ZAmp) {
-                     I_ThetaAmp = I_CanAccess.GetAmp(G_AmpNames[THETA_AMP]);
-                     if (I_ThetaAmp) {
-                        I_JawAmp = I_CanAccess.GetAmp(G_AmpNames[JAW_AMP]);
-                        if (I_JawAmp) {
-                           AllFound = true;
-                        }
-                     }
-                  }
-               }
-            }
+         int FoundCount = 0;
+         for (int Index = 0; Index < MAX_TDF_AMPS; Index++) {
+            *(AmpAddrs[Index]) = I_CanAccess.GetAmp(G_AmpNames[Index]);
+            if (*(AmpAddrs[Index])) FoundCount++;
          }
+         if (FoundCount == MAX_TDF_AMPS) AllFound = true;
          if (!AllFound) {
             I_ErrorString = "Error setting up amplifiers: " + I_CanAccess.GetError();
          }
@@ -863,135 +865,110 @@ bool TdFCanTask::SetupAmps(void) {
 //                    T d F  C a n  T a s k  : :  H o m e  A x e s
 //
 //  Home the specified axes. This uses a CML Linkage, so all the axes in question need to be
-//  all using the same CANBus.
+//  using the same CANBus.
 
 bool TdFCanTask::HomeAxes (bool HomeX, bool HomeY, bool HomeZ, bool HomeTheta, bool HomeJaw) {
+   
+   bool ReturnOK = false;
+   
+   //  Get the Linkage we can use.  Note that this will contain all the amplifiers for
+   //  all the amplifiers for the gantry, in the order specified by G_AmpNames and the
+   //  AmpId enum.
+   
+   CML::Linkage* HomeLinkage = I_CanAccess.GetLinkage(MAX_TDF_AMPS,G_AmpNames);
+   if (HomeLinkage) {
+   
+      const CML::Error* Err = NULL;
 
-   const CML::Error* Err = NULL;
-   
-   //  Set up an array of pointers to the amps, containing just those that are going to be
-   //  homed. We also set up a set of homing configurations, one for each amp.
-   
-   CML::Amp* LinkedAmps[MAX_TDF_AMPS];
-   CML::HomeConfig HomeConfigs[MAX_TDF_AMPS];
-   int Index = 0;
-   if (HomeX) {
-      SetupHomeConfig(HomeConfigs,Index,X1_AMP);
-      LinkedAmps[Index++] = I_X1Amp;
-      SetupHomeConfig(HomeConfigs,Index,X2_AMP);
-      LinkedAmps[Index++] = I_X2Amp;
-   }
-   if (HomeY) {
-      SetupHomeConfig(HomeConfigs,Index,Y_AMP);
-      LinkedAmps[Index++] = I_YAmp;
-   }
-   if (HomeZ) {
-      SetupHomeConfig(HomeConfigs,Index,Z_AMP);
-      LinkedAmps[Index++] = I_ZAmp;
-   }
-   if (HomeTheta) {
-      SetupHomeConfig(HomeConfigs,Index,THETA_AMP);
-      LinkedAmps[Index++] = I_ThetaAmp;
-   }
-   if (HomeJaw) {
-      SetupHomeConfig(HomeConfigs,Index,JAW_AMP);
-      LinkedAmps[Index++] = I_JawAmp;
-   }
-   int NumberAmps = Index;
-   
-   //  Create the linkage to be used. Note that once the linkage is set up, HomeLinkage[n]
-   //  refers to one of the amplifiers in the linkage.
-   
-   {
-      DEBUG ("Creating linkage\n");
-
-      CML::Linkage HomeLinkage;
-      Err = HomeLinkage.Init(NumberAmps,LinkedAmps);
+      CML::HomeConfig HomeConfigs[MAX_TDF_AMPS];
+      for (int Index = 0; Index < MAX_TDF_AMPS; Index++) {
+         SetupHomeConfig(HomeConfigs,Index,AmpId(Index));
+      }
+      
+      //  Set flags to show which amps will be homed.
+      
+      bool HomeFlags[MAX_TDF_AMPS];
+      for (int Index = 0; Index < MAX_TDF_AMPS; Index++) { HomeFlags[Index] = false; }
+      if (HomeX) { HomeFlags[X1_AMP] = true; HomeFlags[X2_AMP] = true; }
+      if (HomeY) HomeFlags[Y_AMP] = true;
+      if (Z_AMP < MAX_TDF_AMPS && HomeZ) HomeFlags[Z_AMP] = true;
+      //if (THETA_AMP < MAX_TDF_AMPS && HomeTheta) HomeFlags[THETA_AMP] = true;
+      //if (JAW_AMP < MAX_TDF_AMPS && HomeJaw) HomeFlags[JAW_AMP] = true;
+      
+      //  Set all the amps in the linkage to a pre-programmed halt mode, specifying that a
+      //  halted axis will be 'floppy'.
+      
+      for (int Index = 0; Index < MAX_TDF_AMPS; Index++) {
+         Err = (*HomeLinkage)[Index].SetHaltMode (CML::HALT_DISABLE);
+         if (Err) DEBUG ("Setting halt mode %s\n",Err->toString());
+      }
+      
+      //  We set up movement limits for the home. At the moment, these are taken from
+      //  Shannon's test code in circle-demo.cpp. Really, we should be getting these from
+      //  the configurator(s). It does seem to suggest that the move limits for all amps
+      //  in a linkage need to be the same. (See programming notes.)
+      
+      double VelLimit   = 2000000;    // velocity (encoder counts / second)
+      double AccelLimit = 2000000;    // acceleration (cts/sec/sec)
+      double DecelLimit = 2000000;    // deceleration (cts/sec/sec)
+      double JerkLimit  = 2000000;    // jerk (cts/sec/sec/sec)
+      Err = HomeLinkage->SetMoveLimits( VelLimit, AccelLimit, DecelLimit, JerkLimit );
       if (Err) {
-         I_ErrorString = "Error initialising home linkage. ";
+         I_ErrorString = "Error setting linkage move limits. ";
          I_ErrorString += Err->toString();
       } else {
          
-         CML::LinkSettings LinkConfig;
-         LinkConfig.haltOnPosWarn = true;  // halt all amps if position following error detected
-         LinkConfig.haltOnVelWin = false;  // halt all amps if velocity following error detected
-         Err = HomeLinkage.Configure (LinkConfig);
-         if (Err) DEBUG ("Configuring %s\n",Err->toString());
-         
-         //  Set all the amps in the linkage to a pre-programmed halt mode, specifying that a
-         //  halted axis will be 'floppy'.
-         
-         for (Index = 0; Index < NumberAmps; Index++) {
-            Err = HomeLinkage[Index].SetHaltMode (CML::HALT_DISABLE);
-            if (Err) DEBUG ("Setting halt mode %s\n",Err->toString());
-         }
-         
-         //  We set up movement limits for the home. At the moment, these are taken from
-         //  Shannon's test code in circle-demo.cpp. Really, we should be getting these from
-         //  the configurator(s). It does seem to suggest that the move limits for all amps
-         //  in a linkage need to be the same. (See programming notes.)
-         
-         double VelLimit   = 2000000;    // velocity (encoder counts / second)
-         double AccelLimit = 2000000;    // acceleration (cts/sec/sec)
-         double DecelLimit = 2000000;    // deceleration (cts/sec/sec)
-         double JerkLimit  = 2000000;    // jerk (cts/sec/sec/sec)
-         Err = HomeLinkage.SetMoveLimits( VelLimit, AccelLimit, DecelLimit, JerkLimit );
-         if (Err) {
-            I_ErrorString = "Error setting linkage move limits. ";
-            I_ErrorString += Err->toString();
-         } else {
-         
-            //  Enable each axis.
+         //  Enable each axis.
             
-            for (Index = 0; Index < NumberAmps; Index++) {
-               Err = HomeLinkage[Index].Enable();
+         for (int Index = 0; Index < MAX_TDF_AMPS; Index++) {
+            if (HomeFlags[Index]) {
+               Err = (*HomeLinkage)[Index].Enable();
                if (Err) DEBUG ("Enabling %s\n",Err->toString());
-           }
+            }
+         }
             
-            //  Now we set the homing configuration for each axis and set it homing.
+         //  Now we set the homing configuration for each axis and set it homing.
             
-            for (Index = 0; Index < NumberAmps; Index++) {
+         for (int Index = 0; Index < MAX_TDF_AMPS; Index++) {
+            if (HomeFlags[Index]) {
                DEBUG ("Homing amp %d\n",Index);
-               Err = HomeLinkage[Index].GoHome(HomeConfigs[Index]);
+               Err = (*HomeLinkage)[Index].GoHome(HomeConfigs[Index]);
                if (Err) {
                   I_ErrorString = "Error starting homing. ";
                   I_ErrorString += Err->toString();
                   //  We ought to stop all the homing at this point.
                }
             }
+         }
             
-            //  And now we wait for the homing to complete.
+         //  And now we wait for the homing to complete.
+         
+         DEBUG ("Waiting for completion\n");
             
+         Err = WaitLinkedHome (HomeLinkage,20000);
+         //Err = HomeLinkage->WaitMoveDone (20000);
+         if (Err) {
+            I_ErrorString = "Homing of axes completed with error. ";
+            I_ErrorString += Err->toString();
+         }
+          
+         DEBUG ("Move complete\n");
             
-            DEBUG ("Waiting for completion\n");
+         //  Disable the amplifiers.
             
-            Err = WaitLinkedHome (&HomeLinkage,20000);
-            //Err = HomeLinkage.WaitMoveDone (20000);
+         for (int Index = 0; Index < MAX_TDF_AMPS; Index++) {
+            Err = (*HomeLinkage)[Index].Disable();
             if (Err) {
-               I_ErrorString = "Homing of axes completed with error. ";
+               I_ErrorString = "Error disabling amplifier. ";
                I_ErrorString += Err->toString();
             }
-          
-            //std::this_thread::sleep_for(3s);
-            DEBUG ("Move complete\n");
-            
-            //  Disable the amplifiers.
-            
-            for (Index = 0; Index < NumberAmps; Index++) {
-               Err = HomeLinkage[Index].Disable();
-               if (Err) {
-                  I_ErrorString = "Error disabling amplifier. ";
-                  I_ErrorString += Err->toString();
-               }
-            }
-            DEBUG ("All complete\n");
          }
-         
+         DEBUG ("All complete\n");
       }
-      DEBUG ("Closing Linkage block\n");
+      if (Err == NULL) ReturnOK = true;
    }
    DEBUG ("HomeAxes returns\n");
-   return (Err = NULL);
+   return ReturnOK;
 }
 
 
@@ -1041,8 +1018,9 @@ CML::Amp* TdFCanTask::GetAmp (AmpId AxisId) {
    //  that used for the definition of the AmpId enum.
    
    static CML::Amp** AmpPtrs[MAX_TDF_AMPS] =
-                              {&I_X1Amp, &I_X2Amp, &I_YAmp, &I_ZAmp, &I_ThetaAmp, &I_JawAmp};
-   
+                              //{&I_X1Amp, &I_X2Amp, &I_YAmp, &I_ZAmp, &I_ThetaAmp, &I_JawAmp};
+                              {&I_X1Amp, &I_X2Amp, &I_YAmp, &I_ZAmp};
+
    CML::Amp* AmpPtr = NULL;
    if (SetupAmps()) {
       if (AxisId >= 0 && AxisId < MAX_TDF_AMPS) {
@@ -1138,7 +1116,135 @@ bool TdFCanTask::SetupLinkage (
 
 bool TdFCanTask::MoveAxes (const std::vector<AxisDemand>& AxisDemands,
                                           drama::thread::TAction* ThisAction) {
+
+   bool ReturnOK = false;
    
+   //  Get the Linkage we can use.  Note that this will contain all the amplifiers for
+   //  all the amplifiers for the gantry, in the order specified by G_AmpNames and the
+   //  AmpId enum.
+   
+   CML::Linkage* MoveLinkage = I_CanAccess.GetLinkage(MAX_TDF_AMPS,G_AmpNames);
+   if (MoveLinkage) {
+   
+      const CML::Error* Err = NULL;
+      
+      //  We need to set the target point for each amplifier in the Linkage, given that
+      //  this covers all the amplifiers in the gantry. Ones specified in the AxisDemands
+      //  will have the new demanded position as their target, ones that are not to move
+      //  will simply use their current position. Also note in MoveFlags[] which amps are
+      //  specified in AxisDemands.
+
+      CML::Point<MAX_TDF_AMPS> TargetPoint; // Used to pass positions to the Linkage
+      CML::uunit Targets[MAX_TDF_AMPS];     // Used to pass positions to WaitLinkedHome(), if used.
+      bool MoveFlags[MAX_TDF_AMPS];
+
+      int NumberDemands = AxisDemands.size();
+      for (int Index = 0; Index < MAX_TDF_AMPS; Index++) {
+         CML::uunit TargetPosition = 0.0;
+         AmpId Id = AmpId(Index);
+         bool Found = false;
+         for (int DemandIndex = 0; DemandIndex < NumberDemands; DemandIndex++) {
+            if (AxisDemands[DemandIndex].AxisId == Id) {
+               TargetPosition = AxisDemands[DemandIndex].Position;
+               Found = true;
+               break;
+            }
+         }
+         if (!Found) {
+            (*MoveLinkage)[Index].GetPositionActual(TargetPosition);
+         }
+         Targets[Index] = TargetPosition;
+         TargetPoint[Index] = TargetPosition;
+         DEBUG ("Target for axis %d is %f\n",Index,TargetPosition);
+
+         MoveFlags[Index] = Found;
+      }
+      TargetPoint.setDim(MAX_TDF_AMPS);
+
+      //  We set up movement limits for the move. At the moment, these are taken from
+      //  Shannon's test code in circle-demo.cpp. Really, we should be getting these from
+      //  the configurator(s). It does seem to suggest that the move limits for all amps
+      //  in a linkage need to be the same. (See programming notes.) The units are encoder
+      //  counts and seconds. We take the specified velocity as a scale from 0 to 1, but
+      //  have to use that from the first axis and ignore the others.
+      
+      double Scale = AxisDemands[0].Velocity;
+      if (Scale > 1.0) Scale = 1.0;
+      if (Scale < 0.001) Scale = 0.001;
+
+      double VelLimit = 2000000 * Scale;    // velocity (encoder counts / second)
+      double AccelLimit = 2000000;          // acceleration (cts/sec/sec)
+      double DecelLimit = 2000000;          // deceleration (cts/sec/sec)
+      double JerkLimit = 2000000;           // jerk (cts/sec/sec/sec)
+
+      DEBUG ("Setting move limits %f %f %f %f\n",VelLimit, AccelLimit, DecelLimit, JerkLimit);
+      Err = MoveLinkage->SetMoveLimits( VelLimit, AccelLimit, DecelLimit, JerkLimit );
+      if (Err) {
+         I_ErrorString = "Error setting linkage move limits. ";
+         I_ErrorString += Err->toString();
+      }
+      
+      if (Err == NULL) {
+      
+         //  Enable each axis.
+      
+         DEBUG ("Enabling axes\n");
+         for (int Index = 0; Index < MAX_TDF_AMPS; Index++) {
+            Err = (*MoveLinkage)[Index].ClearFaults();
+            if (Err) DEBUG ("Clearing fault %s\n",Err->toString());
+            //  I thought you might be able to disable axes that weren't to move, but
+            //  if you do that MoveTo() fails with an 'axis not enabled' error. We have
+            //  to rely on moving to the current position being OK.
+            DEBUG ("Enabling axis %d\n",Index);
+            Err = (*MoveLinkage)[Index].Enable();
+            if (Err) DEBUG ("Enabling %s\n",Err->toString());
+         }
+      }
+         
+      if (Err == NULL) {
+   
+         //  I've commented out the KickHandler, because it seems it interferes with the CML
+         //  use of semaphores, even with that UnblockSIGUSR2() call in there. This still
+         //  needs to be understood - and preferably fixed. Tentatively, it seems that moving
+         //  to the latest version of KickNotifier (Mar 23) and using a version of CML that
+         //  doesn't use signals at all, produces a version that works.
+         
+         //DEBUG ("Establishing kick handler\n");
+         //LinkageKicker KickHandler(ThisAction);
+         //KickHandler.SetLinkage(&MoveLinkage);
+   
+         Err = MoveLinkage->MoveTo(TargetPoint);
+         if (Err) DEBUG ("Moving to target %s\n",Err->toString());
+      }
+      
+      if (Err == NULL) {
+         DEBUG ("Waiting\n");
+
+         //  Now that I no longer restore the SIGUSR2 blocking at the end of each thread, both
+         //  WaitMoveDone() and WaitLinkedHome() seem to work as a way of waiting. Previously
+         //  only WaitLinkedHome would work after the first move. I still don't know just why,
+         //  but it's clearly connected with the use of SIGUSR2. I have both calls here to
+         //  switch beteen them for testing.
+         
+         Err = MoveLinkage->WaitMoveDone(20000);
+         //Err = WaitLinkedHome (MoveLinkage,20000,Targets);
+         if (Err) {
+            MoveLinkage->HaltMove();
+            I_ErrorString = "Error moving to target position. ";
+            I_ErrorString += Err->toString();
+         }
+         for (int Index = 0; Index < MAX_TDF_AMPS; Index++) {
+            (*MoveLinkage)[Index].ClearFaults();
+         }
+      }
+      if (Err == NULL) ReturnOK = true;
+   }
+   return ReturnOK;
+}
+
+
+
+/*
    //  Set up an array of pointers to the amps, containing just those that are going to be
    //  moved, suitable for use with a CML Linkage.
    
@@ -1227,6 +1333,7 @@ bool TdFCanTask::MoveAxes (const std::vector<AxisDemand>& AxisDemands,
    
    return OKSoFar;
 }
+*/
 
 //  ------------------------------------------------------------------------------------------------
 
@@ -1248,8 +1355,10 @@ drama::Request InitialiseAction::MessageReceived() {
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
    if (!(ThisTask->SetupAmps())) {
+      DEBUG ("SetupAmps fails\n");
       MessageUser("INITIALISE: " + ThisTask->GetError());
    } else {
+      DEBUG ("Setup amps OK\n");
       MessageUser("INITIALISE: Task initialised from configuration file " + CONFIGURATION_FILE);
    }
    // We never re-enable the blocking of SIGUSR2 - it causes too many problems.
