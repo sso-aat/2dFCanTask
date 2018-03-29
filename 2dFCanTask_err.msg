@@ -9,7 +9,7 @@
 !     02-Mar-2018 - KS - Original version
 !    
 !
-! "@(#) $Id: ACMM:2dFCanTask/2dfcantask_err.msg,v 1.3 29-Mar-2018 12:49:45+10 ks $"
+! "@(#) $Id: ACMM:2dFCanTask/2dFCanTask_err.msg,v 1.4 29-Mar-2018 20:38:38+10 ks $"
 !
 .TITLE   2DFCANTASK_ERR  template DRAMA Task 
 .FACILITY TDFCANTASK,1092/PREFIX=TDFCANTASK__

@@ -40,7 +40,7 @@
 //  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 //  RCS id:
-//     "@(#) $Id: ACMM:2dFCanTask/CanAccess.cpp,v 1.3 29-Mar-2018 12:49:45+10 ks $"
+//     "@(#) $Id: ACMM:2dFCanTask/CanAccess.cpp,v 1.4 29-Mar-2018 20:38:37+10 ks $"
 
 #include "CanAccess.h"
 
@@ -72,8 +72,9 @@ using CML::Error;
 
 #ifdef USE_CAN_ANAGATE
 #include <can_anagate.h>
+using CML::AnaGateCAN;
 #else
-#define AnaGateCan SimCanInterface
+#define AnaGateCAN SimCanInterface
 #endif
 
 #undef DEBUG
@@ -140,8 +141,10 @@ void CanAccess::Release (void) {
    
    //  The Linkage
    
+   /*
    if (I_Linkage) delete I_Linkage;
    I_Linkage = NULL;
+   */
 }
 
 //  ------------------------------------------------------------------------------------------------
@@ -188,7 +191,7 @@ bool CanAccess::Initialise(const std::string& FileName) {
 
       for (list<CanAccessBusDetails>::iterator Iter = CANBusDetailsList.begin();
                                                        Iter != CANBusDetailsList.end(); Iter++) {
-         AnaGateCan* AnagateInterface = NULL;
+         AnaGateCAN* AnagateInterface = NULL;
          CanOpen* CanOpenInterface = NULL;
          SimCanInterface* SimInterface = NULL;
          CanOpen* SimCanOpenInterface = NULL;
@@ -200,7 +203,7 @@ bool CanAccess::Initialise(const std::string& FileName) {
          //  SimCanInterface it uses is its low-level interface to the actual hardware.
          
          if (Iter->IPAddress != "") {
-            AnagateInterface = new AnaGateCan(Iter->IPAddress.c_str());
+            AnagateInterface = new AnaGateCAN(Iter->IPAddress.c_str());
             CanOpenInterface = new CanOpen;
             const Error *Err = CanOpenInterface->Open(*AnagateInterface);
             if (Err) {

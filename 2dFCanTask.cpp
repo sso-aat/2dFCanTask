@@ -33,7 +33,7 @@
 //  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 //  RCS id:
-//     "@(#) $Id: ACMM:2dFCanTask/2dFCanTask.cpp,v 1.3 29-Mar-2018 12:49:45+10 ks $"
+//     "@(#) $Id: ACMM:2dFCanTask/2dFCanTask.cpp,v 1.4 29-Mar-2018 20:38:38+10 ks $"
 
 //  ------------------------------------------------------------------------------------------------
 
@@ -83,7 +83,7 @@
 //  The maximum number of amplifiers we handle - two X amplifiers, one each for Y,Z,Theta,Jaw.
 
 //#define MAX_TDF_AMPS 6
-#define MAX_TDF_AMPS 4
+#define MAX_TDF_AMPS 3
 
 //  A convenient enum that we can use for the different amps. These can be used as indexes into
 //  arrays.
@@ -94,9 +94,9 @@ enum AmpId {X1_AMP = 0, X2_AMP, Y_AMP, Z_AMP, THETA_AMP, JAW_AMP};
 //  of the above enum.
 
 static const std::string G_AmpNames[MAX_TDF_AMPS] = {
-   "2dFsimGantryX1","2dFsimGantryX2","2dFsimGantryY",
+   "2dFsimGantryX1","2dFsimGantryX2","2dFsimGantryY"
+   //"2dFsimGantryX1","2dFsimGantryX2","2dFsimGantryY",
    //"2dFsimGantryZ","2dFsimGantryTheta","2dFsimGantryJaw"
-   "2dFsimGantryZ"
 };
 
 //  The configuration file that defines the set of CANBuses and simulation settings to be used.
@@ -561,7 +561,7 @@ static bool WhichAxes (const std::string& Axes, bool& X, bool& Y, bool& Z, bool&
    
    if (Valid) {
    
-      //  This is the only bit of the code where the order of the axes in AxisNames[] matters.
+      //  This is one bit of the code where the order of the axes in AxisNames[] matters.
       
       X = AxesEnabled[0];
       Y = AxesEnabled[1];
@@ -705,7 +705,7 @@ const CML::Error* WaitLinkedHome (
 //  A LinkageKicker is an experimental class that inherits from DRAMA's KickNotifier. The idea
 //  is that this can be installed as a kick handler for any action that is moving axes using a
 //  CML Linkage. When kicked, it needs to cancel the current movement. At the moment, this isn't
-//  working - I suspect an interaction with KickNotifier and CML's use of SIGUSR2 signals, but\
+//  working - I suspect an interaction with KickNotifier and CML's use of SIGUSR2 signals, but
 //  haven't confirmed that yet. (22/3/18).
 
 class LinkageKicker : public drama::thread::KickNotifier {
@@ -809,7 +809,8 @@ bool TdFCanTask::SetupAmps(void) {
 
    //  See if all the amps have already been setup successfully.
    
-   bool AllFound = I_X1Amp && I_X2Amp && I_YAmp && I_ZAmp && I_ThetaAmp && I_JawAmp;
+   //bool AllFound = I_X1Amp && I_X2Amp && I_YAmp && I_ZAmp && I_ThetaAmp && I_JawAmp;
+   bool AllFound = I_X1Amp && I_X2Amp && I_YAmp;
 
    if (!AllFound) {
    
@@ -842,7 +843,7 @@ bool TdFCanTask::SetupAmps(void) {
 
       static CML::Amp** AmpAddrs[MAX_TDF_AMPS] =
                         //{ &I_X1Amp, &I_X2Amp, &I_YAmp, &I_ZAmp, &I_ThetaAmp, &I_JawAmp };
-                        { &I_X1Amp, &I_X2Amp, &I_YAmp, &I_ZAmp };
+                        { &I_X1Amp, &I_X2Amp, &I_YAmp };
 
       if (I_CanAccessInitialised) {
          int FoundCount = 0;
@@ -891,7 +892,7 @@ bool TdFCanTask::HomeAxes (bool HomeX, bool HomeY, bool HomeZ, bool HomeTheta, b
       for (int Index = 0; Index < MAX_TDF_AMPS; Index++) { HomeFlags[Index] = false; }
       if (HomeX) { HomeFlags[X1_AMP] = true; HomeFlags[X2_AMP] = true; }
       if (HomeY) HomeFlags[Y_AMP] = true;
-      if (Z_AMP < MAX_TDF_AMPS && HomeZ) HomeFlags[Z_AMP] = true;
+      //if (Z_AMP < MAX_TDF_AMPS && HomeZ) HomeFlags[Z_AMP] = true;
       //if (THETA_AMP < MAX_TDF_AMPS && HomeTheta) HomeFlags[THETA_AMP] = true;
       //if (JAW_AMP < MAX_TDF_AMPS && HomeJaw) HomeFlags[JAW_AMP] = true;
       
@@ -1019,7 +1020,7 @@ CML::Amp* TdFCanTask::GetAmp (AmpId AxisId) {
    
    static CML::Amp** AmpPtrs[MAX_TDF_AMPS] =
                               //{&I_X1Amp, &I_X2Amp, &I_YAmp, &I_ZAmp, &I_ThetaAmp, &I_JawAmp};
-                              {&I_X1Amp, &I_X2Amp, &I_YAmp, &I_ZAmp};
+                              {&I_X1Amp, &I_X2Amp, &I_YAmp};
 
    CML::Amp* AmpPtr = NULL;
    if (SetupAmps()) {

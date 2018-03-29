@@ -21,7 +21,7 @@
 
  *-
 
- * "@(#) $Id: ACMM:2dFCanTask/2dfcantask.h,v 1.3 29-Mar-2018 12:49:45+10 ks $"
+ * "@(#) $Id: ACMM:2dFCanTask/2dfcantask.h,v 1.4 29-Mar-2018 20:38:37+10 ks $"
 
  * History:
      02-Mar-2018 - KS - Original version

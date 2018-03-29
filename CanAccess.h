@@ -33,6 +33,7 @@
 //
 //  History:
 //      9th Mar 2018. Original version. KS.
+//     29th Mar 2018. Added include of string.h to compile under Linux. KS.
 //
 //  Copyright (c) Australian Astronomical Observatory (AAO), (2018).
 //  Permission is hereby granted, free of charge, to any person obtaining a copy of this software
@@ -51,7 +52,7 @@
 //  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 //  RCS id:
-//     "@(#) $Id: ACMM:2dFCanTask/CanAccess.h,v 1.3 29-Mar-2018 12:49:45+10 ks $"
+//     "@(#) $Id: ACMM:2dFCanTask/CanAccess.h,v 1.4 29-Mar-2018 20:38:37+10 ks $"
 
 #include "CANNetworkConfigurator.h"
 #include "CML.h"
@@ -59,6 +60,15 @@
 #include <map>
 #include <string>
 #include <list>
+#include <string.h>
+
+//  Assume for the moment that if we're running on OS X we're running in simulation and don't
+//  have access to the AnaGateCAN code for access to the real hardware. By the same token, if
+//  we're not running on OS X, assume we do have that access.
+
+#ifndef __APPLE__
+#define USE_CAN_ANAGATE
+#endif
 
 //  ------------------------------------------------------------------------------------------------
 
