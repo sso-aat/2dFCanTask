@@ -16,25 +16,54 @@
     Not to be used for commercial purposes without AATB permission.
   
 
- * "@(#) $Id: ACMM:2dFCanTask/dmakefile,v 1.4 29-Mar-2018 20:38:37+10 ks $"
+ * "@(#) $Id: ACMM:2dFCanTask/dmakefile,v 1.5 23-Aug-2021 08:14:08+10 tjf $"
 
  * History:
-     02-Mar-2018 - KS - Original version
+     02-Mar-2018 - KS  - Original version
+     23-Aug-2021 - TJF - Rework for all components being installed correctly.
+                          The rework brought this up to the spec used in HectorRotator
+                          and presumes the libraries were installed - say via the
+                          the AAO_CANopen_System system.
+
 	
 			
  */
  
 #BeginConfig 
-ACMM_RELEASE=1_4$(ACMMBUILDVER)
+ACMM_RELEASE=1_5$(ACMMBUILDVER)
 RELEASE=r$(ACMM_RELEASE)
 SYSTEM=2dFCanTask			/* System name (for release	*/
+
+/* This should in the drama_local.cf file. Note that there are also includes in /usr/local/include.  See CanInterfacesAAO, README.txt for more details */
+/*ANAGATE_LIBS=/usr/local/lib/libCANDLLStaticRelease64.a /usr/local/lib/libAnaGateStaticRelease-1.0.9.a /usr/local/lib/libAPIStaticRelease64.a /usr/local/lib/libAnaGateExtStaticRelease-1.0.3.a*/
+
+/*
+ * Includes and libraries used for can open and simulator
+ */
+
+CAN_INCLUDES = IDir(GENINSSTSIM_DIR) IDir(SIMCANOPEN_DIR) IDir(CANBUSINICONFIG_DIR) IDir(XWING_DIR) \
+   IDir(CANBUSINICONFIG_DIR) IDir(TCSUTIL_DIR) IDir(SIMSERIALLINE_DIR) $(CML_INCLUDE) \
+   IDir(CANINTERFACESAAO_DIR)
+
+
+CAN_LIBRARIES =LinkLibDir(GENINSSTSIM_LIB,GenInstSimulator) LinkLibDir(SIMCANOPEN_LIB,SimCanOpen) \
+    LinkLibDir(CANBUSINICONFIG_LIB,AAOCANBusConfigurator) LinkLibDir(XWING_LIB,XWing) \
+    LinkLibDir(SIMSERIALLINE_LIB,SimSerialLine) LinkLibDir(TCSUTIL_LIB,TcsUtil)  \
+    LinkLibDir(CANINTERFACESAAO_LIB,CanInterfacesAAO) $(ANAGATE_LIBS) $(CML_LIB) \
+    -pthread
+
+
+
+
+/*
 CONFIGURATOR_DIR = ../AAOCANBusIniConfigurator
 CML_DIR = ../CANopen_CML
 SIM_CAN_OPEN_DIR = ../SimCanOpen
 XWING_DIR = ../XWing
 TCS_UTIL_DIR = ../TcsUtil
-INCLUDES =  -I. DramaIncl IDir(DRAMA2_DIR) -I $(CONFIGURATOR_DIR) -I $(CML_DIR)/inc \
-             -I $(SIM_CAN_OPEN_DIR) -I $(XWING_DIR) -I $(TCS_UTIL_DIR)
+*/
+INCLUDES =  -I. DramaIncl IDir(DRAMA2_DIR) $(CAN_INCLUDES)
+
 
 /*
  * Enable Ansi C++ V11/V14 full warnings.  If we have C++14, then we
@@ -46,34 +75,78 @@ USERCCCOPTIONS = AnsiCC14Full()
 USERCCCOPTIONS = AnsiCC11Full()
 #endif
 
+/*
+ * -no-pie is needed to link against the Anagate libraries.  We presume
+ * for the moment that this is on 64 bit machines only since it does not
+ * work on aaolxp 32 bit builds.  On aaolxp we also need -lrd
+ */
+#ifdef LinuxArchitecture
+#if defined(X86_64Architecture)
+LOCAL_LDFLAGS=-no-pie
+#elif defined(X86Architecture)
+LOCAL_LDFLAGS=-lrt
+#endif
+#endif
+
+
 
 
 #EndConfig
-LIBS=LinkLibDir(DRAMA2_LIB,drama2) $(CONFIGURATOR_DIR)/libAAOCANBusConfigurator.a \
-          $(CML_DIR)/c/libcml.a $(SIM_CAN_OPEN_DIR)/libSimCanOpen.a \
-          $(XWING_DIR)/libXWing.a $(TCS_UTIL_DIR)/libTcsUtil.a
+LIBS=LinkLib(2dFCanTask) LinkLibDir(DRAMA2_LIB,drama2) $(CAN_LIBRARIES)
 
 NormalCRules()			/* Include normal c rules	*/
+
+
+/* List of files which make up the library.  GNU Make macros
+ * in the definition of OBJECTS and SRC1 convert these names
+ * to .o and .cpp files respectively.
+ */
+OBJECTS_BASE=CanAccess 2dFCanTask_$(RELEASE)
+
 /*
  *	Objects to be put in the 2DFCANTASK library.
  */
-OBJECTS = Obj(CanAccess) Obj(2dFCanTask) Obj(2dFCanTask_$(RELEASE))
+OBJECTS =  $(addsuffix .o,$(OBJECTS_BASE)) 
 
 /*
- *	Sources for makedepend.
+ *	Sources for makedepend.  
+ *
+ * We need to add 2dFCanTask.cpp to those from OBJECTS_BASE.
  */
-SRC1=  2dFCanTask.cpp CanAccess.cpp
+SRC1=   $(addsuffix .cpp,$(OBJECTS_BASE)) 2dFCanTask.cpp 
 
 /*
  * The target All will build the 2DFCANTASK library and program.
  */
-DummyTarget(All,  NotVms(checktarget) includes Lib(2dFCanTask) Exe(2dFCanTask))
+DummyTarget(All,  NotVms(checktarget) CML_LIB_CHECK includes Lib(2dFCanTask) Exe(2dFCanTask))
 
 DramaCheckTarget()
 
 /*
+ * Warn if we can''t find the CML library in the standard location.
+ *   Normally $DRAMA/drama_local.cfg should set CML_INCLUDE and CML_LIBS correctly.
+ *    If it does that, it will also define HasCML.
+ *   For historical reasons, we allow the build to continue if this is not the case
+ *    presuming the library is available in an adjoining directory.
+ */
+.PHONY : CML_LIB_CHECK
+#ifdef HasCML
+CML_LIB_CHECK :
+#else
+CML_INCLUDE=-I ../CANopen_CML/inc -I ../CANopen_CML/inc/can
+CML_LIB=../CANopen_CML/c/libcml.a
+CML_LIB_CHECK :
+         @echo ""
+        @echo "*** CML library not properly enabled on this machine in $$DRAMA_LOCAL/drama_local.cfg, looking for it  in ../CANopen_CML ***"
+        @echo ""
+#endif
+release :: CML_LIB_CHECK
+
+
+
+/*
  * We use an includes target for include files which need to be built.  This
- * is only realy necessary if makedepnds has not been run.
+ * is only really necessary if makedepnds has not been run.
  */
 DummyTarget(includes, 2dFCanTask_err.h 2dFCanTask_err_msgt.h)
 /*
@@ -81,10 +154,10 @@ DummyTarget(includes, 2dFCanTask_err.h 2dFCanTask_err_msgt.h)
  */
 ErrorIncludeFiles(2dFCanTask_err)
 
-2dFCanTask_$(RELEASE).o : 2dFCanTaskversion.c
-	@ echo Compiling 2dFCanTaskversion to $@
-	$(CC) -c $(CFLAGS) StringDefine(TDFCANTASK_VER,$(RELEASE)) -DTDFCANTASK_DATE=$(DATE_CMD) 2dFCanTaskversion.c
-	mv 2dFCanTaskversion.o $@
+2dFCanTask_$(RELEASE).o : 2dFCanTaskVersion.c
+	@ echo Compiling 2dFCanTaskVersion to $@
+	$(CC) -c $(CFLAGS) StringDefine(TDFCANTASK_VER,$(RELEASE)) -DTDFCANTASK_DATE=$(DATE_CMD) 2dFCanTaskVersion.c
+	mv 2dFCanTaskVersion.o $@
 
 CanAccess.o : CanAccess.cpp CanAccess.h
 
@@ -97,13 +170,13 @@ ObjectLibraryTarget(2dFCanTask, $(OBJECTS),)
 /*
  * The 2DFCANTASK program itself
  */
-DramaCPPProgramTarget(2dFCanTask, Obj(2dFCanTask) Obj(CanAccess), Lib(2dFCanTask), $(LIBS),)
+DramaCPPProgramTarget(2dFCanTask, Obj(2dFCanTask), Lib(2dFCanTask), $(LIBS),)
 
 /*
  * Release targets
  */
 DramaReleaseCheck()
-DramaReleaseCommon(2dFCanTask_err.h 2dFCanTask_err_msgt.h 2dFCanTask.h)
+DramaReleaseCommon(2dFCanTask_err.h 2dFCanTask_err_msgt.h CanAccess.h)
 DramaReleaseTarget(2dFCanTask,Lib(2dFCanTask),,))
 DramaReleaseDramaStart()
 

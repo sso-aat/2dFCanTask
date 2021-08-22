@@ -15,6 +15,7 @@
 //                    experimental non-threaded versions such as G_MOVE_AXIS_NT. INITIALISE
 //                    now initialises the task instead of the 2dF gantry. Experimented
 //                    (unsuccessfully) with cancellation of a move. KS.
+//     23rd Aug 2021  ThisAction argument to MoveAxes() is unused, comment it out.
 //
 //  Copyright (c) Australian Astronomical Observatory (AAO), (2018).
 //  Permission is hereby granted, free of charge, to any person obtaining a copy of this software
@@ -33,7 +34,7 @@
 //  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 //  RCS id:
-//     "@(#) $Id: ACMM:2dFCanTask/2dFCanTask.cpp,v 1.4 29-Mar-2018 20:38:38+10 ks $"
+//     "@(#) $Id: ACMM:2dFCanTask/2dFCanTask.cpp,v 1.5 23-Aug-2021 08:14:08+10 tjf $"
 
 //  ------------------------------------------------------------------------------------------------
 
@@ -1116,7 +1117,7 @@ bool TdFCanTask::SetupLinkage (
 //
 
 bool TdFCanTask::MoveAxes (const std::vector<AxisDemand>& AxisDemands,
-                                          drama::thread::TAction* ThisAction) {
+                                          drama::thread::TAction* /*ThisAction*/) {
 
    bool ReturnOK = false;
    
