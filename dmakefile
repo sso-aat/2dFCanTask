@@ -16,7 +16,7 @@
     Not to be used for commercial purposes without AATB permission.
   
 
- * "@(#) $Id: ACMM:2dFCanTask/dmakefile,v 1.5 23-Aug-2021 08:14:08+10 tjf $"
+ * "@(#) $Id: ACMM:2dFCanTask/dmakefile,v 1.6 23-Aug-2021 10:48:18+10 tjf $"
 
  * History:
      02-Mar-2018 - KS  - Original version
@@ -25,14 +25,16 @@
                           and presumes the libraries were installed - say via the
                           the AAO_CANopen_System system.
 
+     23-Aug-2021 - TJF - System name changed from 2dFCanTask to tdFCanTask since
+                          we can't release with a number as the first charater.
 	
 			
  */
  
 #BeginConfig 
-ACMM_RELEASE=1_5$(ACMMBUILDVER)
+ACMM_RELEASE=1_6$(ACMMBUILDVER)
 RELEASE=r$(ACMM_RELEASE)
-SYSTEM=2dFCanTask			/* System name (for release	*/
+SYSTEM=tdFCanTask			/* System name (for release	*/
 
 /* This should in the drama_local.cf file. Note that there are also includes in /usr/local/include.  See CanInterfacesAAO, README.txt for more details */
 /*ANAGATE_LIBS=/usr/local/lib/libCANDLLStaticRelease64.a /usr/local/lib/libAnaGateStaticRelease-1.0.9.a /usr/local/lib/libAPIStaticRelease64.a /usr/local/lib/libAnaGateExtStaticRelease-1.0.3.a*/

@@ -40,7 +40,7 @@
 //  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 //  RCS id:
-//     "@(#) $Id: ACMM:2dFCanTask/CanAccess.cpp,v 1.5 23-Aug-2021 08:14:08+10 tjf $"
+//     "@(#) $Id: ACMM:2dFCanTask/CanAccess.cpp,v 1.6 23-Aug-2021 10:48:18+10 tjf $"
 
 #include "CanAccess.h"
 
