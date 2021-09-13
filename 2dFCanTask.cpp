@@ -83,21 +83,18 @@
 
 //  The maximum number of amplifiers we handle - two X amplifiers, one each for Y,Z,Theta,Jaw.
 
-//#define MAX_TDF_AMPS 6
 #define MAX_TDF_AMPS 3
 
 //  A convenient enum that we can use for the different amps. These can be used as indexes into
 //  arrays.
 
-enum AmpId {X1_AMP = 0, X2_AMP, Y_AMP, Z_AMP, THETA_AMP, JAW_AMP};
+enum AmpId {X1_AMP = 0, X2_AMP, Y_AMP};
 
 //  The names of the various amps, as used in the .ini file(s). The order has to match that
 //  of the above enum.
 
 static const std::string G_AmpNames[MAX_TDF_AMPS] = {
    "2dFsimGantryX1","2dFsimGantryX2","2dFsimGantryY"
-   //"2dFsimGantryX1","2dFsimGantryX2","2dFsimGantryY",
-   //"2dFsimGantryZ","2dFsimGantryTheta","2dFsimGantryJaw"
 };
 
 //  The configuration file that defines the set of CANBuses and simulation settings to be used.
@@ -456,9 +453,6 @@ std::vector<AxisDemand> GetDemands(
             AxisDemands.push_back(Demand);
          } else {
             if (TcsUtil::MatchCaseBlind(AxisName,"Y")) Demand.AxisId = Y_AMP;
-            else if (TcsUtil::MatchCaseBlind(AxisName,"Z")) Demand.AxisId = Z_AMP;
-            else if (TcsUtil::MatchCaseBlind(AxisName,"THETA")) Demand.AxisId = THETA_AMP;
-            else if (TcsUtil::MatchCaseBlind(AxisName,"JAW")) Demand.AxisId = JAW_AMP;
             else {
                Error = "Invalid axis specification: " + AxesList[Index];
                OKSoFar = false;
@@ -843,7 +837,6 @@ bool TdFCanTask::SetupAmps(void) {
       //  Access the CML::Amp objects used to control the specified axes.
 
       static CML::Amp** AmpAddrs[MAX_TDF_AMPS] =
-                        //{ &I_X1Amp, &I_X2Amp, &I_YAmp, &I_ZAmp, &I_ThetaAmp, &I_JawAmp };
                         { &I_X1Amp, &I_X2Amp, &I_YAmp };
 
       if (I_CanAccessInitialised) {
@@ -893,9 +886,6 @@ bool TdFCanTask::HomeAxes (bool HomeX, bool HomeY, bool HomeZ, bool HomeTheta, b
       for (int Index = 0; Index < MAX_TDF_AMPS; Index++) { HomeFlags[Index] = false; }
       if (HomeX) { HomeFlags[X1_AMP] = true; HomeFlags[X2_AMP] = true; }
       if (HomeY) HomeFlags[Y_AMP] = true;
-      //if (Z_AMP < MAX_TDF_AMPS && HomeZ) HomeFlags[Z_AMP] = true;
-      //if (THETA_AMP < MAX_TDF_AMPS && HomeTheta) HomeFlags[THETA_AMP] = true;
-      //if (JAW_AMP < MAX_TDF_AMPS && HomeJaw) HomeFlags[JAW_AMP] = true;
       
       //  Set all the amps in the linkage to a pre-programmed halt mode, specifying that a
       //  halted axis will be 'floppy'.
@@ -1020,7 +1010,6 @@ CML::Amp* TdFCanTask::GetAmp (AmpId AxisId) {
    //  that used for the definition of the AmpId enum.
    
    static CML::Amp** AmpPtrs[MAX_TDF_AMPS] =
-                              //{&I_X1Amp, &I_X2Amp, &I_YAmp, &I_ZAmp, &I_ThetaAmp, &I_JawAmp};
                               {&I_X1Amp, &I_X2Amp, &I_YAmp};
 
    CML::Amp* AmpPtr = NULL;
