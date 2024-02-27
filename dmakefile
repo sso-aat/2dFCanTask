@@ -138,9 +138,9 @@ CML_LIB_CHECK :
 CML_INCLUDE=-I ../CANopen_CML/inc -I ../CANopen_CML/inc/can
 CML_LIB=../CANopen_CML/c/libcml.a
 CML_LIB_CHECK :
-         @echo ""
-        @echo "*** CML library not properly enabled on this machine in $$DRAMA_LOCAL/drama_local.cfg, looking for it  in ../CANopen_CML ***"
-        @echo ""
+	@echo ""
+	@echo "*** CML library not properly enabled on this machine in $$DRAMA_LOCAL/drama_local.cfg, looking for it  in ../CANopen_CML ***"
+	@echo ""
 #endif
 release :: CML_LIB_CHECK
 
