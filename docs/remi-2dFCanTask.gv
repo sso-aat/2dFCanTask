@@ -1,0 +1,40 @@
+digraph x {
+    fontname="Helvetica"
+    rankdir=TB
+    ranksep=0.25
+    nodesep=0.25
+    label = "2dFCanTask X1, X2, and Y-Axis Test\n2024-02-28 rev B"
+
+    node [shape=box, style=filled, fontname="Helvetica", color=black]
+
+    node [fillcolor="#ff8080"]
+    "Web Browser"
+
+    node [fillcolor="#ffff80"]
+    "remi-2dFCanTask\nPython Program"
+
+    node [fillcolor="#80ff80"]
+    "ditscmd\nC++ Program\nDRAMA Utility"
+    "DRAMA\nMessage Bus"
+
+    node [fillcolor="#80ffff"]
+    "2dFCanTask\nC++ Program\nDRAMA Task"
+    "motion_test\nC Program"
+
+    node [fillcolor="#8080ff"]
+    "AnaGate CAN UNO"
+    "X1 Axis Amplifer"
+    "X2 Axis Amplifer"
+    "Y Axis Amplifer"
+    "AnaGate CAN UNO" -> "X1 Axis Amplifer"
+    "AnaGate CAN UNO" -> "X2 Axis Amplifer"
+    "AnaGate CAN UNO" -> "Y Axis Amplifer"
+
+    edge [fontname="Helvetica", fontcolor="#d0d0d0"]
+    "Web Browser" -> "remi-2dFCanTask\nPython Program"
+    "remi-2dFCanTask\nPython Program" -> "ditscmd\nC++ Program\nDRAMA Utility"
+    "ditscmd\nC++ Program\nDRAMA Utility" -> "DRAMA\nMessage Bus"
+    "DRAMA\nMessage Bus" -> "2dFCanTask\nC++ Program\nDRAMA Task"
+    "2dFCanTask\nC++ Program\nDRAMA Task" -> "AnaGate CAN UNO" [label="drive"];
+    "motion_test\nC Program" -> "AnaGate CAN UNO" [dir=back, label="watch"];
+}
