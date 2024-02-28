@@ -1,0 +1,58 @@
+#!/usr/bin/python3
+# sso aat temporary phone web app for axis move via drama experiment
+# james.cameron@anu.edu.au 2021-10-08
+
+import os
+import subprocess
+import remi.gui as gui
+from remi import start, App
+
+KEYS = [
+    'G_INIT_NT X,Y',
+    'G_MOVE_AXIS_NT X,Y 0,0 1,1',
+    'G_MOVE_AXIS_NT X,Y 10000,10000 1,1',
+    'G_MOVE_AXIS_NT X,Y 20000,20000 1,1',
+    'G_MOVE_AXIS_NT X,Y 40000,40000 1,1',
+    'G_MOVE_AXIS_NT X,Y 80000,80000 1,1',
+    'G_MOVE_AXIS_NT X,Y 80000,0 1,1',
+    'G_MOVE_AXIS_NT X,Y 0,80000 1,1',
+]
+
+
+class MyApp(App):
+    def __init__(self, *args):
+        super(MyApp, self).__init__(*args)
+
+    def main(self):
+        container = gui.VBox()
+
+        self.lbl = gui.Label('2dFCanTask DRAMA 2024-02-28 rev C')
+        container.append(self.lbl)
+
+        buttons = {}
+        for key in KEYS:
+            buttons[key] = gui.Button(key, width=400, height=50, border=10)
+            buttons[key].onclick.do(self.on_button_pressed, key)
+            container.append(buttons[key])
+
+        self.txt = gui.TextInput(single_line=False, height=600)
+        container.append(self.txt)
+
+        return container
+
+    def on_button_pressed(self, widget, text):
+        if text not in KEYS:
+            return
+        print(text)
+        args = [os.path.join(os.getenv("DITS_DEV"), "ditscmd")]
+        args += ['TdFCanTask']
+        args += text.split(' ')
+
+        self.txt.set_value(text)
+        sp = subprocess.run(args, capture_output=True, check=False)
+        print(sp.stderr.decode())
+        print(sp.stdout.decode())
+        self.txt.set_value(sp.stderr.decode() + sp.stdout.decode())
+
+
+start(MyApp, start_browser=False, address='0.0.0.0', port=8081)
