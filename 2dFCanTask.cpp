@@ -60,6 +60,9 @@
 #include <math.h>
 #include <vector>
 
+// the header file to include the sleep function.
+#include <unistd.h>
+
 //  The CAN Anagate interface is an interface to CANBus hardware that uses an Internet interface
 //  and the Anagate library. This is not available on all systems - in general, only a Linux box
 //  set up as an instrument controller will have this - so for systems that don't have that,
@@ -141,7 +144,7 @@ private:
 
 class GHomeAction : public drama::thread::TAction {
 public:
-   GHomeAction(std::weak_ptr<drama::Task> theTask) : TAction(theTask) {}
+   GHomeAction(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask) {}
    ~GHomeAction() {}
 private:
    void ActionThread(const drama::sds::Id &) override;
@@ -173,6 +176,17 @@ class GInitActionNT : public drama::MessageHandler {
 public:
    GInitActionNT() {}
    ~GInitActionNT() {}
+private:
+   drama::Request MessageReceived() override;
+};
+
+
+// G_Park_Gantry_NT is a newly-added action to park the gantry
+class GParkGantryActionNT: public drama::MessageHandler {
+public:
+   GParkGantryActionNT() {}
+   ~GParkGantryActionNT() {}
+
 private:
    drama::Request MessageReceived() override;
 };
@@ -218,6 +232,13 @@ private:
    GMoveAxisActionNT I_GMoveAxisActionNTObj;
    //  The action handler for the HOME action.
    GHomeAction I_GHomeActionObj;
+
+
+
+   //The new action handler for the ParkGantry action
+   GParkGantryActionNT I_GParkGantryActionNTObj;
+
+
    //  Interface to the CanAccess layer.
    CanAccess I_CanAccess;
    //  True once the CanAccess layer has been initialised.
@@ -660,6 +681,7 @@ const CML::Error* WaitLinkedHome (
             }
          }
       }
+      DEBUG("Total number of home axis now: %d\n", HomedCount);
       if (HomedCount == ampct) {
          printf ("All amps homed\n");
          break;
@@ -689,7 +711,7 @@ const CML::Error* WaitLinkedHome (
       CML::cml.Debug( "Link %d - Linkage::WaitMoveDone returned: %s\n",
                                        TheLinkage->GetAmp(0).GetNodeID(), err->toString() );
    }
-
+   DEBUG("Timeout now: %d\n", timeWaited);
    return err;
 }
 
@@ -745,6 +767,9 @@ TdFCanTask::TdFCanTask(const std::string &taskName) :
    I_GInitActionObj(TaskPtr()),
    I_GMoveAxisActionObj(TaskPtr()),
    I_GHomeActionObj(TaskPtr()),
+   //newly-added handler to manage the parkgantry action
+   //I_GParkGantryActionNTObj(TaskPtr()),
+
    I_CanAccessInitialised(false),
    I_X1Amp(NULL),
    I_X2Amp(NULL),
@@ -770,6 +795,10 @@ TdFCanTask::TdFCanTask(const std::string &taskName) :
    Add("G_MOVE_AXIS_NT", drama::MessageHandlerPtr(&I_GMoveAxisActionNTObj, drama::nodel()));
    Add("G_INIT_NT", drama::MessageHandlerPtr(&I_GInitActionNTObj, drama::nodel()));
    Add("G_HOME", drama::MessageHandlerPtr(&I_GHomeActionObj, drama::nodel()));
+
+   // add new PakrGan action 
+   Add("G_PARKGAN", drama::MessageHandlerPtr(&I_GParkGantryActionNTObj, drama::nodel()));
+
    Add("EXIT", &drama::SimpleExitAction);
 }
 
@@ -925,6 +954,11 @@ bool TdFCanTask::HomeAxes (bool HomeX, bool HomeY, bool HomeZ, bool HomeTheta, b
             if (HomeFlags[Index]) {
                DEBUG ("Homing amp %d\n",Index);
                Err = (*HomeLinkage)[Index].GoHome(HomeConfigs[Index]);
+               //Err = HomeLinkage->GetAmp(Index).WaitMoveDone( 20000 );
+               //CML::uunit Pos;
+               //HomeLinkage->GetAmp(Index).GetPositionActual(Pos);
+               //(*HomeLinkage)[Index].GetPositionActual(Pos);
+               //DEBUG("Amp %d controls the gantry, now in Position %f\n", Index, Pos);
                if (Err) {
                   I_ErrorString = "Error starting homing. ";
                   I_ErrorString += Err->toString();
@@ -945,7 +979,15 @@ bool TdFCanTask::HomeAxes (bool HomeX, bool HomeY, bool HomeZ, bool HomeTheta, b
          }
           
          DEBUG ("Move complete\n");
-            
+         sleep(10);
+         for (int Index = 0; Index < MAX_TDF_AMPS; Index++) {
+            if (HomeFlags[Index]) {
+               CML::uunit Pos;
+               HomeLinkage->GetAmp(Index).GetPositionActual(Pos);
+               //(*HomeLinkage)[Index].GetPositionActual(Pos);
+               DEBUG("Move completes, now Amp %d is in Position %f\n", Index, Pos);
+            }
+         }
          //  Disable the amplifiers.
             
          for (int Index = 0; Index < MAX_TDF_AMPS; Index++) {
@@ -984,7 +1026,7 @@ bool TdFCanTask::SetupHomeConfig(CML::HomeConfig HomeConfigs[],int Index,AmpId A
       //  all amplifiers. What we should be doing is using the configurators to get the individual
       //  settings that apply to each amplifier.
       
-      HomeConfigs[Index].method  = CML::CHM_EXTENDED;
+      HomeConfigs[Index].method  = CML::CHM_NLIM;
       HomeConfigs[Index].extended = 0b0000001000110001; // homes to neg limit, then to next index
       //HomeConfigs[Index].current = 100; // max current in units of 0.01A (hardstop only)
       HomeConfigs[Index].velFast = 10000;
@@ -1630,6 +1672,41 @@ void GHomeAction::ActionThread(const drama::sds::Id &Arg) {
    // We never re-enable the blocking of SIGUSR2 - it causes too many problems.
    //BlockSIGUSR2();
 
+}
+
+drama::Request GParkGantryActionNT::MessageReceived() {
+
+   UnblockSIGUSR2();
+   std::string Axes("");
+   drama::sds::Id Arg = GetEntry().Argument();
+   if (Arg) {
+      drama::gitarg::String AxesArg(Arg, "AXES", 1);
+      Axes = AxesArg;
+   }
+   MessageUser("G_PARKGAN: " + Axes);
+   bool X,Y,Z,Theta,Jaw;
+   if (WhichAxes(Axes,X,Y,Z,Theta,Jaw)) {
+      if (X) MessageUser ("Park X axis");
+      if (Y) MessageUser ("Park Y axis");
+      if (Z) MessageUser ("Park Z axis");
+      if (Theta) MessageUser ("Park Theta axis");
+      if (Jaw) MessageUser ("Park Jaw axis");
+      auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+      ThisTask->ClearError();
+      if (!(ThisTask->SetupAmps())) {
+         MessageUser("G_PARKGAN: " + ThisTask->GetError());
+      } else {
+         if (!(ThisTask->HomeAxes(X,Y,Z,Theta,Jaw))) {
+            MessageUser("G_PARKGAN: " + ThisTask->GetError());
+         } else {
+            MessageUser("G_PARKGAN: Axes homed");
+         }
+      }
+   } else {
+      MessageUser("G_PARKGAN: Invalid axis specification");
+   }
+
+   return  drama::RequestCode::End;
 }
 
 //  ------------------------------------------------------------------------------------------------
