@@ -150,6 +150,16 @@ private:
    void ActionThread(const drama::sds::Id &) override;
 };
 
+// G_HOME_NT is a non-threaded version of G_HOME
+class GHomeActionNT : public drama::MessageHandler {
+   public:
+      GHomeActionNT() {}
+      ~GHomeActionNT() {}
+   private:
+      drama::Request MessageReceived() override;
+};
+
+
 //  G_MOVE_AXIS - move one (or more) 2dF positioner gantry axes to specified position(s).
 
 class GMoveAxisAction : public drama::thread::TAction {
@@ -191,6 +201,52 @@ private:
    drama::Request MessageReceived() override;
 };
 
+// G_UNPARK_NT is a non-thread version of UnParkGantry action
+class GUnParkActionNT : public drama::MessageHandler {
+public:
+   GUnParkActionNT() {}
+   ~GUnParkActionNT() {}
+private:
+   drama::Request MessageReceived() override;
+};
+
+// G_MOVEOFFSET_NT is a non-thread version of MoveOffset action
+class GMoveOffsetActionNT : public drama::MessageHandler {
+public:
+   GMoveOffsetActionNT() {}
+   ~GMoveOffsetActionNT() {}
+private:
+   drama::Request MessageReceived() override;
+};
+
+// G_EXIT is a non-thread version of Exit action
+class GEXITActionNT : public drama::MessageHandler {
+public:
+   GEXITActionNT() {}
+   ~GEXITActionNT() {}
+private:
+   drama::Request MessageReceived() override;
+};
+
+
+// G_MOVEActionNT is a non-thread version of Move action, it moves a particular axis
+class GMOVEActionNT : public drama::MessageHandler {
+public:
+   GMOVEActionNT() {}
+   ~GMOVEActionNT() {}
+private:
+   drama::Request MessageReceived() override;
+};
+
+// G_RESETActionNT is a non-thread version of Move action, it moves a particular axis
+class GRESETActionNT : public drama::MessageHandler {
+public:
+   GRESETActionNT() {}
+   ~GRESETActionNT() {}
+private:
+   drama::Request MessageReceived() override;
+};
+
 //  ------------------------------------------------------------------------------------------------
 
 //                                  T a s k  D e f i n i t i o n
@@ -206,12 +262,16 @@ public:
    //  Home a specified combination of axes.
    bool HomeAxes (bool HomeX, bool HomeY, bool HomeZ, bool HomeTheta, bool HomeJaw);
    //  Move one or more axes to specified target positions.
-   bool MoveAxes (const std::vector<AxisDemand>& AxisDemands,
+   bool MoveAxes (const std::vector<AxisDemand>& AxisDemands, bool MoveOffset=false,
                                             drama::thread::TAction* ThisAction = NULL);
    //  Return a string describing the most recent error.
    const std::string& GetError (void) { return I_ErrorString; }
    //  Clear the error string.
    void ClearError (void) { I_ErrorString = ""; }
+
+   // Disable the Amplifiers
+   bool DisableAmps(void);
+   
 private:
    //  Set up the homing configuration for a specified amplifier.
    bool SetupHomeConfig(CML::HomeConfig HomeConfigs[],int Index,AmpId Amp);
@@ -232,11 +292,22 @@ private:
    GMoveAxisActionNT I_GMoveAxisActionNTObj;
    //  The action handler for the HOME action.
    GHomeAction I_GHomeActionObj;
-
-
+   // newly-added action handler for the G_HOME_NT (non-threaded) action
+   GHomeActionNT I_GHomeActionNTObj;
 
    //The new action handler for the ParkGantry action
    GParkGantryActionNT I_GParkGantryActionNTObj;
+   // The new action handler for G_UNPARK_NT action.
+   GUnParkActionNT I_GUnParkActionNTObj;
+   // The new action handler for G_MOVEOFFSET_NT action.
+   GMoveOffsetActionNT I_GMoveOffsetActionNTObj;
+   // The new action handler for G_EXIT action.
+   GEXITActionNT I_GExitActionNTObj;
+   // The new action handler for G_MOVE_NT action.
+   GMOVEActionNT I_GMoveActionNTObj;
+   // The new action handler for G_RESET action.
+   GRESETActionNT I_GResetActionNTObj;
+
 
 
    //  Interface to the CanAccess layer.
@@ -401,6 +472,37 @@ bool GetDouble (const std::string& ValueString, double& Value)
    return OK;
 }
 
+
+//Setup the Positions and Velocities
+void SetupPosAndVel(std::string Axes, std::string &Positions, std::string &Velocities, bool isHomed=false)
+{
+   std::vector<std::string> AxesList = SplitString(Axes);
+   unsigned int NumberAxes = AxesList.size();
+   if(NumberAxes == 0)
+   {
+      return;
+   }
+   if(isHomed)
+   {
+      for (unsigned int Index = 0; Index < NumberAxes; Index++)
+      {
+         Positions+="0";
+         Positions+=",";
+         Velocities+="1";
+         Velocities+=",";
+      }
+   }else{
+      for (unsigned int Index = 0; Index < NumberAxes; Index++)
+      {
+         Positions+="5000";
+         Positions+=",";
+         Velocities+="1";
+         Velocities+=",";
+      }
+   }
+   if(Positions.back()==',') Positions.pop_back();
+   if(Velocities.back()==',') Velocities.pop_back();
+}
 //  ------------------------------------------------------------------------------------------------
 
 //                                   G e t  D e m a n d s
@@ -795,9 +897,19 @@ TdFCanTask::TdFCanTask(const std::string &taskName) :
    Add("G_MOVE_AXIS_NT", drama::MessageHandlerPtr(&I_GMoveAxisActionNTObj, drama::nodel()));
    Add("G_INIT_NT", drama::MessageHandlerPtr(&I_GInitActionNTObj, drama::nodel()));
    Add("G_HOME", drama::MessageHandlerPtr(&I_GHomeActionObj, drama::nodel()));
-
-   // add new PakrGan action 
-   Add("G_PARKGAN", drama::MessageHandlerPtr(&I_GParkGantryActionNTObj, drama::nodel()));
+   Add("G_HOME_NT", drama::MessageHandlerPtr(&I_GHomeActionNTObj, drama::nodel()));
+   // add new ParkGantry action 
+   Add("G_PARK_NT", drama::MessageHandlerPtr(&I_GParkGantryActionNTObj, drama::nodel()));
+   // add new UnParkGantry action
+   Add("G_UNPARK_NT", drama::MessageHandlerPtr(&I_GUnParkActionNTObj, drama::nodel()));
+   // add new Move Gantry Offset action
+   Add("G_MOVEOFFSET_NT", drama::MessageHandlerPtr(&I_GMoveOffsetActionNTObj, drama::nodel()));
+   // add new Exit action, which disables all the amplifiers
+   Add("G_EXIT", drama::MessageHandlerPtr(&I_GMoveOffsetActionNTObj, drama::nodel()));
+   // add new Move Axis action, which only moves a particular axis
+   Add("G_MOVE_NT", drama::MessageHandlerPtr(&I_GMoveActionNTObj, drama::nodel()));
+   // add new Reset action, which disables the amplifiers and setup them again.
+   Add("G_RESET", drama::MessageHandlerPtr(&I_GResetActionNTObj, drama::nodel()));
 
    Add("EXIT", &drama::SimpleExitAction);
 }
@@ -884,6 +996,56 @@ bool TdFCanTask::SetupAmps(void) {
 }
 
 
+bool TdFCanTask::DisableAmps()
+{
+   bool DisableAllAmps = false;
+   const CML::Error* Err = NULL;
+
+   if (!I_CanAccessInitialised)
+   {
+      DEBUG ("CanAccess is not inlitialised!\n");
+      return DisableAllAmps;
+   }
+    
+   if(I_X1Amp)
+   {
+      Err = I_CanAccess.GetAmp(G_AmpNames[0])->Disable();
+      if(Err) {
+         I_ErrorString = "Error disabling X_1 amplifier. ";
+         I_ErrorString += Err->toString();
+         return DisableAllAmps;
+      }
+      I_X1Amp = nullptr;
+      DEBUG ("X_1 amplifier disabled!\n");
+   }
+   if(I_X2Amp)
+   {
+      Err = I_CanAccess.GetAmp(G_AmpNames[1])->Disable();
+      if(Err) {
+         I_ErrorString = "Error disabling X_2 amplifier. ";
+         I_ErrorString += Err->toString();
+         return DisableAllAmps;
+      }
+      I_X2Amp = nullptr;
+      DEBUG ("X_2 amplifier disabled!\n");
+   }
+   if(I_YAmp)
+   {
+      Err = I_CanAccess.GetAmp(G_AmpNames[2])->Disable();
+      if(Err) {
+         I_ErrorString = "Error disabling Y amplifier. ";
+         I_ErrorString += Err->toString();
+         return DisableAllAmps;
+      }
+      I_YAmp = nullptr;
+      DEBUG ("Y amplifier disabled!\n");
+   }
+
+   DEBUG ("All amplifiers disabled!\n");
+   return true;
+
+}
+
 //  ------------------------------------------------------------------------------------------------
 
 //                    T d F  C a n  T a s k  : :  H o m e  A x e s
@@ -894,7 +1056,6 @@ bool TdFCanTask::SetupAmps(void) {
 bool TdFCanTask::HomeAxes (bool HomeX, bool HomeY, bool HomeZ, bool HomeTheta, bool HomeJaw) {
    
    bool ReturnOK = false;
-   
    //  Get the Linkage we can use.  Note that this will contain all the amplifiers for
    //  all the amplifiers for the gantry, in the order specified by G_AmpNames and the
    //  AmpId enum.
@@ -979,25 +1140,34 @@ bool TdFCanTask::HomeAxes (bool HomeX, bool HomeY, bool HomeZ, bool HomeTheta, b
          }
           
          DEBUG ("Move complete\n");
-         sleep(10);
-         for (int Index = 0; Index < MAX_TDF_AMPS; Index++) {
-            if (HomeFlags[Index]) {
-               CML::uunit Pos;
-               HomeLinkage->GetAmp(Index).GetPositionActual(Pos);
-               //(*HomeLinkage)[Index].GetPositionActual(Pos);
-               DEBUG("Move completes, now Amp %d is in Position %f\n", Index, Pos);
-            }
-         }
+
+         /// the code is used to test if the homing poisition is set to zero after the move completes.
+         /// We have tried different homing methods. CHM_EXTENDED doesn't home properly, even though 
+         /// the position is zero after the homing process.
+
+         // sleep(10);
+         // for (int Index = 0; Index < MAX_TDF_AMPS; Index++) {
+         //    if (HomeFlags[Index]) {
+         //       CML::uunit Pos;
+         //       HomeLinkage->GetAmp(Index).GetPositionActual(Pos);
+         //       //(*HomeLinkage)[Index].GetPositionActual(Pos);
+         //       DEBUG("Move completes, now Amp %d is in Position %f\n", Index, Pos);
+         //    }
+         // }
          //  Disable the amplifiers.
             
-         for (int Index = 0; Index < MAX_TDF_AMPS; Index++) {
-            Err = (*HomeLinkage)[Index].Disable();
-            if (Err) {
-               I_ErrorString = "Error disabling amplifier. ";
-               I_ErrorString += Err->toString();
-            }
-         }
-         DEBUG ("All complete\n");
+
+         // Perry requested these amplifers to be active after these moves, so disable this block of codes
+         // as request.
+
+         // for (int Index = 0; Index < MAX_TDF_AMPS; Index++) {
+         //    Err = (*HomeLinkage)[Index].Disable();
+         //    if (Err) {
+         //       I_ErrorString = "Error disabling amplifier. ";
+         //       I_ErrorString += Err->toString();
+         //    }
+         // }
+         // DEBUG ("All complete\n");
       }
       if (Err == NULL) ReturnOK = true;
    }
@@ -1026,7 +1196,7 @@ bool TdFCanTask::SetupHomeConfig(CML::HomeConfig HomeConfigs[],int Index,AmpId A
       //  all amplifiers. What we should be doing is using the configurators to get the individual
       //  settings that apply to each amplifier.
       
-      HomeConfigs[Index].method  = CML::CHM_NLIM;
+      HomeConfigs[Index].method  = CML::CHM_NLIM_ONDX;
       HomeConfigs[Index].extended = 0b0000001000110001; // homes to neg limit, then to next index
       //HomeConfigs[Index].current = 100; // max current in units of 0.01A (hardstop only)
       HomeConfigs[Index].velFast = 10000;
@@ -1147,7 +1317,7 @@ bool TdFCanTask::SetupLinkage (
 //  has a target position and, optionally, a demanded velocity for each axis.
 //
 
-bool TdFCanTask::MoveAxes (const std::vector<AxisDemand>& AxisDemands,
+bool TdFCanTask::MoveAxes (const std::vector<AxisDemand>& AxisDemands, bool MoveOffset /*=false*/,
                                           drama::thread::TAction* /*ThisAction*/) {
 
    bool ReturnOK = false;
@@ -1178,7 +1348,16 @@ bool TdFCanTask::MoveAxes (const std::vector<AxisDemand>& AxisDemands,
          bool Found = false;
          for (int DemandIndex = 0; DemandIndex < NumberDemands; DemandIndex++) {
             if (AxisDemands[DemandIndex].AxisId == Id) {
-               TargetPosition = AxisDemands[DemandIndex].Position;
+               if(MoveOffset==true)
+               {
+                  CML::uunit CurrentPosition = 0.0;
+                  (*MoveLinkage)[DemandIndex].GetPositionActual(CurrentPosition);
+                  TargetPosition = AxisDemands[DemandIndex].Position + CurrentPosition;
+               }
+               else 
+               {
+                  TargetPosition = AxisDemands[DemandIndex].Position;
+               }
                Found = true;
                break;
             }
@@ -1544,7 +1723,7 @@ void GMoveAxisAction::ActionThread(const drama::sds::Id &Arg) {
       if (!(ThisTask->SetupAmps())) {
          MessageUser("MOVE_AXES: " + ThisTask->GetError());
       } else {
-         if (!(ThisTask->MoveAxes(AxisDemands,this))) {
+         if (!(ThisTask->MoveAxes(AxisDemands, false, this))) {
             MessageUser("MOVE_AXES: " + ThisTask->GetError());
          } else {
             MessageUser("MOVE_AXES: Move complete");
@@ -1576,6 +1755,7 @@ drama::Request GMoveAxisActionNT::MessageReceived() {
    std::string Axes;
    std::string Positions;
    std::string Velocities;
+   std::string OffsetFlag="";
    if (Arg) {
       //  I didn't want a try block here. I just didn't want an exception - I wanted Git
       //  to use the default values I specified if there wasn't one in the arguments.
@@ -1588,13 +1768,20 @@ drama::Request GMoveAxisActionNT::MessageReceived() {
          Positions = PositionsArg;
          drama::gitarg::String VelocitiesArg(Arg, "VELOCITIES", 3,"",NoFlags);
          Velocities = VelocitiesArg;
+         drama::gitarg::String OffsetFlagArg(Arg, "OFFSET", 4,"",NoFlags);
+         OffsetFlag = OffsetFlagArg;
       }
       catch (...) {
       }
    }
    std::string Error;
    std::vector<AxisDemand> AxisDemands = GetDemands(Axes,Positions,Velocities,Error);
-   
+   bool MoveOffset = false;
+
+   if(!OffsetFlag.compare("OFFSET"))
+   {
+      MoveOffset=true;
+   }
    int NumberAxes = AxisDemands.size();
    if (NumberAxes <= 0) {
       MessageUser ("MOVE_AXES: " + Error);
@@ -1609,7 +1796,7 @@ drama::Request GMoveAxisActionNT::MessageReceived() {
       if (!(ThisTask->SetupAmps())) {
          MessageUser("MOVE_AXES: " + ThisTask->GetError());
       } else {
-         if (!(ThisTask->MoveAxes(AxisDemands))) {
+         if (!(ThisTask->MoveAxes(AxisDemands, MoveOffset))) {
             MessageUser("MOVE_AXES: " + ThisTask->GetError());
          } else {
             MessageUser("MOVE_AXES: Move complete");
@@ -1674,6 +1861,16 @@ void GHomeAction::ActionThread(const drama::sds::Id &Arg) {
 
 }
 
+//  ------------------------------------------------------------------------------------------------
+
+//         G  Park  Gantry   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
+//
+// Currently the ParkGantry action still uses the HomeAxes() program to park the gantry.
+// At some stage, this program should be changed to MoveAxes(Linkage,Target) because this 
+// process is faster. The issue is CML library computes a curve based on the start position
+// end position, and moves based on the curve. The end position of the curve is not necessarily
+// the exact position we want. 
+
 drama::Request GParkGantryActionNT::MessageReceived() {
 
    UnblockSIGUSR2();
@@ -1683,7 +1880,7 @@ drama::Request GParkGantryActionNT::MessageReceived() {
       drama::gitarg::String AxesArg(Arg, "AXES", 1);
       Axes = AxesArg;
    }
-   MessageUser("G_PARKGAN: " + Axes);
+   MessageUser("G_PARK_NT: " + Axes);
    bool X,Y,Z,Theta,Jaw;
    if (WhichAxes(Axes,X,Y,Z,Theta,Jaw)) {
       if (X) MessageUser ("Park X axis");
@@ -1694,16 +1891,270 @@ drama::Request GParkGantryActionNT::MessageReceived() {
       auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
       ThisTask->ClearError();
       if (!(ThisTask->SetupAmps())) {
-         MessageUser("G_PARKGAN: " + ThisTask->GetError());
+         MessageUser("G_PARK_NT: " + ThisTask->GetError());
       } else {
          if (!(ThisTask->HomeAxes(X,Y,Z,Theta,Jaw))) {
-            MessageUser("G_PARKGAN: " + ThisTask->GetError());
+            MessageUser("G_PARK_NT: " + ThisTask->GetError());
          } else {
-            MessageUser("G_PARKGAN: Axes homed");
+            MessageUser("G_PARK_NT: Axes homed");
          }
       }
    } else {
-      MessageUser("G_PARKGAN: Invalid axis specification");
+      MessageUser("G_PARK_NT: Invalid axis specification");
+   }
+
+   return  drama::RequestCode::End;
+}
+
+//  ------------------------------------------------------------------------------------------------
+
+//         G  Home   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
+// Currently the G_HOME Action doesn't work properly. It will throw out an error when the G_HOME is invoked, indicating
+// there should have been an interlock check. It is very strange that G_HOME function uses the same code as G_INIT_NT.
+// G_HOME fails to process the Home action whilst G_INIT_NT functions properly. The error may result from the thread version drama?
+// Need to check if the non-threaded version works. 
+
+drama::Request GHomeActionNT::MessageReceived()
+{
+
+   UnblockSIGUSR2();
+   std::string Axes("");
+   std::string Positions;
+   std::string Velocities;
+   drama::sds::Id Arg = GetEntry().Argument();
+   if (Arg) {
+      drama::gitarg::String AxesArg(Arg, "AXES", 1);
+      Axes = AxesArg;
+   }
+   MessageUser("G_HOME_NT: " + Axes);
+   SetupPosAndVel(Axes, Positions,Velocities, true);
+   bool X,Y,Z,Theta,Jaw;
+   if (WhichAxes(Axes,X,Y,Z,Theta,Jaw)) {
+      if (X) MessageUser ("Home X axis");
+      if (Y) MessageUser ("Home Y axis");
+      if (Z) MessageUser ("Home Z axis");
+      if (Theta) MessageUser ("Home Theta axis");
+      if (Jaw) MessageUser ("Home Jaw axis");
+      auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+      ThisTask->ClearError();
+      if (!(ThisTask->SetupAmps())) {
+         MessageUser("G_HOME_NT: " + ThisTask->GetError());
+      } else {
+         if (!(ThisTask->HomeAxes(X,Y,Z,Theta,Jaw))) {
+            MessageUser("G_HOME_NT: " + ThisTask->GetError());
+         } else {
+            MessageUser("G_HOME_NT: Axes homed");
+         }
+      }
+   } else {
+      MessageUser("G_HOME_NT: Invalid axis specification");
+   }
+   return drama::RequestCode::End;
+}
+
+//  ------------------------------------------------------------------------------------------------
+
+//         G  UnPark   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
+drama::Request GUnParkActionNT::MessageReceived()
+{
+   UnblockSIGUSR2();
+   std::string Axes("");
+   std::string Positions;
+   std::string Velocities;
+
+   drama::sds::Id Arg = GetEntry().Argument();
+   if (Arg) {
+      drama::gitarg::String AxesArg(Arg, "AXES", 1);
+      Axes = AxesArg;
+   }
+   MessageUser("G_UNPARK_NT: " + Axes);
+   SetupPosAndVel(Axes, Positions,Velocities, false);
+   bool X,Y,Z,Theta,Jaw;
+   if (WhichAxes(Axes,X,Y,Z,Theta,Jaw)) {
+      if (X) MessageUser ("UnPark X axis");
+      if (Y) MessageUser ("UnPark Y axis");
+      if (Z) MessageUser ("UnPark Z axis");
+      if (Theta) MessageUser ("UnPark Theta axis");
+      if (Jaw) MessageUser ("UnPark Jaw axis");
+      auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+      ThisTask->ClearError();
+      if (!(ThisTask->SetupAmps())) {
+         MessageUser("G_UNPARK_NT: " + ThisTask->GetError());
+      } else {
+         std::string Error;
+         std::vector<AxisDemand> AxisDemands=GetDemands(Axes,Positions,Velocities,Error);
+         if (!(ThisTask->MoveAxes(AxisDemands))) {
+            MessageUser("G_UNPARK_NT: " + ThisTask->GetError());
+         } else {
+            MessageUser("G_UNPARK_NT: Axes unparked");
+         }
+      }
+   } else {
+      MessageUser("G_HOME_NT: Invalid axis specification");
+   }
+   return  drama::RequestCode::End;
+}
+
+//  ------------------------------------------------------------------------------------------------
+
+//         G  MoveOffset   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
+// The G_MOVEOFFSET Action moves an offset amount from its current position. This is a non-thread version.
+
+drama::Request GMoveOffsetActionNT::MessageReceived()
+{
+   UnblockSIGUSR2();
+
+   drama::sds::Id Arg = GetEntry().Argument();
+
+   std::string Axes;
+   std::string Positions;
+   std::string Velocities;
+   if (Arg) {
+      //  I didn't want a try block here. I just didn't want an exception - I wanted Git
+      //  to use the default values I specified if there wasn't one in the arguments.
+      //  But I can't work out how to do that.
+      try {
+         drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
+         drama::gitarg::String AxesArg(Arg, "AXES", 1,"",NoFlags);
+         Axes = AxesArg;
+         drama::gitarg::String PositionsArg(Arg, "POSITIONS", 2,"",NoFlags);
+         Positions = PositionsArg;
+         drama::gitarg::String VelocitiesArg(Arg, "VELOCITIES", 3,"",NoFlags);
+         Velocities = VelocitiesArg;
+      }
+      catch (...) {
+      }
+   }
+   std::string Error;
+   std::vector<AxisDemand> AxisDemands = GetDemands(Axes,Positions,Velocities,Error);
+   int NumberAxes = AxisDemands.size();
+   if (NumberAxes <= 0) {
+      MessageUser ("G_MOVEOFFSET_NT: " + Error);
+   } else {
+      unsigned int NumberAxes = AxisDemands.size();
+      for (unsigned int Index = 0; Index < NumberAxes; Index++) {
+         DEBUG ("AxisId: %d, offset position %f, velocity %f\n",AxisDemands[Index].AxisId,
+                                     AxisDemands[Index].Position,AxisDemands[Index].Velocity);
+      }
+      auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+      ThisTask->ClearError();
+      if (!(ThisTask->SetupAmps())) {
+         MessageUser("G_MOVEOFFSET_NT: " + ThisTask->GetError());
+      } else {
+         if (!(ThisTask->MoveAxes(AxisDemands, true))) {
+            MessageUser("G_MOVEOFFSET_NT: " + ThisTask->GetError());
+         } else {
+            MessageUser("G_MOVEOFFSET_NT: Move complete");
+         }
+      }
+   }
+   
+   return  drama::RequestCode::End;
+}
+
+
+//  ------------------------------------------------------------------------------------------------
+
+//         G  Exit   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
+drama::Request GEXITActionNT::MessageReceived()
+{
+   UnblockSIGUSR2();
+   auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   ThisTask->ClearError();
+   if(ThisTask->DisableAmps()==true){
+      DEBUG ("Disable amps OK\n");
+      MessageUser("G_EXIT: All amps have been disabled ");
+   }else{
+      DEBUG ("DisableAmps fails\n");
+      MessageUser("G_EXIT: " + ThisTask->GetError());
+   }
+   return  drama::RequestCode::End;
+}
+
+//  ------------------------------------------------------------------------------------------------
+
+//         G  Move   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
+drama::Request GMOVEActionNT::MessageReceived()
+{
+   UnblockSIGUSR2();
+   drama::sds::Id Arg = GetEntry().Argument();
+
+   std::string Axes;
+   std::string Positions;
+   std::string Velocities;
+   std::string OffsetFlag;
+   if (Arg) {
+      //  I didn't want a try block here. I just didn't want an exception - I wanted Git
+      //  to use the default values I specified if there wasn't one in the arguments.
+      //  But I can't work out how to do that.
+      try {
+         drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
+         drama::gitarg::String AxesArg(Arg, "AXES", 1,"",NoFlags);
+         Axes = AxesArg;
+         drama::gitarg::String PositionsArg(Arg, "POSITIONS", 2,"",NoFlags);
+         Positions = PositionsArg;
+         drama::gitarg::String VelocitiesArg(Arg, "VELOCITIES", 3,"",NoFlags);
+         Velocities = VelocitiesArg;
+         drama::gitarg::String OffsetFlagArg(Arg, "OFFSET", 4,"",NoFlags);
+         OffsetFlag = OffsetFlagArg;
+      }
+      catch (...) {
+      }
+   }
+   bool MoveOffset = false;
+   if(!OffsetFlag.compare("OFFSET"))
+   {
+      MoveOffset=true;
+   }
+
+   std::string Error;
+   std::vector<AxisDemand> AxisDemands = GetDemands(Axes,Positions,Velocities,Error);
+   int NumberAxes = AxisDemands.size();
+   if (NumberAxes <= 1) {
+      MessageUser ("G_MOVE_NT can only a particular axis. If more than one axes need to move, please choose G_MOVE_AXIS_NT." + Error);
+   } else {
+      unsigned int NumberAxes = AxisDemands.size();
+      for (unsigned int Index = 0; Index < NumberAxes; Index++) {
+         DEBUG ("AxisId: %d, position %f, velocity %f\n",AxisDemands[Index].AxisId,
+                                     AxisDemands[Index].Position,AxisDemands[Index].Velocity);
+      }
+      auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+      ThisTask->ClearError();
+      if (!(ThisTask->SetupAmps())) {
+         MessageUser("G_MOVE_NT: " + ThisTask->GetError());
+      } else {
+         if (!(ThisTask->MoveAxes(AxisDemands, MoveOffset))) {
+            MessageUser("G_MOVE_NT: " + ThisTask->GetError());
+         } else {
+            MessageUser("G_MOVE_NT: Move complete");
+         }
+      }
+   }
+   return  drama::RequestCode::End;
+}
+
+//  ------------------------------------------------------------------------------------------------
+
+//         G  Reset   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
+drama::Request GRESETActionNT::MessageReceived()
+{
+   UnblockSIGUSR2();
+   auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   ThisTask->ClearError();
+
+   if(ThisTask->DisableAmps()==true)
+   {
+      DEBUG ("Disable all the amps, now reset the amps\n");
+      if(ThisTask->SetupAmps()==true)
+      {
+         DEBUG ("Reset amps OK\n");
+      }else{
+         DEBUG ("Reset Amps fails\n");
+         MessageUser("G_RESET: " + ThisTask->GetError());
+      }
+   }else{
+      DEBUG ("Reset Amps fails\n");
+      MessageUser("G_RESET: " + ThisTask->GetError());
    }
 
    return  drama::RequestCode::End;
