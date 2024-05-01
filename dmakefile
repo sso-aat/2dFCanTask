@@ -64,7 +64,7 @@ SIM_CAN_OPEN_DIR = ../SimCanOpen
 XWING_DIR = ../XWing
 TCS_UTIL_DIR = ../TcsUtil
 */
-INCLUDES =  -I. DramaIncl IDir(DRAMA2_DIR) $(CAN_INCLUDES)
+INCLUDES =  -I. DramaIncl IDir(DRAMA2_DIR) $(CAN_INCLUDES) $(GCAM_INCL) $(GCAM2_INCL) $(SLA_INCL)
 
 
 /*
@@ -94,7 +94,7 @@ LOCAL_LDFLAGS=-lrt
 
 
 #EndConfig
-LIBS=LinkLib(2dFCanTask) LinkLibDir(DRAMA2_LIB,drama2) $(CAN_LIBRARIES)
+LIBS=LinkLib(2dFCanTask) LinkLibDir(DRAMA2_LIB,drama2) $(CAN_LIBRARIES) $(GCAM2_LIB) $(GCAM_LIB) $(SLA_LIB)
 
 NormalCRules()			/* Include normal c rules	*/
 
@@ -178,7 +178,7 @@ DramaCPPProgramTarget(2dFCanTask, Obj(2dFCanTask), Lib(2dFCanTask), $(LIBS),)
  * Release targets
  */
 DramaReleaseCheck()
-DramaReleaseCommon(2dFCanTask_err.h 2dFCanTask_err_msgt.h CanAccess.h)
+DramaReleaseCommon(2dFCanTask.h 2dFCanTask_err.h 2dFCanTask_err_msgt.h CanAccess.h)
 DramaReleaseTarget(2dFCanTask,Lib(2dFCanTask),,))
 DramaReleaseDramaStart()
 

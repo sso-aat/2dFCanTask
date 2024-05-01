@@ -43,6 +43,8 @@
 //  DRAMA definitions
 #include "drama.hh"
 
+#include "2dFCanTask.h"
+
 //  Access to CML amplifiers and I/O modules that handles all simulation aspects.
 #include "CanAccess.h"
 
@@ -271,6 +273,10 @@ public:
 
    // Disable the Amplifiers
    bool DisableAmps(void);
+
+
+   //returns the pointer of the fpi task
+   tdFfpiTaskType  *tdFfpiGetMainStruct() {return I_tdFfpiMainStruct;}
    
 private:
    //  Set up the homing configuration for a specified amplifier.
@@ -328,6 +334,9 @@ private:
    CML::Amp* I_JawAmp;
    //  Description of the latest error, for use by action handlers.
    std::string I_ErrorString;
+
+   // the pointer structure to store the parameters of fpi task added by lliu 01/05/2024
+   tdFfpiTaskType  *I_tdFfpiMainStruct;
 };
 
 //  ------------------------------------------------------------------------------------------------
