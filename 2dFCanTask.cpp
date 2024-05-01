@@ -878,8 +878,6 @@ TdFCanTask::TdFCanTask(const std::string &taskName) :
    I_GInitActionObj(TaskPtr()),
    I_GMoveAxisActionObj(TaskPtr()),
    I_GHomeActionObj(TaskPtr()),
-   //newly-added handler to manage the parkgantry action
-   //I_GParkGantryActionNTObj(TaskPtr()),
 
    I_CanAccessInitialised(false),
    I_X1Amp(NULL),
@@ -1786,10 +1784,12 @@ drama::Request GMoveAxisActionNT::MessageReceived() {
    std::string Error;
    std::vector<AxisDemand> AxisDemands = GetDemands(Axes,Positions,Velocities,Error);
    bool MoveOffset = false;
-
-   if(!OffsetFlag.compare("OFFSET"))
+   bool MoveBackward = false;
+   if(!OffsetFlag.compare("+") || !OffsetFlag.compare("-"))
    {
       MoveOffset=true;
+      if(!OffsetFlag.compare("-"))
+         MoveBackward = true;
    }
    int NumberAxes = AxisDemands.size();
    if (NumberAxes <= 0) {
@@ -1797,6 +1797,8 @@ drama::Request GMoveAxisActionNT::MessageReceived() {
    } else {
       unsigned int NumberAxes = AxisDemands.size();
       for (unsigned int Index = 0; Index < NumberAxes; Index++) {
+         if(MoveBackward == true)
+            AxisDemands[Index].Position *= (-1.0);
          DEBUG ("AxisId: %d, position %f, velocity %f\n",AxisDemands[Index].AxisId,
                                      AxisDemands[Index].Position,AxisDemands[Index].Velocity);
       }
@@ -1949,7 +1951,9 @@ drama::Request GHomeActionNT::MessageReceived()
       if (!(ThisTask->SetupAmps())) {
          MessageUser("G_HOME_NT: " + ThisTask->GetError());
       } else {
-         if (!(ThisTask->HomeAxes(X,Y,Z,Theta,Jaw))) {
+         std::string Error;
+         std::vector<AxisDemand> AxisDemands=GetDemands(Axes,Positions,Velocities,Error);
+         if (!(ThisTask->MoveAxes(AxisDemands))) {
             MessageUser("G_HOME_NT: " + ThisTask->GetError());
          } else {
             MessageUser("G_HOME_NT: Axes homed");
@@ -2018,6 +2022,7 @@ drama::Request GMoveOffsetActionNT::MessageReceived()
    std::string Axes;
    std::string Positions;
    std::string Velocities;
+   std::string OffsetFlag="";
    if (Arg) {
       //  I didn't want a try block here. I just didn't want an exception - I wanted Git
       //  to use the default values I specified if there wasn't one in the arguments.
@@ -2030,10 +2035,19 @@ drama::Request GMoveOffsetActionNT::MessageReceived()
          Positions = PositionsArg;
          drama::gitarg::String VelocitiesArg(Arg, "VELOCITIES", 3,"",NoFlags);
          Velocities = VelocitiesArg;
+         drama::gitarg::String OffsetFlagArg(Arg, "OFFSET", 4,"",NoFlags);
+         OffsetFlag = OffsetFlagArg;
       }
       catch (...) {
       }
    }
+
+   bool MoveBackward = false;
+   if(!OffsetFlag.compare("-"))
+   {
+      MoveBackward = true;
+   }
+
    std::string Error;
    std::vector<AxisDemand> AxisDemands = GetDemands(Axes,Positions,Velocities,Error);
    int NumberAxes = AxisDemands.size();
@@ -2042,6 +2056,8 @@ drama::Request GMoveOffsetActionNT::MessageReceived()
    } else {
       unsigned int NumberAxes = AxisDemands.size();
       for (unsigned int Index = 0; Index < NumberAxes; Index++) {
+         if(MoveBackward == true)
+            AxisDemands[Index].Position *= (-1.0);
          DEBUG ("AxisId: %d, offset position %f, velocity %f\n",AxisDemands[Index].AxisId,
                                      AxisDemands[Index].Position,AxisDemands[Index].Velocity);
       }
@@ -2111,19 +2127,24 @@ drama::Request GMOVEActionNT::MessageReceived()
       }
    }
    bool MoveOffset = false;
-   if(!OffsetFlag.compare("OFFSET"))
+   bool MoveBackward = false;
+   if(!OffsetFlag.compare("+") || !OffsetFlag.compare("-"))
    {
       MoveOffset=true;
+      if(!OffsetFlag.compare("-"))
+         MoveBackward=true;
    }
 
    std::string Error;
    std::vector<AxisDemand> AxisDemands = GetDemands(Axes,Positions,Velocities,Error);
    int NumberAxes = AxisDemands.size();
    if (NumberAxes <= 1) {
-      MessageUser ("G_MOVE_NT can only a particular axis. If more than one axes need to move, please choose G_MOVE_AXIS_NT." + Error);
+      MessageUser ("G_MOVE_NT can only work on one axis. If more than one axes need to move, please choose G_MOVE_AXIS_NT." + Error);
    } else {
       unsigned int NumberAxes = AxisDemands.size();
       for (unsigned int Index = 0; Index < NumberAxes; Index++) {
+         if(MoveBackward)
+            AxisDemands[Index].Position *= (-1.0);
          DEBUG ("AxisId: %d, position %f, velocity %f\n",AxisDemands[Index].AxisId,
                                      AxisDemands[Index].Position,AxisDemands[Index].Velocity);
       }
