@@ -1886,12 +1886,15 @@ drama::Request GParkGantryActionNT::MessageReceived() {
 
    UnblockSIGUSR2();
    std::string Axes("");
+   std::string Positions;
+   std::string Velocities;
    drama::sds::Id Arg = GetEntry().Argument();
    if (Arg) {
       drama::gitarg::String AxesArg(Arg, "AXES", 1);
       Axes = AxesArg;
    }
    MessageUser("G_PARK_NT: " + Axes);
+   SetupPosAndVel(Axes, Positions,Velocities, true);
    bool X,Y,Z,Theta,Jaw;
    if (WhichAxes(Axes,X,Y,Z,Theta,Jaw)) {
       if (X) MessageUser ("Park X axis");
@@ -1904,7 +1907,9 @@ drama::Request GParkGantryActionNT::MessageReceived() {
       if (!(ThisTask->SetupAmps())) {
          MessageUser("G_PARK_NT: " + ThisTask->GetError());
       } else {
-         if (!(ThisTask->HomeAxes(X,Y,Z,Theta,Jaw))) {
+         std::string Error;
+         std::vector<AxisDemand> AxisDemands=GetDemands(Axes,Positions,Velocities,Error);
+         if (!(ThisTask->MoveAxes(AxisDemands))) {
             MessageUser("G_PARK_NT: " + ThisTask->GetError());
          } else {
             MessageUser("G_PARK_NT: Axes homed");
@@ -1930,15 +1935,12 @@ drama::Request GHomeActionNT::MessageReceived()
 
    UnblockSIGUSR2();
    std::string Axes("");
-   std::string Positions;
-   std::string Velocities;
    drama::sds::Id Arg = GetEntry().Argument();
    if (Arg) {
       drama::gitarg::String AxesArg(Arg, "AXES", 1);
       Axes = AxesArg;
    }
    MessageUser("G_HOME_NT: " + Axes);
-   SetupPosAndVel(Axes, Positions,Velocities, true);
    bool X,Y,Z,Theta,Jaw;
    if (WhichAxes(Axes,X,Y,Z,Theta,Jaw)) {
       if (X) MessageUser ("Home X axis");
@@ -1951,9 +1953,7 @@ drama::Request GHomeActionNT::MessageReceived()
       if (!(ThisTask->SetupAmps())) {
          MessageUser("G_HOME_NT: " + ThisTask->GetError());
       } else {
-         std::string Error;
-         std::vector<AxisDemand> AxisDemands=GetDemands(Axes,Positions,Velocities,Error);
-         if (!(ThisTask->MoveAxes(AxisDemands))) {
+         if (!(ThisTask->HomeAxes(X,Y,Z,Theta,Jaw))) {
             MessageUser("G_HOME_NT: " + ThisTask->GetError());
          } else {
             MessageUser("G_HOME_NT: Axes homed");
