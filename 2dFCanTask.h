@@ -10,15 +10,14 @@
 #ifndef TDFCANTASK_H
 #define TDFCANTASK_H
 
-#ifdef __cplusplus
- extern "C" {
-#endif
-
-
 #include "sds.h"
 #include "Git.h"
 #include "gcam.h"
 #include "slalib.h"
+
+//to check if a directory exists
+#include <boost/filesystem.hpp>
+#include <boost/filesystem/fstream.hpp>
 /*
  *  Constant definitions.
  */
@@ -29,7 +28,7 @@
 
 #define PI               3.1415926535
 
-#define _XI                          0  /* Used as array indexes                      */
+#define _XI                         0  /* Used as array indexes                      */
 #define _YI                         1
 
 #define X1                     (1<<0)
@@ -90,6 +89,10 @@
 #define FPI_Y                       3
 #define CS_FPI                      4
  
+#ifndef TDFPT_PARAM_DIR
+#define TDFPT_PARAM_DIR  "/home/lliu/Project_Codes/buildanagate/Parameters/"
+#endif 
+
 
 #define TDFFPI_MSG_BUFFER       20000  /* Size of message buffer for TDFFPI          */
 
@@ -229,7 +232,4 @@ typedef struct  tdFfpiDataType {
 }  tdFfpiDataType;
 
 
-#ifdef __cplusplus
-}
-#endif
 #endif

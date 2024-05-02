@@ -17,4 +17,15 @@
 .BASE 2
 MALLOCERR "Malloc error"
 NOTINIT "The task has not been initialised"
+NO_ENV_VAR "The environment variable used to find the parameter files is not defined"
+NO_FIBRE "Fibre-end not in field of view"
+NO_FID "Fiducial not in field of view"
+NOT_PARKED "Gantry is not parked"
+INSUF_FIDS "Insufficent fids found to do a survey calculation"
+INVWIN "Invalid centroiding window definition"
+INV_CENTROID "Invalid centroid value"
+INV_POS "Invalid target gantry position"
+PARKED "Gantry is parked"
+SIMULATION "Action not possible as we are in simulation mode"
+SLALIB "Error returned by slalib function"
 .END

@@ -54,8 +54,11 @@ CAN_LIBRARIES =LinkLibDir(GENINSSTSIM_LIB,GenInstSimulator) LinkLibDir(SIMCANOPE
     LinkLibDir(CANINTERFACESAAO_LIB,CanInterfacesAAO) $(ANAGATE_LIBS) $(CML_LIB) \
     -pthread
 
-
-
+/*
+BOOST_DIR=/instsoft/extern/boost/
+BOOST_INCL=-I$(BOOST_DIR)/include
+BOOST_LIB=-L$(BOOST_DIR)/lib -lboost_thread -lboost_system
+*/
 
 /*
 CONFIGURATOR_DIR = ../AAOCANBusIniConfigurator
@@ -64,7 +67,7 @@ SIM_CAN_OPEN_DIR = ../SimCanOpen
 XWING_DIR = ../XWing
 TCS_UTIL_DIR = ../TcsUtil
 */
-INCLUDES =  -I. DramaIncl IDir(DRAMA2_DIR) $(CAN_INCLUDES) $(GCAM_INCL) $(GCAM2_INCL) $(SLA_INCL)
+INCLUDES =  -I. DramaIncl IDir(DRAMA2_DIR) $(CAN_INCLUDES) $(GCAM_INCL) $(GCAM2_INCL) $(SLA_INCL) $(BOOST_INCL) 
 
 
 /*
@@ -94,7 +97,7 @@ LOCAL_LDFLAGS=-lrt
 
 
 #EndConfig
-LIBS=LinkLib(2dFCanTask) LinkLibDir(DRAMA2_LIB,drama2) $(CAN_LIBRARIES) $(GCAM2_LIB) $(GCAM_LIB) $(SLA_LIB)
+LIBS=LinkLib(2dFCanTask) LinkLibDir(DRAMA2_LIB,drama2) $(CAN_LIBRARIES) $(GCAM2_LIB) $(GCAM_LIB) $(SLA_LIB) $(BOOST_LIB)
 
 NormalCRules()			/* Include normal c rules	*/
 
