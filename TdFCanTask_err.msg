@@ -26,6 +26,7 @@ INVWIN "Invalid centroiding window definition"
 INV_CENTROID "Invalid centroid value"
 INV_POS "Invalid target gantry position"
 PARKED "Gantry is parked"
+READ_ERROR "Check the SDS file, some fields are missing"
 SIMULATION "Action not possible as we are in simulation mode"
 SLALIB "Error returned by slalib function"
 .END
