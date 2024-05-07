@@ -284,6 +284,7 @@ private:
    drama::Request MessageReceived() override;
 };
 
+// P_TELPOSActionNT is a non-thread version of TELPOS action, it sets the current position of telescope
 class PTELPOSActionNT : public drama::MessageHandler
 {
 public:
@@ -294,11 +295,34 @@ private:
    drama::Request MessageReceived() override;
 };
 
+// P_SetActionNT is a non-thread version of SET action, it sets a signal parameter of tdffpi task
 class PSetActionNT : public drama::MessageHandler
 {
 public:
    PSetActionNT() {}
    ~PSetActionNT() {}
+
+private:
+   drama::Request MessageReceived() override;
+};
+
+// P_ResetLockActionNT is a non-thread version of RESET_LOCK action, it resets the internal lock
+class PResetLockActionNT : public drama::MessageHandler
+{
+public:
+   PResetLockActionNT() {}
+   ~PResetLockActionNT() {}
+
+private:
+   drama::Request MessageReceived() override;
+};
+
+// P_SetCoffsActionNT is a non-thread version of SET_COFFS action, it resets the image cofficients
+class PSetCoffsActionNT : public drama::MessageHandler
+{
+public:
+   PSetCoffsActionNT() {}
+   ~PSetCoffsActionNT() {}
 
 private:
    drama::Request MessageReceived() override;
@@ -338,6 +362,8 @@ public:
    bool tdFfpiDefRead(short loadingFiles, short check);
    // lliu added on 06-05-2024 to set parameter
    bool SetParameter(string &ParameterName, string &ParameterValue);
+   // lliu added on 07-05-2024 to write parameter
+   bool tdFfpiDefWrite(short savingFiles, short check);
 
 private:
    //  Set up the homing configuration for a specified amplifier.
@@ -349,6 +375,7 @@ private:
                      CML::Amp *LinkedAmps[], double Limits[] = NULL);
 
    bool tdFfpiReadFile(drama::sds::Id &defId);
+   bool tdFfpiWriteFile(drama::sds::Id &defId);
 
    //  The action handler for the INITIALISE action.
    InitialiseAction I_InitialiseActionObj;
@@ -382,6 +409,10 @@ private:
    PTELPOSActionNT I_PTelposActionNTObj;
    // The new action handler for Set action;
    PSetActionNT I_PSetActionNTObj;
+   // The new action handler for ResetLock action
+   PResetLockActionNT I_PResetLockNTObj;
+   // The newe action handler for SetCoffs action
+   PSetCoffsActionNT I_PSetCoffsActionNTObj;
 
    //  Interface to the CanAccess layer.
    CanAccess I_CanAccess;
@@ -1149,7 +1180,10 @@ TdFCanTask::TdFCanTask(const std::string &taskName) : drama::Task(taskName),
    Add("P_TELPOS", drama::MessageHandlerPtr(&I_PTelposActionNTObj, drama::nodel()));
    // add new Set action which set the FPI task parameters;
    Add("P_SET", drama::MessageHandlerPtr(&I_PSetActionNTObj, drama::nodel()));
-
+   // add new Reset Lock action which reset the lock;
+   Add("P_RESETLOCK", drama::MessageHandlerPtr(&I_PResetLockNTObj, drama::nodel()));
+   //
+   Add("P_SETCOFFS", drama::MessageHandlerPtr(&I_PSetCoffsActionNTObj, drama::nodel()));
    Add("EXIT", &drama::SimpleExitAction);
 }
 
@@ -1176,6 +1210,32 @@ TdFCanTask::~TdFCanTask()
       free(I_tdFfpiMainStruct);
       I_tdFfpiMainStruct = nullptr;
    }
+}
+
+bool TdFCanTask::tdFfpiDefWrite(short savingFiles, short check)
+{
+   string pathName = TDFPT_PARAM_DIR;
+   string fName;
+   if (savingFiles & DEFS_FILE)
+   {
+      tdFfpiTaskType *details = tdFfpiGetMainStruct();
+      drama::sds::Id defId;
+      if(tdFfpiWriteFile(defId))
+      {
+         if(defId)
+         {
+            fName = pathName + "tdFfpiDefs.sds";
+            defId.Write(fName);
+         }else{
+            I_ErrorString += "The created sds structure is invalid.\n";
+            return false;
+         }
+      }else{
+         I_ErrorString += "Fail to create a sds structure.\n";
+         return false;
+      }
+   }
+   return true;
 }
 
 // TdF CanTask Read Default Parameter SDS File
@@ -1218,6 +1278,122 @@ bool TdFCanTask::tdFfpiDefRead(short loadingFiles, short check)
    }
 }
 
+bool TdFCanTask::tdFfpiWriteFile(drama::sds::Id &defId)
+{
+   tdFfpiTaskType *details = tdFfpiGetMainStruct();
+   drama::sds::Id tmpId, tmp2Id;
+   double dParam;
+   unsigned long int dimVal = 6;
+   long int lIntParam;
+   short shortParam;
+   std::vector<unsigned long int> dims; 
+   dims.push_back(dimVal);
+
+   if(details == nullptr)
+   {
+      DramaTHROW(TDFCANTASK__MALLOCERR, "Malloc error.");
+   }
+   defId = drama::sds::Id::CreateTopLevel(
+       "tdFfpiDefs", SDS_STRUCT);
+   tmpId = defId.CreateChildItem("freeImage", SDS_STRUCT);
+   tmpId.Put("bias", (short)details->freeImg.bias);
+   tmp2Id = tmpId.CreateChildArray("camCoeffs", SDS_DOUBLE, dims);
+
+   drama::sds::ArrayWriteHelper<double> arrayHelper;
+   tmp2Id.ArrayAccess(&arrayHelper);
+
+   for (int index = 0; index < (int)dimVal; index++)
+   {
+      arrayHelper[index] = details->freeImg.camCoeffs[index];
+   }
+
+   tmpId = defId.CreateChildItem("normWindow", SDS_STRUCT);
+   tmpId.Put("xCen", (double)details->normWin.xCen);
+   tmpId.Put("yCen", (double)details->normWin.yCen);
+   tmpId.Put("xSpan", (short)details->normWin.xSpan);
+   tmpId.Put("ySpan", (short)details->normWin.ySpan);
+
+   tmpId = defId.CreateChildItem("searchWindow", SDS_STRUCT);
+   tmpId.Put("xCen", (double)details->searchWin.xCen);
+   tmpId.Put("yCen", (double)details->searchWin.yCen);
+   tmpId.Put("xSpan", (short)details->searchWin.xSpan);
+   tmpId.Put("ySpan", (short)details->searchWin.ySpan);
+
+   tmpId = defId.CreateChildItem("conversion", SDS_STRUCT);
+   tmp2Id = tmpId.CreateChildArray("coeffs", SDS_DOUBLE, dims);
+   drama::sds::ArrayWriteHelper<double> arrayHelperCoeffs;
+   tmp2Id.ArrayAccess(&arrayHelperCoeffs);
+   for (int index = 0; index < (int)dimVal; index++)
+   {
+      arrayHelperCoeffs[index] = details->convert.coeffs[index];
+   }
+
+   tmpId = defId.CreateChildItem("parameters", SDS_STRUCT);
+   lIntParam = (long int)xyVel;
+   tmpId.Put("XY_VEL", lIntParam);
+
+   lIntParam = (long int)stepSize;
+   tmpId.Put("STEP_SIZE", lIntParam);
+
+   lIntParam = (long int)maxError;
+   tmpId.Put("MAX_ERROR", lIntParam);
+
+   lIntParam = (long int)posTol;
+   tmpId.Put("POS_TOL", lIntParam);
+
+   lIntParam = (long int)attempts;
+   tmpId.Put("POS_ATTEMPTS", lIntParam);
+
+   lIntParam = (long int)fibInImgThres;
+   tmpId.Put("FIBRE_IN_IMAGE", lIntParam);
+
+   dParam = (double)settleTime;
+   tmpId.Put("SETTLE_TIME", dParam);
+
+   lIntParam = (long int)timeoutFac;
+   tmpId.Put("TIMEOUT_FAC", lIntParam);
+
+   lIntParam = (long int)xaccuracy;
+   tmpId.Put("X_ACCURACY", lIntParam);
+
+   lIntParam = (long int)yaccuracy;
+   tmpId.Put("Y_ACCURACY", lIntParam);
+
+   if(details->dprFeedback)
+   {
+      tmpId.Put("DPR_FEEDBACK", "YES");
+   }
+   else
+   {
+      tmpId.Put("DPR_FEEDBACK", "NO");
+   }
+
+   lIntParam = (long int)overlayPlaneEnabled;
+   tmpId.Put("VFG_OP_ENABLE", lIntParam);
+
+   dParam = (double)zerocamCenWait;
+   tmpId.Put("ZEROCAM_CENWAIT", dParam);
+
+   lIntParam = (long int)copleyXPosLim;
+   tmpId.Put("COPLEY_LIM_X_POS", lIntParam);
+
+   lIntParam = (long int)copleyXNegLim;
+   tmpId.Put("COPLEY_LIM_X_NEG", lIntParam);
+
+   lIntParam = (long int)copleyYPosLim;
+   tmpId.Put("COPLEY_LIM_Y_POS", lIntParam);
+
+   lIntParam = (long int)copleyYNegLim;
+   tmpId.Put("COPLEY_LIM_Y_NEG", lIntParam);
+
+   lIntParam = (long int)shortZeroX;
+   tmpId.Put("PLT1_CFID_OFF_X", lIntParam);
+
+   lIntParam = (long int)shortZeroY;
+   tmpId.Put("PLT1_CFID_OFF_Y", lIntParam);
+   return true;
+}
+
 bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
 {
    tdFfpiTaskType *details = tdFfpiGetMainStruct();
@@ -1237,7 +1413,7 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
       DEBUG("The sds::Id is invalid");
       I_ErrorString += "Malloc error.\n";
       DramaTHROW(TDFCANTASK__MALLOCERR, "Malloc error.");
-      return false;
+      // return false;
    }
 
    /*
@@ -1275,25 +1451,25 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
       if (tmp2Id)
       {
          tmp2Id.Get(6 * sizeof(double), details->freeImg.camCoeffs, &actlen, 0);
-         if (actlen != 6)
+         if (actlen != 6 * sizeof(double)) // this is not correct actlen returns bytes values
          {
             I_ErrorString += "The field of camCoeffs is invalid.\n";
             DramaTHROW(TDFCANTASK__READ_ERROR, "The field of camCoeffs is invalid.");
-            return false;
+            // return false;
          }
       }
       else
       {
          I_ErrorString += "Cannot find the field of camCoeffs.\n";
          DramaTHROW(TDFCANTASK__READ_ERROR, "Cannot find the field of camCoeffs.");
-         return false;
+         // return false;
       }
    }
    else
    {
       I_ErrorString += "Cannot find the field of freeImage.\n";
       DramaTHROW(TDFCANTASK__READ_ERROR, "Cannot find the field of freeImage.");
-      return false;
+      // return false;
    }
 
    slaInvf(details->freeImg.camCoeffs, details->freeImg.invCoeffs, &j);
@@ -1370,7 +1546,7 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
       {
          // SdsGet(tmp2Id, 6 * sizeof(double), 0, details->convert.coeffs, &actlen, status);
          tmp2Id.Get(6 * sizeof(double), details->convert.coeffs, &actlen, 0);
-         if (actlen != 6)
+         if (actlen != 6 * sizeof(double)) //
          {
             I_ErrorString += "The field of conversion coeffs is invalid.\n";
             DramaTHROW(TDFCANTASK__READ_ERROR, "The field of conversion coeffs is invalid.");
@@ -1383,14 +1559,14 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
       {
          I_ErrorString += "Cannot find the field of coeffs.\n";
          DramaTHROW(TDFCANTASK__READ_ERROR, "Cannot find the field of coeffs.");
-         return false;
+         // return false;
       }
    }
    else
    {
       I_ErrorString += "Cannot find the field of conversion.\n";
       DramaTHROW(TDFCANTASK__READ_ERROR, "Cannot find the field of conversion.");
-      return false;
+      // return false;
    }
 
    // if (*status != STATUS__OK)
@@ -2097,7 +2273,9 @@ bool TdFCanTask::SetParameter(string &ParameterName, string &ParameterValue)
          I_ErrorString += "In Protected Mode, cannot set up the Parked Mode!";
          return false;
       }
-      tdfCanParked = ParameterValue;
+      // validate the value, restrict the value to YES & NO;
+      if (ParameterValue == "YES" || ParameterValue == "NO")
+         tdfCanParked = ParameterValue;
       DEBUG("Setting up the PARKED Mode %s\n", ParameterValue.c_str());
    }
    else if ((strcmp(ParameterName.c_str(), "HA") == 0) ||
@@ -2621,14 +2799,14 @@ drama::Request InitialiseAction::MessageReceived()
    UnblockSIGUSR2();
 
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
-   drama::ParSys parSys(GetTask());
+   // drama::ParSys parSys(GetTask());
    drama::sds::Id parSysId(drama::sds::Id::CreateFromSdsIdType((long)(DitsGetParId())));
 
    ThisTask->ClearError();
    if (!(ThisTask->InitialisefpiMainStruct()))
    {
       DEBUG("Fail to allocate memory to fpiMainStruct\n");
-      return drama::RequestCode::Exit;
+      return drama::RequestCode::End;
    }
    else
    {
@@ -2654,7 +2832,7 @@ drama::Request InitialiseAction::MessageReceived()
       {
 
          DEBUG("Parameter ZEROCAM_CENWAIT length mismatch");
-         return drama::RequestCode::Exit;
+         return drama::RequestCode::End;
       }
       length = 0;
       // SdsFreeId(id, &status);
@@ -2667,7 +2845,7 @@ drama::Request InitialiseAction::MessageReceived()
       if (length != sizeof(*(details->pars.plt1CenterFidOffsetX)))
       {
          DEBUG("Parameter PLT1_CFID_OFF_X length mismatch");
-         return drama::RequestCode::Exit;
+         return drama::RequestCode::End;
       }
       length = 0;
       // SdsFreeId(id, &status);
@@ -2680,7 +2858,7 @@ drama::Request InitialiseAction::MessageReceived()
       if (length != sizeof(*(details->pars.plt1CenterFidOffsetY)))
       {
          DEBUG("Parameter PLT1_CFID_OFF_Y length mismatch");
-         return drama::RequestCode::Exit;
+         return drama::RequestCode::End;
       }
       length = 0;
       // SdsFreeId(id, &status);
@@ -2692,7 +2870,7 @@ drama::Request InitialiseAction::MessageReceived()
       if (defRead == false)
       {
          details->inUse = NO;
-         return drama::RequestCode::Exit;
+         return drama::RequestCode::End;
       }
 
       details->ipsMode = 0;
@@ -3506,9 +3684,6 @@ drama::Request PTELPOSActionNT::MessageReceived()
       paramHA.Put(dHA);
       paramDEC.Put(dDEC);
 
-      paramHA.Update();
-      paramDEC.Update();
-
       DEBUG("After the update, the current HA is:\n");
       paramHA.List();
       DEBUG("\nAfter the update, the current DEC is:\n");
@@ -3529,7 +3704,7 @@ drama::Request PSetActionNT::MessageReceived()
    ThisTask->ClearError();
 
    drama::sds::Id Arg = GetEntry().Argument();
-   drama::ParSys parSys(GetTask());
+   drama::ParSys parSys(GetTask()); // this is duplicated;
    drama::sds::Id parSysId(drama::sds::Id::CreateFromSdsIdType((long)(DitsGetParId())));
 
    string ParameterName = "";
@@ -3553,7 +3728,19 @@ drama::Request PSetActionNT::MessageReceived()
    {
       if (parSys.Exists(ParameterName))
       {
-         ThisTask->SetParameter(ParameterName, ParameterValue);
+         drama::ParId paramOriginal(GetTask(), ParameterName);
+         DEBUG("Before the Parameter Setting, the original val is:\n");
+         paramOriginal.List();
+         if (ThisTask->SetParameter(ParameterName, ParameterValue))
+         {
+            DEBUG("After the Parameter Setting, the new val is:\n");
+            paramOriginal.List();
+            MessageUser("P_SET: Set Parameter Complete.\n");
+         }
+         else
+         {
+            MessageUser("P_SET: " + ThisTask->GetError());
+         }
       }
       else
       {
@@ -3562,6 +3749,89 @@ drama::Request PSetActionNT::MessageReceived()
    }
    return drama::RequestCode::End;
 }
+
+drama::Request PResetLockActionNT::MessageReceived()
+{
+   UnblockSIGUSR2();
+   auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   ThisTask->ClearError();
+   tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
+   if (details != nullptr)
+   {
+      details->inUse = NO;
+      MessageUser("P_RESETLOCK: Reset internal lock completed.\n");
+   }
+   else
+   {
+      MessageUser("P_RESETLOCK: the structure pointer is null, please initialise the task first.\n");
+   }
+
+   return drama::RequestCode::End;
+}
+
+drama::Request PSetCoffsActionNT::MessageReceived()
+{
+   UnblockSIGUSR2();
+   auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   ThisTask->ClearError();
+   tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
+   drama::sds::Id Arg = GetEntry().Argument();
+   string CoffsVal;
+   string SaveFlag;
+   int j = 0;
+   if (details != nullptr)
+   {
+      if (Arg)
+      {
+         try
+         {
+            drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
+            drama::gitarg::String CoffsValArg(Arg, "CoffsVal", 1, "", NoFlags);
+            CoffsVal = CoffsValArg;
+            drama::gitarg::String SaveFlagArg(Arg, "ParameterValue", 2, "", NoFlags);
+            SaveFlag = SaveFlagArg;
+         }
+         catch (exception &e)
+         {
+            MessageUser("P_SETCOFFS: " + string(e.what()));
+            return drama::RequestCode::End;
+         }
+         std::vector<string> ParameterVec = SplitString(CoffsVal);
+         if ((int)ParameterVec.size() == 6)
+         {
+            for (int index = 0; index < 6; index++)
+            {
+               details->convert.coeffs[index] = stod(ParameterVec[index]);
+            }
+            slaInvf(details->convert.coeffs, details->convert.invCoeffs, &j);
+            if (j != 0)
+            {
+               for (int index = 0; index < 6; index++)
+                  details->convert.invCoeffs[index] = details->convert.coeffs[index];
+            }
+            if (SaveFlag == "SAVE" || SaveFlag == "save")
+            {
+               ThisTask->tdFfpiDefWrite(1, 0);
+            }
+            MessageUser("P_SETCOFFS: Set Coffs completed.\n");
+         }
+         else
+         {
+            MessageUser("P_SETCOFFS: Invalid input arguments. Require 6 input arguments.\n");
+         }
+      }
+      else
+      {
+         MessageUser("P_SETCOFFS: No i.nput arguments.\n");
+      }
+   }
+   else
+   {
+      MessageUser("P_SETCOFFS: the structure pointer is null, please initialise the task first.\n");
+   }
+   return drama::RequestCode::End;
+}
+
 //  ------------------------------------------------------------------------------------------------
 
 //                                    M a i n  P r o g r a m
