@@ -93,6 +93,10 @@
 #define TDFPT_PARAM_DIR  "/home/lliu/Project_Codes/buildanagate/Parameters/"
 #endif 
 
+#define FPI_XY_FR_MIN         1  /* FPI XY axes minimum feedrate value (?)        */
+#define FPI_XY_FR_MAX   1000000  /* FPI XY axes maximum feedrate value (?)        */
+#define PLATE_FR_MIN          1  /* Plate rotators minimum feedrate value (?)     */
+#define PLATE_FR_MAX    3000000  /* Plate rotators maximum feedrate value (?)     */
 
 #define TDFFPI_MSG_BUFFER       20000  /* Size of message buffer for TDFFPI          */
 
