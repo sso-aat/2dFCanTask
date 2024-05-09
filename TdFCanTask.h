@@ -100,6 +100,12 @@
 
 #define TDFFPI_MSG_BUFFER       20000  /* Size of message buffer for TDFFPI          */
 
+#define FPI_CLEAR_X 253513
+#define FPI_CLEAR_Y -240488
+
+#ifndef SAFE
+#define SAFE 2
+#endif 
 /*
  *  If not on VxWorks, must define the following.
  */

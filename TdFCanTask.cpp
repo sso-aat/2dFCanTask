@@ -393,6 +393,61 @@ private:
    drama::Request MessageReceived() override;
 };
 
+// P_ReportActionNT is a non-thread version of Report action, it reports the value of a fpi task parameter
+class PReportActionNT : public drama::MessageHandler
+{
+public:
+   PReportActionNT() {}
+   ~PReportActionNT() {}
+
+private:
+   drama::Request MessageReceived() override;
+};
+
+// P_ReportLocksActionNT is a non-thread version of ReportLocks action, it reports the status of internal lock
+class PReportLocksActionNT : public drama::MessageHandler
+{
+public:
+   PReportLocksActionNT() {}
+   ~PReportLocksActionNT() {}
+
+private:
+   drama::Request MessageReceived() override;
+};
+
+// P_ReportCoeffsActionNT is a non-thread version of ReportCoeffs action, it reports the coeffs
+class PReportCoeffsActionNT : public drama::MessageHandler
+{
+public:
+   PReportCoeffsActionNT() {}
+   ~PReportCoeffsActionNT() {}
+
+private:
+   drama::Request MessageReceived() override;
+};
+
+// P_ReportImageActionNT is a non-thread version of ReportImage action, it reports the details of image
+class PReportImageActionNT : public drama::MessageHandler
+{
+public:
+   PReportImageActionNT() {}
+   ~PReportImageActionNT() {}
+
+private:
+   drama::Request MessageReceived() override;
+};
+
+// P_ReportWindowActionNT is a non-thread version of ReportWindow action, it reports the details of window
+class PReportWindowActionNT : public drama::MessageHandler
+{
+public:
+   PReportWindowActionNT() {}
+   ~PReportWindowActionNT() {}
+
+private:
+   drama::Request MessageReceived() override;
+};
+
 //  ------------------------------------------------------------------------------------------------
 
 //                                  T a s k  D e f i n i t i o n
@@ -429,6 +484,10 @@ public:
    bool SetParameter(string &ParameterName, string &ParameterValue);
    // lliu added on 07-05-2024 to write parameter
    bool tdFfpiDefWrite(short savingFiles, short check);
+   // lliu added on 09-05-2024 to check the locks
+   bool tdFfpiIlocks(long int ilocks);
+   // lliu added on 09-05-2024 to update the pos;
+   bool tdFfpiUpdatePos(short updateIdeal, short useDpr, short displayText);
 
 private:
    //  Set up the homing configuration for a specified amplifier.
@@ -446,12 +505,30 @@ private:
    // Read the flex file
    bool tdFfpiReadFlexFile(drama::sds::Id &defId);
 
+   void tdFfpiConvertFromEnc(int xEnc, int yEnc, double plateTheta,
+                             short level, double *xCon, double *yCon);
+   void tdFfpiFlexure(long int x, long int y,
+                      double ha, double dec, TdfFlexType *pars, long int *dx, long int *dy);
+   void tdFstateBitSet(unsigned char bit);
+   void tdFstateBitClear(unsigned char bit);
+
+   // --------------------------------------------------------------------------
+   // Gantry movement related actions
+   // --------------------------------------------------------------------------
    //  The action handler for the INITIALISE action.
    InitialiseAction I_InitialiseActionObj;
    //  The action handler for the G_INIT action.
    GInitAction I_GInitActionObj;
    //  A non-threaded version of G_INIT, called G_INIT_NT
    GInitActionNT I_GInitActionNTObj;
+   // The new action handler for G_EXIT action.
+   GEXITActionNT I_GExitActionNTObj;
+   // The new action handler for G_RESET action.
+   GRESETActionNT I_GResetActionNTObj;
+
+   // --------------------------------------------------------------------------
+   // Gantry movement related actions
+   // --------------------------------------------------------------------------
    //  The action handler for the G_MOVE_AXIS action.
    GMoveAxisAction I_GMoveAxisActionObj;
    //  The action handler for the G_MOVE_AXIS_NT (non-threaded) action.
@@ -460,20 +537,18 @@ private:
    GHomeAction I_GHomeActionObj;
    // newly-added action handler for the G_HOME_NT (non-threaded) action
    GHomeActionNT I_GHomeActionNTObj;
-
    // The new action handler for the ParkGantry action
    GParkGantryActionNT I_GParkGantryActionNTObj;
    // The new action handler for G_UNPARK_NT action.
    GUnParkActionNT I_GUnParkActionNTObj;
    // The new action handler for G_MOVEOFFSET_NT action.
    GMoveOffsetActionNT I_GMoveOffsetActionNTObj;
-   // The new action handler for G_EXIT action.
-   GEXITActionNT I_GExitActionNTObj;
    // The new action handler for G_MOVE_NT action.
    GMOVEActionNT I_GMoveActionNTObj;
-   // The new action handler for G_RESET action.
-   GRESETActionNT I_GResetActionNTObj;
 
+   // --------------------------------------------------------------------------
+   // Parameter setting related actions
+   // --------------------------------------------------------------------------
    // The new action handler for TELPOS action;
    PTELPOSActionNT I_PTelposActionNTObj;
    // The new action handler for Set action;
@@ -494,6 +569,20 @@ private:
    PUpdateFlexActionNT I_PUpdateFlexActionNTObj;
    // The new action handler for Update action
    PUpdateActionNT I_PUpdateActionNTObj;
+
+   // --------------------------------------------------------------------------
+   // Parameter reporting related actions
+   // --------------------------------------------------------------------------
+   // The new action handler for Report action
+   PReportActionNT I_PReportActionNTObj;
+   // The new action handler for Report Lock action
+   PReportLocksActionNT I_PReportLocksActionNTObj;
+   // The new action handler for Report Coeffs action
+   PReportCoeffsActionNT I_PReportCoeffsActionNTObj;
+   // The new action handler for Report Image action
+   PReportImageActionNT I_PReportImageActionNTObj;
+   // The new action handler for Report Window action
+   PReportWindowActionNT I_PReportWindowActionNTObj;
 
    //  Interface to the CanAccess layer.
    CanAccess I_CanAccess;
@@ -721,6 +810,26 @@ bool GetDouble(const std::string &ValueString, double &Value)
       OK = false;
    }
    return OK;
+}
+
+long int doubleToLong(double doubleNum)
+{
+   double doubleTemp;
+   long int longTemp, addAmount, one = 1;
+   short negativeNumber;
+
+   negativeNumber = (doubleNum < 0) ? YES : NO;
+   if (negativeNumber == YES)
+      doubleNum = -doubleNum;
+
+   longTemp = doubleNum / one;
+   doubleTemp = doubleNum - (double)longTemp;
+   addAmount = (doubleTemp < 0.5) ? 0 : 1;
+   longTemp += addAmount;
+   if (negativeNumber)
+      longTemp = -longTemp;
+
+   return (longTemp);
 }
 
 // Setup the Positions and Velocities
@@ -1263,21 +1372,34 @@ TdFCanTask::TdFCanTask(const std::string &taskName) : drama::Task(taskName),
    // add new Set action which sets the FPI task parameters;
    Add("P_SET", drama::MessageHandlerPtr(&I_PSetActionNTObj, drama::nodel()));
    // add new Reset Lock action which resets the lock;
-   Add("P_RESETLOCK", drama::MessageHandlerPtr(&I_PResetLockNTObj, drama::nodel()));
+   Add("P_RESET_LOCK", drama::MessageHandlerPtr(&I_PResetLockNTObj, drama::nodel()));
    // add new Set Coeffs action which sets the coefficients;
-   Add("P_SETCOEFFS", drama::MessageHandlerPtr(&I_PSetCoeffsActionNTObj, drama::nodel()));
+   Add("P_SET_COEFFS", drama::MessageHandlerPtr(&I_PSetCoeffsActionNTObj, drama::nodel()));
    // add new Set Image action which sets the coefficients of camera;
-   Add("P_SETIMAGE", drama::MessageHandlerPtr(&I_PSetImageActionNTObj, drama::nodel()));
+   Add("P_SET_IMAGE", drama::MessageHandlerPtr(&I_PSetImageActionNTObj, drama::nodel()));
    // add new Set Window action which sets the search window during the centroid;
-   Add("P_SETWINDOW", drama::MessageHandlerPtr(&I_PSetWindowActionNTObj, drama::nodel()));
+   Add("P_SET_WINDOW", drama::MessageHandlerPtr(&I_PSetWindowActionNTObj, drama::nodel()));
    // add new SetVel action which sets the velocity of gantry
-   Add("P_SETVEL", drama::MessageHandlerPtr(&I_PSetVelActionNTObj, drama::nodel()));
+   Add("P_SET_VEL", drama::MessageHandlerPtr(&I_PSetVelActionNTObj, drama::nodel()));
    // add new SetPlate action which sets the velocity of gantry
-   Add("P_SETPLATE", drama::MessageHandlerPtr(&I_PSetPlateActionNTObj, drama::nodel()));
+   Add("P_SET_PLATE", drama::MessageHandlerPtr(&I_PSetPlateActionNTObj, drama::nodel()));
    // add new UpdateFlex action which rereads flex file
-   Add("P_UPDATEFLEX", drama::MessageHandlerPtr(&I_PUpdateFlexActionNTObj, drama::nodel()));
+   Add("P_UPDATE_FLEX", drama::MessageHandlerPtr(&I_PUpdateFlexActionNTObj, drama::nodel()));
    // add new Update action which updates the pose
-   Add("P_UPDATE", drama::MessageHandlerPtr(&I_PUpdateActionNTObj, drama::nodel()));
+   Add("P_POLL_POSE", drama::MessageHandlerPtr(&I_PUpdateActionNTObj, drama::nodel()));
+   Add("P_UPDATE_POSE", drama::MessageHandlerPtr(&I_PUpdateActionNTObj, drama::nodel()));
+
+   // add new Report action which reports the parameters of fpi task
+   Add("P_REPORT", drama::MessageHandlerPtr(&I_PReportActionNTObj, drama::nodel()));
+   // add new Report Lock action which reports the status of the lock
+   Add("P_REPORT_LOCKS", drama::MessageHandlerPtr(&I_PReportLocksActionNTObj, drama::nodel()));
+   // add new Report Coeffs action which reports the coefficents
+   Add("P_REPORT_COEFFS", drama::MessageHandlerPtr(&I_PReportCoeffsActionNTObj, drama::nodel()));
+   // add new Report Image action which reports the image
+   Add("P_REPORT_IMAGE", drama::MessageHandlerPtr(&I_PReportImageActionNTObj, drama::nodel()));
+   // add new Report Window action which reports the window
+   Add("P_REPORT_WINDOW", drama::MessageHandlerPtr(&I_PReportWindowActionNTObj, drama::nodel()));
+
    Add("EXIT", &drama::SimpleExitAction);
 }
 
@@ -2087,6 +2209,245 @@ bool TdFCanTask::tdFfpiReadFlexFile(drama::sds::Id &defId)
    }
 
    return true;
+}
+
+bool TdFCanTask::tdFfpiIlocks(long int ilocks)
+{
+
+   if (ilocks & ILOCK__TASK_INIT)
+   {
+      if (I_tdFfpiMainStruct->Initialised == NO)
+      {
+         I_ErrorString += "The task has not been initialised.\n";
+         DEBUG("The task has not been initialised.\n");
+         return false;
+      }
+   }
+
+   if (ilocks & ILOCK__GAN_PARKED)
+   {
+      if (tdfCanParked == "YES")
+      {
+         I_ErrorString += "The gantry has parked.\n";
+         DEBUG("The gantry has parked.\n");
+         return false;
+      }
+   }
+
+   if (ilocks & ILOCK__GAN_NOT_PARKED)
+   {
+      if (tdfCanParked == "NO")
+      {
+         I_ErrorString += "The gantry has not parked.\n";
+         DEBUG("The gantry has not parked.\n");
+         return false;
+      }
+   }
+   DEBUG("Lock check has completed.\n");
+   return true;
+}
+
+void TdFCanTask::tdFfpiFlexure(long int x, long int y,
+                               double ha, double dec, TdfFlexType *pars, long int *dx, long int *dy)
+{
+   double pa, zd;
+   double phi = -0.54589;
+   double yd;
+   double dyd;
+
+   *dy = 0;
+
+   /*  parallactic angle */
+   pa = slaPa(ha, dec, phi);
+
+   /*  Zenith distance */
+   zd = slaZd(ha, dec, phi);
+
+   yd = (double)y - pars->offset;
+
+   dyd = pars->k * yd * (pars->length - yd) * cos(pa) * sin(zd);
+
+   *dx = (long)(dyd * 4.0 / ((pars->length) * (pars->length)));
+}
+
+void TdFCanTask::tdFstateBitSet(unsigned char bit)
+{
+   unsigned short oldval, newval = 0;
+   oldval = ushortZero;
+   newval = oldval | bit;
+
+   /* Only update the parameter (triggering monitors) if value has changed*/
+   if (newval != oldval)
+      ushortZero = newval;
+}
+
+void TdFCanTask::tdFstateBitClear(unsigned char bit)
+{
+   unsigned short oldval, newval = 0;
+   oldval = ushortZero;
+
+   newval = oldval & (~bit);
+
+   /* Only update the parameter (triggering monitors) if value has changed*/
+   if (newval != oldval)
+      ushortZero = newval;
+}
+
+void TdFCanTask::tdFfpiConvertFromEnc(int xEnc, int yEnc, double plateTheta,
+                                      short level, double *xCon, double *yCon)
+{
+   long int dx = 0, dy = 0;
+   double x_enc, y_enc, x_fp, y_fp, ha, dec;
+
+   if ((level == _ALL) || (level == _FLEX))
+   {
+      *xCon = (double)xEnc;
+      *yCon = (double)yEnc;
+      return;
+   }
+
+   ha = dzeroHA;
+   dec = dzeroDEC;
+   tdFfpiFlexure((long int)xEnc, (long int)yEnc,
+                 ha, dec, &I_tdFfpiMainStruct->convert.flex,
+                 &dx, &dy);
+
+   x_enc = (double)xEnc + (double)dx;
+   y_enc = (double)yEnc + (double)dy;
+   /*
+    *  This is all we want if the level is _TEMP.
+    */
+   if (level == _TEMP)
+   {
+      *xCon = x_enc;
+      *yCon = y_enc;
+      return;
+   }
+
+   if (level == _COEFFS)
+   {
+      *xCon = x_enc;
+      *yCon = y_enc;
+      return;
+   }
+
+   /*
+    *  Translate/rotate/scale to non-deflected coordinates for set temperature.
+    */
+   slaXy2xy(x_enc, y_enc,                          /* Encoder coordinates     */
+            I_tdFfpiMainStruct->convert.invCoeffs, /* Transformation matrix   */
+            &x_fp, &y_fp);                         /* Field-plate coordinates */
+   if (I_tdFfpiMainStruct->currentPlate == 1)
+   {
+      if (I_tdFfpiMainStruct->plateOneDontRemove)
+      {
+      }
+      else
+      {
+         double t_x = x_fp;
+         double t_y = y_fp;
+         x_fp = t_x + (double)(*(I_tdFfpiMainStruct->pars.plt1CenterFidOffsetX));
+         y_fp = t_y + (double)(*(I_tdFfpiMainStruct->pars.plt1CenterFidOffsetY));
+      }
+   }
+   /*
+    *  Remove rotation due to field plate rotation.
+    */
+   *xCon = x_fp * cos(-plateTheta) - y_fp * sin(-plateTheta);
+   *yCon = y_fp * cos(-plateTheta) + x_fp * sin(-plateTheta);
+}
+
+bool TdFCanTask::tdFfpiUpdatePos(short updateIdeal, short useDpr, short displayText)
+{
+   double atFpX, atFpY;
+   long int oldFpX, oldFpY, newFpX, newFpY;
+
+   if (I_tdFfpiMainStruct == nullptr)
+   {
+      I_ErrorString += "The structure pointer is not initialised.\n";
+      return false;
+   }
+   if (useDpr)
+   {
+      CML::Linkage *MoveLinkage = I_CanAccess.GetLinkage(MAX_TDF_AMPS, G_AmpNames);
+      if (MoveLinkage)
+      {
+         for (int Index = 0; Index < MAX_TDF_AMPS; Index++)
+         {
+            CML::uunit CurrentPosition = 0.0;
+            (*MoveLinkage)[Index].GetPositionActual(CurrentPosition);
+            if (Index < 2)
+            {
+               I_tdFfpiMainStruct->atEnc.x = (int)CurrentPosition;
+            }
+            else if (Index == 2)
+            {
+               I_tdFfpiMainStruct->atEnc.y = (int)CurrentPosition;
+            }
+         }
+      }
+      else
+      {
+         I_ErrorString += "Failed to get information from the motor.\n";
+         return false;
+      }
+   }
+   else
+   {
+      I_tdFfpiMainStruct->atEnc.x = I_tdFfpiMainStruct->toEnc.x;
+      I_tdFfpiMainStruct->atEnc.y = I_tdFfpiMainStruct->toEnc.y;
+   }
+
+   {
+      /*
+       * Update the parameters which contain the encoder values - but only if they
+       * have actually changed (to avoid flooding parameter monitors)
+       */
+      if (xPark != I_tdFfpiMainStruct->atEnc.x)
+      {
+         xPark = I_tdFfpiMainStruct->atEnc.x;
+         xCopleyPark = I_tdFfpiMainStruct->atEnc.x;
+      }
+      if (yPark != I_tdFfpiMainStruct->atEnc.y)
+      {
+         yPark = I_tdFfpiMainStruct->atEnc.y;
+         yCopleyPark = I_tdFfpiMainStruct->atEnc.y;
+      }
+   }
+
+   tdFfpiConvertFromEnc(I_tdFfpiMainStruct->atEnc.x,
+                        I_tdFfpiMainStruct->atEnc.y,
+                        (double)plateTheta, _FULL,
+                        &atFpX, &atFpY);
+
+   if (displayText)
+      DEBUG("tdFfpi:Converted encoder values %d, %d to %f, %f.\n", I_tdFfpiMainStruct->atEnc.x, I_tdFfpiMainStruct->atEnc.y, atFpX, atFpY);
+
+   oldFpX = (long int)(xPark);
+   oldFpY = (long int)(yPark);
+   newFpX = doubleToLong(atFpX);
+   newFpY = doubleToLong(atFpY);
+
+   if (oldFpX != newFpX)
+   {
+      xPark = newFpX;
+      xCopleyPark = newFpX;
+   }
+   if (oldFpY != newFpY)
+   {
+      yPark = newFpY;
+      yCopleyPark = newFpY;
+   }
+   if ((newFpX >= (FPI_CLEAR_X - 1000)) && (newFpY <= (FPI_CLEAR_Y + 1000)))
+      tdFstateBitSet(SAFE);
+   else
+      tdFstateBitClear(SAFE);
+
+   if (updateIdeal)
+   {
+      I_tdFfpiMainStruct->ideal.x = newFpX;
+      I_tdFfpiMainStruct->ideal.y = newFpY;
+   }
 }
 //  ------------------------------------------------------------------------------------------------
 
@@ -3911,7 +4272,13 @@ drama::Request PSetActionNT::MessageReceived()
       catch (exception &e)
       {
          MessageUser("P_SET: " + string(e.what()));
+         return drama::RequestCode::End;
       }
+   }
+   if (ParameterName.find(',') != string::npos || ParameterName.find(' ') != string::npos)
+   {
+      MessageUser("P_SET: please check the name of parameter, this action only supports a single parameter.\n");
+      return drama::RequestCode::End;
    }
    if (!ParameterName.empty() && !ParameterValue.empty())
    {
@@ -3951,11 +4318,11 @@ drama::Request PResetLockActionNT::MessageReceived()
    if (details != nullptr)
    {
       details->inUse = NO;
-      MessageUser("P_RESETLOCK: Reset internal lock completed.\n");
+      MessageUser("P_RESET_LOCK: Reset internal lock completed.\n");
    }
    else
    {
-      MessageUser("P_RESETLOCK: the structure pointer is null, please initialise the task first.\n");
+      MessageUser("P_RESET_LOCK: the structure pointer is null, please initialise the task first.\n");
    }
 
    return drama::RequestCode::End;
@@ -3989,7 +4356,7 @@ drama::Request PSetCoeffsActionNT::MessageReceived()
          }
          catch (exception &e)
          {
-            MessageUser("P_SETCOEFFS: " + string(e.what()));
+            MessageUser("P_SET_COEFFS: " + string(e.what()));
             return drama::RequestCode::End;
          }
          std::vector<string> ParameterVec = SplitString(CoffsVal);
@@ -4009,24 +4376,24 @@ drama::Request PSetCoeffsActionNT::MessageReceived()
             {
                if (!ThisTask->tdFfpiDefWrite(DEFS_FILE + FLEX_FILE, check))
                {
-                  MessageUser("P_SETCOEFFS: Save Coffs failed " + ThisTask->GetError());
+                  MessageUser("P_SET_COEFFS: Save Coffs failed " + ThisTask->GetError());
                }
             }
-            MessageUser("P_SETCOEFFS: Set Coffs completed.\n");
+            MessageUser("P_SET_COEFFS: Set Coffs completed.\n");
          }
          else
          {
-            MessageUser("P_SETCOEFFS: Invalid input arguments. Require 6 input arguments.\n");
+            MessageUser("P_SET_COEFFS: Invalid input arguments. Require 6 input arguments.\n");
          }
       }
       else
       {
-         MessageUser("P_SETCOEFFS: No input arguments.\n");
+         MessageUser("P_SET_COEFFS: No input arguments.\n");
       }
    }
    else
    {
-      MessageUser("P_SETCOEFFS: the structure pointer is null, please initialise the task first.\n");
+      MessageUser("P_SET_COEFFS: the structure pointer is null, please initialise the task first.\n");
    }
    return drama::RequestCode::End;
 }
@@ -4042,7 +4409,7 @@ drama::Request PSetImageActionNT::MessageReceived()
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
    if (details == nullptr)
    {
-      MessageUser("P_SETIMAGE: the structure pointer is null, please initialise the task first.\n");
+      MessageUser("P_SET_IMAGE: the structure pointer is null, please initialise the task first.\n");
       return drama::RequestCode::End;
    }
 
@@ -4085,13 +4452,13 @@ drama::Request PSetImageActionNT::MessageReceived()
       }
       if (!ThisTask->tdFfpiDefWrite(DEFS_FILE, check))
       {
-         MessageUser("P_SETIMAGE: Save Image failed " + ThisTask->GetError());
+         MessageUser("P_SET_IMAGE: Save Image failed " + ThisTask->GetError());
       }
-      MessageUser("P_SETIMAGE: Set Image completed.\n");
+      MessageUser("P_SET_IMAGE: Set Image completed.\n");
    }
    else
    {
-      MessageUser("P_SETIMAGE: No input arguments.\n");
+      MessageUser("P_SET_IMAGE: No input arguments.\n");
    }
 
    return drama::RequestCode::End;
@@ -4108,7 +4475,7 @@ drama::Request PSetWindowActionNT::MessageReceived()
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
    if (details == nullptr)
    {
-      MessageUser("P_SETWINDOW: the structure pointer is null, please initialise the task first.\n");
+      MessageUser("P_SET_WINDOW: the structure pointer is null, please initialise the task first.\n");
       return drama::RequestCode::End;
    }
    drama::sds::Id Arg = GetEntry().Argument();
@@ -4151,13 +4518,13 @@ drama::Request PSetWindowActionNT::MessageReceived()
       }
       if (!ThisTask->tdFfpiDefWrite(DEFS_FILE, 0))
       {
-         MessageUser("P_SETWINDOW: Save Window failed " + ThisTask->GetError());
+         MessageUser("P_SET_WINDOW: Save Window failed " + ThisTask->GetError());
       }
-      MessageUser("P_SETWINDOW: Set Window completed.\n");
+      MessageUser("P_SET_WINDOW: Set Window completed.\n");
    }
    else
    {
-      MessageUser("P_SETWINDOW: No input arguments.\n");
+      MessageUser("P_SET_WINDOW: No input arguments.\n");
    }
 
    return drama::RequestCode::End;
@@ -4180,21 +4547,21 @@ drama::Request PSetVelActionNT::MessageReceived()
       drama::gitarg::Int<FPI_XY_FR_MIN, FPI_XY_FR_MAX> feedRateArg(Arg, "feedrate", 1, 0, NoFlags);
       iFeedrate = feedRateArg;
       drama::ParId paramFeedRate(GetTask(), "XY_VEL");
-      MessageUser("P_SETVEL: before the setting, the value of XY_VEL is: \n");
+      MessageUser("P_SET_VEL: before the setting, the value of XY_VEL is: \n");
       paramFeedRate.List();
       paramFeedRate.Put((int)iFeedrate);
-      MessageUser("P_SETVEL: after the setting, the value of XY_VEL is: \n");
+      MessageUser("P_SET_VEL: after the setting, the value of XY_VEL is: \n");
       paramFeedRate.List();
 
       if (!ThisTask->tdFfpiDefWrite(DEFS_FILE, 0))
       {
-         MessageUser("P_SETVEL: Save XY_VEL failed " + ThisTask->GetError());
+         MessageUser("P_SET_VEL: Save XY_VEL failed " + ThisTask->GetError());
       }
-      MessageUser("P_SETVEL: Set VEL completed.\n");
+      MessageUser("P_SET_VEL: Set VEL completed.\n");
    }
    else
    {
-      MessageUser("P_SETVEL: No input arguments.\n");
+      MessageUser("P_SET_VEL: No input arguments.\n");
    }
    return drama::RequestCode::End;
 }
@@ -4212,7 +4579,7 @@ drama::Request PSetPlateActionNT::MessageReceived()
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
    if (details == nullptr)
    {
-      MessageUser("P_SETPLATE: the structure pointer is null, please initialise the task first.\n");
+      MessageUser("P_SET_PLATE: the structure pointer is null, please initialise the task first.\n");
       return drama::RequestCode::End;
    }
    if (Arg)
@@ -4220,14 +4587,14 @@ drama::Request PSetPlateActionNT::MessageReceived()
       drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
       drama::gitarg::Int<-1, 1> plateArg(Arg, "PLATE", 1, 0, NoFlags);
       iPlate = plateArg;
-      DEBUG("P_SETPLATE: before the setting, the value of plate is: %hd\n", details->currentPlate);
+      DEBUG("P_SET_PLATE: before the setting, the value of plate is: %hd\n", details->currentPlate);
       details->currentPlate = (short)iPlate;
-      DEBUG("P_SETPLATE: after the setting, the value of plate is: %hd\n", details->currentPlate);
-      MessageUser("P_SETPLATE: Set Plate completed.\n");
+      DEBUG("P_SET_PLATE: after the setting, the value of plate is: %hd\n", details->currentPlate);
+      MessageUser("P_SET_PLATE: Set Plate completed.\n");
    }
    else
    {
-      MessageUser("P_SETPLATE: No input arguments.\n");
+      MessageUser("P_SET_PLATE: No input arguments.\n");
    }
 
    return drama::RequestCode::End;
@@ -4244,12 +4611,12 @@ drama::Request PUpdateFlexActionNT::MessageReceived()
    short check = SHOW;
    if (!ThisTask->tdFfpiDefRead(FLEX_FILE, check))
    {
-      DEBUG("P_UPDATEFLEX: failed to read tdfFpiFlex.sds.\n");
-      MessageUser("P_UPDATEFLEX: failed to read tdfFpiFlex.sds " + ThisTask->GetError());
+      DEBUG("P_UPDATE_FLEX: failed to read tdfFpiFlex.sds.\n");
+      MessageUser("P_UPDATE_FLEX: failed to read tdfFpiFlex.sds " + ThisTask->GetError());
    }
    else
    {
-      MessageUser("P_UPDATEFLEX: Update Flex completed.\n");
+      MessageUser("P_UPDATE_FLEX: Update Flex completed.\n");
    }
    return drama::RequestCode::End;
 }
@@ -4268,7 +4635,191 @@ drama::Request PUpdateActionNT::MessageReceived()
       MessageUser("P_UPDATE: the structure pointer is null, please initialise the task first.\n");
       return drama::RequestCode::End;
    }
-   
+   if (!ThisTask->tdFfpiIlocks(ILOCK__TASK_INIT))
+   {
+      MessageUser("Unable to execute this action: " + ThisTask->GetError());
+      return drama::RequestCode::End;
+   }
+   double dTimeout = 0.0;
+   drama::sds::Id Arg = GetEntry().Argument();
+   if (Arg)
+   {
+      drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
+      drama::gitarg::String dTimeoutArg(Arg, "timeout", 1, "0.0", NoFlags);
+      dTimeout = stod(dTimeoutArg) > 0.0 ? stod(dTimeoutArg) : 0.0;
+      if (!ThisTask->tdFfpiUpdatePos(NO, YES, YES))
+      {
+         MessageUser("P_POLL_POSE: failed to complete the action, " + ThisTask->GetError());
+      }
+      MessageUser("P_POLL_POSE: action completed");
+   }
+   else
+   {
+      if (!ThisTask->tdFfpiUpdatePos(YES, details->dprFeedback, YES))
+      {
+         MessageUser("P_UPDATE_POSE: failed to complete the action, " + ThisTask->GetError());
+      }
+      MessageUser("P_UPDATE_POSE: action completed.\n");
+   }
+   return drama::RequestCode::End;
+}
+
+//  ------------------------------------------------------------------------------------------------
+
+//         P  Report   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
+drama::Request PReportActionNT::MessageReceived()
+{
+   UnblockSIGUSR2();
+   auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   ThisTask->ClearError();
+   drama::sds::Id Arg = GetEntry().Argument();
+   drama::sds::Id parSysId(drama::sds::Id::CreateFromSdsIdType((long)(DitsGetParId())));
+   if (Arg)
+   {
+      drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
+      drama::gitarg::String parameterNameArg(Arg, "parameter", 1, "", NoFlags);
+      string parameterName = parameterNameArg;
+      if (parameterName == "_ALL_")
+      {
+         MessageUser("P_REPORT: report all the parameters.\n");
+         parSysId.List();
+      }
+      else if (parSysId.Exists(parameterName))
+      {
+         drama::sds::Id parameterId = parSysId.Find(parameterName);
+         MessageUser("P_REPORT: report the value of " + parameterName + "\n");
+         parameterId.List();
+      }
+      else
+      {
+         MessageUser("P_REPORT: the input argument is not valid. The parameter does not exist.\n");
+      }
+   }
+   else
+   {
+      MessageUser("P_REPORT: no input argument.\n");
+   }
+   MessageUser("P_REPORT: action completed.\n");
+   return drama::RequestCode::End;
+}
+
+//  ------------------------------------------------------------------------------------------------
+
+//         P  ReportLock   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
+drama::Request PReportLocksActionNT::MessageReceived()
+{
+   UnblockSIGUSR2();
+   auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   ThisTask->ClearError();
+   tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
+   if (details == nullptr)
+   {
+      MessageUser("P_REPORT_LOCKS: the structure pointer is null, please initialise the task!\n");
+   }
+   if (details->inUse)
+   {
+      MessageUser("P_REPORT_LOCKS: LOCK IN USE");
+   }
+   else
+   {
+      MessageUser("P_REPORT_LOCKS:LOCK NOT IN USE");
+   }
+   MessageUser("P_REPORT_LOCKS: action completed.\n");
+   return drama::RequestCode::End;
+}
+
+//  ------------------------------------------------------------------------------------------------
+
+//         P  ReportCoeffs   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
+drama::Request PReportCoeffsActionNT::MessageReceived()
+{
+   UnblockSIGUSR2();
+   auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   ThisTask->ClearError();
+   tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
+   if (details == nullptr)
+   {
+      MessageUser("P_REPORT_COEFFS: the structure pointer is null, please initialise the task!\n");
+   }
+   DEBUG("The coeffs array is: \n");
+   for (int index = 0; index < 6; ++index)
+   {
+      DEBUG("%f  ", details->convert.coeffs[index]);
+   }
+   DEBUG("\n");
+   MessageUser("P_REPORT_COEFFS: action completed.\n");
+   return drama::RequestCode::End;
+}
+
+drama::Request PReportImageActionNT::MessageReceived()
+{
+   UnblockSIGUSR2();
+   auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   ThisTask->ClearError();
+   tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
+   if (details == nullptr)
+   {
+      MessageUser("P_REPORT_IMAGE: the structure pointer is null, please initialise the task!\n");
+   }
+   DEBUG("FREE image details: \n");
+   DEBUG("The bias(centroiding) is: %hd", (short)details->freeImg.bias);
+   DEBUG("The Camera coeffs array is: \n");
+   for (int index = 0; index < 6; ++index)
+   {
+      DEBUG("%f  ", details->freeImg.camCoeffs[index]);
+   }
+   DEBUG("\n");
+   DEBUG("The Inverse coeffs array is: \n");
+   for (int index = 0; index < 6; ++index)
+   {
+      DEBUG("%f  ", details->freeImg.invCoeffs[index]);
+   }
+   DEBUG("\n");
+   MessageUser("P_REPORT_COEFFS: action completed.\n");
+   return drama::RequestCode::End;
+}
+
+drama::Request PReportWindowActionNT::MessageReceived()
+{
+   UnblockSIGUSR2();
+   auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   ThisTask->ClearError();
+   tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
+   if (details == nullptr)
+   {
+      MessageUser("P_REPORT_WINDOW: the structure pointer is null, please initialise the task!\n");
+   }
+   drama::sds::Id Arg = GetEntry().Argument();
+   string windowStr = "SEARCH";
+   if (Arg)
+   {
+      drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
+      drama::gitarg::String windowArg(Arg, "window", 1, "SEARCH", NoFlags);
+      if (windowArg == "SEARCH" || windowArg == "NORM" || windowArg == "FULL")
+      {
+         windowStr = windowArg;
+      }
+      if (windowStr == "SEARCH")
+      {
+         DEBUG("SEARCH window details:\n");
+         DEBUG("Window centre = %.1f,  %.1f\n", details->searchWin.xCen, details->searchWin.yCen);
+         DEBUG("Window span   = %d,  %d\n", details->searchWin.xSpan, details->searchWin.ySpan);
+      }
+      else
+      {
+         DEBUG("NORM window details:\n");
+         DEBUG("Window centre = %.1f,  %.1f\n", details->normWin.xCen, details->normWin.yCen);
+         DEBUG("Window span   = %d,  %d\n", details->normWin.xSpan, details->normWin.ySpan);
+      }
+   }
+   else
+   {
+      DEBUG("SEARCH window details:\n");
+      DEBUG("Window centre = %.1f,  %.1f\n", details->searchWin.xCen, details->searchWin.yCen);
+      DEBUG("Window span   = %d,  %d\n", details->searchWin.xSpan, details->searchWin.ySpan);
+   }
+
+   MessageUser("P_REPORT_WINDOW: action completed.\n");
    return drama::RequestCode::End;
 }
 
