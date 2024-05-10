@@ -448,6 +448,17 @@ private:
    drama::Request MessageReceived() override;
 };
 
+// P_SaveDefsActionNT is a non-thread version of SaveDef action, it saves Def into the tdfFpiDef.sds
+class PSaveDefsActionNT : public drama::MessageHandler
+{
+public:
+   PSaveDefsActionNT() {}
+   ~PSaveDefsActionNT() {}
+
+private:
+   drama::Request MessageReceived() override;
+};
+
 //  ------------------------------------------------------------------------------------------------
 
 //                                  T a s k  D e f i n i t i o n
@@ -583,6 +594,8 @@ private:
    PReportImageActionNT I_PReportImageActionNTObj;
    // The new action handler for Report Window action
    PReportWindowActionNT I_PReportWindowActionNTObj;
+   // The new action handler for Parameter Saving action
+   PSaveDefsActionNT I_PSaveDefsActionNTObj;
 
    //  Interface to the CanAccess layer.
    CanAccess I_CanAccess;
@@ -1399,7 +1412,8 @@ TdFCanTask::TdFCanTask(const std::string &taskName) : drama::Task(taskName),
    Add("P_REPORT_IMAGE", drama::MessageHandlerPtr(&I_PReportImageActionNTObj, drama::nodel()));
    // add new Report Window action which reports the window
    Add("P_REPORT_WINDOW", drama::MessageHandlerPtr(&I_PReportWindowActionNTObj, drama::nodel()));
-
+   // add new Save Defs action which saves the parameter into a file
+   Add("P_SAVE_DEFS", drama::MessageHandlerPtr(&I_PSaveDefsActionNTObj, drama::nodel()));
    Add("EXIT", &drama::SimpleExitAction);
 }
 
@@ -4751,6 +4765,9 @@ drama::Request PReportCoeffsActionNT::MessageReceived()
    return drama::RequestCode::End;
 }
 
+//  ------------------------------------------------------------------------------------------------
+
+//         P  ReportImage   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
 drama::Request PReportImageActionNT::MessageReceived()
 {
    UnblockSIGUSR2();
@@ -4779,6 +4796,9 @@ drama::Request PReportImageActionNT::MessageReceived()
    return drama::RequestCode::End;
 }
 
+//  ------------------------------------------------------------------------------------------------
+
+//         P  ReportWindow   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
 drama::Request PReportWindowActionNT::MessageReceived()
 {
    UnblockSIGUSR2();
@@ -4820,6 +4840,22 @@ drama::Request PReportWindowActionNT::MessageReceived()
    }
 
    MessageUser("P_REPORT_WINDOW: action completed.\n");
+   return drama::RequestCode::End;
+}
+
+//  ------------------------------------------------------------------------------------------------
+
+//         P  SaveDefs   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
+drama::Request PSaveDefsActionNT::MessageReceived()
+{
+   UnblockSIGUSR2();
+   auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   ThisTask->ClearError();
+   if (!ThisTask->tdFfpiDefWrite(DEFS_FILE + FLEX_FILE, 0))
+   {
+      MessageUser("P_SAVE_DEFS: Save DEFS_FILE failed " + ThisTask->GetError());
+   }
+   MessageUser("P_SAVE_DEFS: action completed.\n");
    return drama::RequestCode::End;
 }
 
