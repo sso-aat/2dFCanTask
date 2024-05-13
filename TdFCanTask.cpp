@@ -618,7 +618,7 @@ private:
 
    // the pointer structure to store the parameters of fpi task added by lliu 01/05/2024
    tdFfpiTaskType *I_tdFfpiMainStruct;
-   // drama::ParSys I_TdFCanTaskParSys;
+   drama::ParSys I_TdFCanTaskParSys;
 
 public:
    drama::Parameter<double> dzero;
@@ -642,10 +642,10 @@ public:
    drama::Parameter<INT32> fibInImgThres;
    drama::Parameter<INT32> copleyCodeVer; /* <---- PMAC code version number */
    drama::Parameter<INT32> overlayPlaneEnabled;
-   drama::Parameter<INT32> copleyXPosLim;
-   drama::Parameter<INT32> copleyXNegLim;
-   drama::Parameter<INT32> copleyYPosLim;
-   drama::Parameter<INT32> copleyYNegLim;
+   // drama::Parameter<INT32> copleyXPosLim;
+   //  drama::Parameter<INT32> copleyXNegLim;
+   //  drama::Parameter<INT32> copleyYPosLim;
+   //  drama::Parameter<INT32> copleyYNegLim;
 
    drama::Parameter<short> attempts;
    drama::Parameter<short> shortZeroX;
@@ -1303,7 +1303,7 @@ TdFCanTask::TdFCanTask(const std::string &taskName) : drama::Task(taskName),
                                                       I_GMoveAxisActionObj(TaskPtr()),
                                                       I_GHomeActionObj(TaskPtr()),
                                                       I_CanAccessInitialised(false),
-                                                      // I_TdFCanTaskParSys(TaskPtr()),
+                                                      I_TdFCanTaskParSys(TaskPtr()),
                                                       tdfTaskStr(TaskPtr(), "ENQ_DEV_DESCR", "2dF Focal Plane Imager Gantry Task"),
                                                       tdfSimSearchRunStr(TaskPtr(), "SIM_SEARCH_RAN", "No"),
                                                       tdfVersionStr(TaskPtr(), "ENQ_VER_NUM", ""),
@@ -1334,10 +1334,10 @@ TdFCanTask::TdFCanTask(const std::string &taskName) : drama::Task(taskName),
                                                       ushortZero(TaskPtr(), "TASK_STATE", 0),
                                                       ushortZeroCentroid(TaskPtr(), "DEBUG_CENTROID", 0),
                                                       zerocamCenWait(TaskPtr(), "ZEROCAM_CENWAIT", 1.0),
-                                                      copleyXPosLim(TaskPtr(), "Copley_LIM_X_POS", 528000),
-                                                      copleyXNegLim(TaskPtr(), "Copley_LIM_X_NEG", -16300),
-                                                      copleyYPosLim(TaskPtr(), "Copley_LIM_Y_POS", 537400),
-                                                      copleyYNegLim(TaskPtr(), "Copley_LIM_Y_NEG", -3400),
+                                                      // copleyXPosLim(TaskPtr(), "COPLEY_LIM_X_POS", 0),
+                                                      //  copleyXNegLim(TaskPtr(), "COPLEY_LIM_X_NEG", 0),
+                                                      //  copleyYPosLim(TaskPtr(), "COPLEY_LIM_Y_POS", 0),
+                                                      //  copleyYNegLim(TaskPtr(), "COPLEY_LIM_Y_NEG", 0),
                                                       shortZeroX(TaskPtr(), "PLT1_CFID_OFF_X", 0),
                                                       shortZeroY(TaskPtr(), "PLT1_CFID_OFF_Y", 0),
                                                       I_X1Amp(NULL),
@@ -1374,7 +1374,7 @@ TdFCanTask::TdFCanTask(const std::string &taskName) : drama::Task(taskName),
    // add new Move Gantry Offset action
    Add("G_MOVEOFFSET_NT", drama::MessageHandlerPtr(&I_GMoveOffsetActionNTObj, drama::nodel()));
    // add new Exit action, which disables all the amplifiers
-   Add("G_EXIT", drama::MessageHandlerPtr(&I_GMoveOffsetActionNTObj, drama::nodel()));
+   Add("G_EXIT", drama::MessageHandlerPtr(&I_GExitActionNTObj, drama::nodel()));
    // add new Move Axis action, which only moves a particular axis
    Add("G_MOVE_NT", drama::MessageHandlerPtr(&I_GMoveActionNTObj, drama::nodel()));
    // add new Reset action, which disables the amplifiers and setup them again.
@@ -1399,8 +1399,7 @@ TdFCanTask::TdFCanTask(const std::string &taskName) : drama::Task(taskName),
    // add new UpdateFlex action which rereads flex file
    Add("P_UPDATE_FLEX", drama::MessageHandlerPtr(&I_PUpdateFlexActionNTObj, drama::nodel()));
    // add new Update action which updates the pose
-   Add("P_POLL_POSE", drama::MessageHandlerPtr(&I_PUpdateActionNTObj, drama::nodel()));
-   Add("P_UPDATE_POSE", drama::MessageHandlerPtr(&I_PUpdateActionNTObj, drama::nodel()));
+   Add("P_UPDATE", drama::MessageHandlerPtr(&I_PUpdateActionNTObj, drama::nodel()));
 
    // add new Report action which reports the parameters of fpi task
    Add("P_REPORT", drama::MessageHandlerPtr(&I_PReportActionNTObj, drama::nodel()));
@@ -1632,17 +1631,17 @@ bool TdFCanTask::tdFfpiWriteFile(drama::sds::Id &defId)
    dParam = (double)zerocamCenWait;
    tmpId.Put("ZEROCAM_CENWAIT", dParam);
 
-   lIntParam = (long int)copleyXPosLim;
-   tmpId.Put("COPLEY_LIM_X_POS", lIntParam);
+   // lIntParam = (long int)copleyXPosLim;
+   // tmpId.Put("PMAC_LIM_X_POS", lIntParam);
 
-   lIntParam = (long int)copleyXNegLim;
-   tmpId.Put("COPLEY_LIM_X_NEG", lIntParam);
+   // lIntParam = (long int)copleyXNegLim;
+   // tmpId.Put("PMAC_LIM_X_NEG", lIntParam);
 
-   lIntParam = (long int)copleyYPosLim;
-   tmpId.Put("COPLEY_LIM_Y_POS", lIntParam);
+   // lIntParam = (long int)copleyYPosLim;
+   // tmpId.Put("PMAC_LIM_Y_POS", lIntParam);
 
-   lIntParam = (long int)copleyYNegLim;
-   tmpId.Put("COPLEY_LIM_Y_NEG", lIntParam);
+   // lIntParam = (long int)copleyYNegLim;
+   // tmpId.Put("PMAC_LIM_Y_NEG", lIntParam);
 
    lIntParam = (long int)shortZeroX;
    tmpId.Put("PLT1_CFID_OFF_X", lIntParam);
@@ -1715,6 +1714,12 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
             DramaTHROW(TDFCANTASK__READ_ERROR, "The field of camCoeffs is invalid.");
             // return false;
          }
+         DEBUG("The FreeImage camCoeffs array is:\n");
+         for (int index = 0; index < 6; index++)
+         {
+            DEBUG(" %f ", details->freeImg.camCoeffs[index]);
+         }
+         DEBUG("\n");
       }
       else
       {
@@ -1738,6 +1743,12 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
          details->freeImg.invCoeffs[i] = details->freeImg.camCoeffs[i];
    }
 
+   DEBUG("The FreeImage invCoeffs array is:\n");
+   for (int index = 0; index < 6; index++)
+   {
+      DEBUG(" %f ", details->freeImg.invCoeffs[index]);
+   }
+   DEBUG("\n");
    /*
     *  Read the normal wimdow definitions.
     */
@@ -1748,19 +1759,27 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
    {
       // ArgGetd(tmpId, "xCen", &dParam, status);
       tmpId.Get("xCen", &dParam);
+      DEBUG("xCen from file is %f\n", dParam);
       details->normWin.xCen = dParam;
+      DEBUG("normWin.xCen is %f\n", details->normWin.xCen);
 
       // ArgGetd(tmpId, "yCen", &dParam, status);
       tmpId.Get("yCen", &dParam);
+      DEBUG("yCen from file is %f\n", dParam);
       details->normWin.yCen = dParam;
+      DEBUG("normWin.yCen is %f\n", details->normWin.yCen);
 
       // ArgGets(tmpId, "xSpan", &sParam, status);
       tmpId.Get("xSpan", &sParam);
+      DEBUG("xSpan from file is %hd\n", sParam);
       details->normWin.xSpan = (int)sParam;
+      DEBUG("normWin.xSpan is %d\n", details->normWin.xSpan);
 
       // ArgGets(tmpId, "ySpan", &sParam, status);
       tmpId.Get("ySpan", &sParam);
+      DEBUG("ySpan from file is %hd\n", sParam);
       details->normWin.ySpan = (int)sParam;
+      DEBUG("normWin.ySpan is %d\n", details->normWin.ySpan);
       // SdsFreeId(tmpId, status);
    }
 
@@ -1811,6 +1830,12 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
          }
          // SdsFreeId(tmpId, status);
          // SdsFreeId(tmp2Id, status);
+         DEBUG("The SearchWindow conversion array is:\n");
+         for (int index = 0; index < 6; index++)
+         {
+            DEBUG(" %f ", details->convert.coeffs[index]);
+         }
+         DEBUG("\n");
       }
       else
       {
@@ -1834,7 +1859,12 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
       for (i = 0; i < 6; i++)
          details->convert.invCoeffs[i] = details->convert.coeffs[i];
    }
-
+   DEBUG("The SearchWindow invconversion array is:\n");
+   for (int index = 0; index < 6; index++)
+   {
+      DEBUG(" %f ", details->convert.invCoeffs[index]);
+   }
+   DEBUG("\n");
    /*
     *  Set default parameter values.
     */
@@ -1855,8 +1885,11 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
       if (lIntParam)
       {
          // I_TdFCanTaskParSys.Put("XY_VEL", lIntParam);
-         xyVel = lIntParam;
-         DEBUG("xyVel is %d\n", xyVel);
+         DEBUG("XY_VEL from file is %ld\n", lIntParam);
+         // xyVel = static_cast<INT32>(lIntParam);
+         DEBUG("xyVel original is %d\n", this->xyVel);
+         I_TdFCanTaskParSys.Put("XY_VEL", (INT32)lIntParam);
+         DEBUG("xyVel after altering is %d\n", this->xyVel);
          lIntParam = 0;
       }
 
@@ -1872,6 +1905,8 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
       {
          // I_TdFCanTaskParSys.Put("STEP_SIZE", lIntParam);
          stepSize = lIntParam;
+         DEBUG("STEP_SIZE from file is %ld\n", lIntParam);
+         I_TdFCanTaskParSys.Put("STEP_SIZE", (INT32)lIntParam);
          DEBUG("stepSize is %d\n", stepSize);
          lIntParam = 0;
       }
@@ -1888,6 +1923,8 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
       {
          // I_TdFCanTaskParSys.Put("MAX_ERROR", lIntParam);
          maxError = lIntParam;
+         DEBUG("MAX_ERROR from file is %ld\n", lIntParam);
+         I_TdFCanTaskParSys.Put("MAX_ERROR", (INT32)lIntParam);
          DEBUG("maxError is %d\n", maxError);
          lIntParam = 0;
       }
@@ -1904,6 +1941,8 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
       {
          // I_TdFCanTaskParSys.Put("POS_TOL", lIntParam);
          posTol = lIntParam;
+         DEBUG("POS_TOL from file is %ld\n", lIntParam);
+         I_TdFCanTaskParSys.Put("POS_TOL", (INT32)lIntParam);
          DEBUG("posTol is %d\n", posTol);
          lIntParam = 0;
       }
@@ -1920,6 +1959,8 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
       {
          // I_TdFCanTaskParSys.Put("POS_ATTEMPTS", sParam);
          attempts = sParam;
+         DEBUG("POS_ATTEMPTS from file is %hd\n", sParam);
+         I_TdFCanTaskParSys.Put("POS_ATTEMPTS", (short)sParam);
          DEBUG("attempts is %hd\n", attempts);
          sParam = 0;
       }
@@ -1937,6 +1978,8 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
 
          // I_TdFCanTaskParSys.Put("FIBRE_IN_IMAGE", lIntParam);
          fibInImgThres = lIntParam;
+         DEBUG("FIBRE_IN_IMAGE from file is %ld\n", lIntParam);
+         I_TdFCanTaskParSys.Put("POS_ATTEMPTS", (INT32)lIntParam);
          DEBUG("fibInImgThres is %d\n", fibInImgThres);
          lIntParam = 0;
       }
@@ -1953,6 +1996,8 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
       {
          // I_TdFCanTaskParSys.Put("SETTLE_TIME", dParam);
          settleTime = dParam;
+         DEBUG("SETTLE_TIME from file is %f\n", dParam);
+         I_TdFCanTaskParSys.Put("SETTLE_TIME", (double)dParam);
          DEBUG("settleTime is %f\n", settleTime);
          dParam = 0.0;
       }
@@ -1969,6 +2014,8 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
       {
          // I_TdFCanTaskParSys.Put("X_ACCURACY", lIntParam);
          xaccuracy = lIntParam;
+         DEBUG("X_ACCURACY from file is %ld\n", lIntParam);
+         I_TdFCanTaskParSys.Put("X_ACCURACY", (INT32)lIntParam);
          DEBUG("xaccuracy is %d\n", xaccuracy);
          lIntParam = 0;
       }
@@ -1985,6 +2032,8 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
       {
          // I_TdFCanTaskParSys.Put("Y_ACCURACY", lIntParam);
          yaccuracy = lIntParam;
+         DEBUG("Y_ACCURACY from file is %ld\n", lIntParam);
+         I_TdFCanTaskParSys.Put("Y_ACCURACY", (INT32)lIntParam);
          DEBUG("yaccuracy is %d\n", yaccuracy);
          lIntParam = 0;
       }
@@ -2001,6 +2050,8 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
       {
          // I_TdFCanTaskParSys.Put("TIMEOUT_FAC", lIntParam);
          timeoutFac = lIntParam;
+         DEBUG("TIMEOUT_FAC from file is %ld\n", lIntParam);
+         I_TdFCanTaskParSys.Put("TIMEOUT_FAC", (INT32)lIntParam);
          DEBUG("timeoutFac is %d\n", timeoutFac);
          lIntParam = 0;
       }
@@ -2017,6 +2068,7 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
       tmpId.Get("DPR_FEEDBACK", &strParam);
       if (strParam.empty() == false)
       {
+         DEBUG("DPR_FEEDBACK from file is %s\n", strParam.c_str());
          details->dprFeedback = strcmp("NO", strParam.c_str()) ? YES : NO;
          DEBUG("details->dprFeedback is %hd\n", details->dprFeedback);
          strParam = "";
@@ -2034,6 +2086,8 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
       {
          // I_TdFCanTaskParSys.Put("VFG_OP_ENABLE", lIntParam);
          overlayPlaneEnabled = lIntParam;
+         DEBUG("VFG_OP_ENABLE from file is %ld\n", lIntParam);
+         I_TdFCanTaskParSys.Put("VFG_OP_ENABLE", (INT32)lIntParam);
          DEBUG("overlayPlaneEnabled is %d\n", overlayPlaneEnabled);
          lIntParam = 0;
       }
@@ -2050,6 +2104,8 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
       {
          // I_TdFCanTaskParSys.Put("ZEROCAM_CENWAIT", dParam);
          zerocamCenWait = dParam;
+         DEBUG("ZEROCAM_CENWAIT from file is %f\n", dParam);
+         I_TdFCanTaskParSys.Put("ZEROCAM_CENWAIT", (double)dParam);
          DEBUG("zerocamCenWait is %f\n", zerocamCenWait);
          dParam = 0.0;
       }
@@ -2065,8 +2121,10 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
       if (lIntParam)
       {
          // I_TdFCanTaskParSys.Put("PMAC_LIM_X_POS", lIntParam);
-         copleyXPosLim = lIntParam;
-         DEBUG("copleyXPosLim is %d\n", copleyXPosLim);
+         // copleyXPosLim = lIntParam;
+         DEBUG("PMAC_LIM_X_POS from file is %d\n", lIntParam);
+         I_TdFCanTaskParSys.Put("PMAC_LIM_X_POS", (INT32)lIntParam);
+         // DEBUG("copleyXPosLim is %d\n", copleyXPosLim);
          lIntParam = 0;
       }
 
@@ -2081,8 +2139,10 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
       if (lIntParam)
       {
          // I_TdFCanTaskParSys.Put("PMAC_LIM_X_NEG", lIntParam);
-         copleyXNegLim = lIntParam;
-         DEBUG("copleyXNegLim is %d\n", copleyXNegLim);
+         // copleyXNegLim = lIntParam;
+         DEBUG("PMAC_LIM_X_NEG from file is %d\n", lIntParam);
+         I_TdFCanTaskParSys.Put("PMAC_LIM_X_NEG", (INT32)lIntParam);
+         // DEBUG("copleyXNegLim is %d\n", copleyXNegLim);
          lIntParam = 0;
       }
 
@@ -2097,8 +2157,10 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
       if (lIntParam)
       {
          // I_TdFCanTaskParSys.Put("PMAC_LIM_Y_POS", lIntParam);
-         copleyYPosLim = lIntParam;
-         DEBUG("copleyYPosLim is %d\n", copleyYPosLim);
+         // copleyYPosLim = lIntParam;
+         // DEBUG("copleyYPosLim is %d\n", copleyYPosLim);
+         DEBUG("PMAC_LIM_Y_POS from file is %d\n", lIntParam);
+         I_TdFCanTaskParSys.Put("PMAC_LIM_Y_POS", (INT32)lIntParam);
          lIntParam = 0;
       }
 
@@ -2113,8 +2175,10 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
       if (lIntParam)
       {
          // I_TdFCanTaskParSys.Put("PMAC_LIM_Y_NEG", lIntParam);
-         copleyYNegLim = lIntParam;
-         DEBUG("copleyYNegLim is %d\n", copleyYNegLim);
+         // copleyYNegLim = lIntParam;
+         // DEBUG("copleyYNegLim is %d\n", copleyYNegLim);
+         DEBUG("PMAC_LIM_Y_NEG from file is %d\n", lIntParam);
+         I_TdFCanTaskParSys.Put("PMAC_LIM_Y_NEG", (INT32)lIntParam);
          lIntParam = 0;
       }
 
@@ -2130,6 +2194,8 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
       {
          // I_TdFCanTaskParSys.Put("PLT1_CFID_OFF_X", lIntParam);
          shortZeroX = lIntParam;
+         DEBUG("PLT1_CFID_OFF_X from file is %d\n", lIntParam);
+         I_TdFCanTaskParSys.Put("PLT1_CFID_OFF_X", (short)lIntParam);
          DEBUG("shortZeroX is %hd\n", shortZeroX);
          lIntParam = 0;
       }
@@ -2146,6 +2212,8 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
       {
          // I_TdFCanTaskParSys.Put("PLT1_CFID_OFF_Y", lIntParam);
          shortZeroY = lIntParam;
+         DEBUG("PLT1_CFID_OFF_Y from file is %d\n", lIntParam);
+         I_TdFCanTaskParSys.Put("PLT1_CFID_OFF_Y", (short)lIntParam);
          DEBUG("shortZeroY is %hd\n", shortZeroY);
          lIntParam = 0;
       }
@@ -2510,7 +2578,7 @@ bool TdFCanTask::SetupAmps(void)
          }
       }
 
-      DEBUG("Setting amp addrs\n");
+      DEBUG("\nSetting amp addrs\n");
 
       //  Access the CML::Amp objects used to control the specified axes.
 
@@ -2545,7 +2613,7 @@ bool TdFCanTask::InitialisefpiMainStruct()
       I_tdFfpiMainStruct = (tdFfpiTaskType *)malloc(sizeof(tdFfpiTaskType));
       if (nullptr == I_tdFfpiMainStruct)
       {
-         DEBUG("I_tdFfpiMainStruct fail to initialise\n");
+         DEBUG("\nI_tdFfpiMainStruct fail to initialise\n");
          return false;
       }
       else
@@ -2566,7 +2634,7 @@ bool TdFCanTask::DisableAmps()
 
    if (!I_CanAccessInitialised)
    {
-      DEBUG("CanAccess is not inlitialised!\n");
+      DEBUG("\nCanAccess is not inlitialised!\n");
       return DisableAllAmps;
    }
 
@@ -2770,7 +2838,7 @@ bool TdFCanTask::SetParameter(string &ParameterName, string &ParameterValue)
    if (strcmp(ParameterName.c_str(), "MODE") == 0)
    {
       tdfCanMode = ParameterValue;
-      DEBUG("Setting up the mode %s\n", ParameterValue.c_str());
+      DEBUG("\nSetting up the mode %s\n", ParameterValue.c_str());
    }
    else if ((strcmp(ParameterName.c_str(), "X") == 0) || (strcmp(ParameterName.c_str(), "Y") == 0))
    {
@@ -2786,11 +2854,13 @@ bool TdFCanTask::SetParameter(string &ParameterName, string &ParameterValue)
          if (strcmp(ParameterName.c_str(), "X") == 0)
          {
             xPark = PosVal;
+            I_TdFCanTaskParSys.Put("X", (INT32)PosVal);
             DEBUG("Setting up the X %d\n", xPark);
          }
          else
          {
             yPark = PosVal;
+            I_TdFCanTaskParSys.Put("Y", (INT32)PosVal);
             DEBUG("Setting up the Y %d\n", yPark);
          }
       }
@@ -2799,6 +2869,7 @@ bool TdFCanTask::SetParameter(string &ParameterName, string &ParameterValue)
    {
       int VelVal = stoi(ParameterValue);
       xyVel = VelVal;
+      I_TdFCanTaskParSys.Put("XY_VEL", (INT32)VelVal);
       DEBUG("Setting up the velocity %d\n", xyVel);
    }
    else if ((strcmp(ParameterName.c_str(), "X_ACCURACY") == 0) ||
@@ -2808,11 +2879,13 @@ bool TdFCanTask::SetParameter(string &ParameterName, string &ParameterValue)
       if (strcmp(ParameterName.c_str(), "X_ACCURACY") == 0)
       {
          xaccuracy = accuracy;
+         I_TdFCanTaskParSys.Put("X_ACCURACY", (INT32)accuracy);
          DEBUG("Setting up the X_ACCURACY %d\n", xaccuracy);
       }
       else
       {
          yaccuracy = accuracy;
+         I_TdFCanTaskParSys.Put("Y_ACCURACY", (INT32)accuracy);
          DEBUG("Setting up the Y_ACCURACY %d\n", yaccuracy);
       }
    }
@@ -2820,6 +2893,7 @@ bool TdFCanTask::SetParameter(string &ParameterName, string &ParameterValue)
    {
       double ThetaVal = stod(ParameterValue);
       plateTheta = ThetaVal;
+      I_TdFCanTaskParSys.Put("PLATE_THETA", (double)ThetaVal);
       DEBUG("Setting up the plate theta %f\n", plateTheta);
    }
    else if (strcmp(ParameterName.c_str(), "PARKED") == 0)
@@ -2829,9 +2903,13 @@ bool TdFCanTask::SetParameter(string &ParameterName, string &ParameterValue)
          I_ErrorString += "In Protected Mode, cannot set up the Parked Mode!";
          return false;
       }
-      // validate the value, restrict the value to YES & NO;
-      if (ParameterValue == "YES" || ParameterValue == "NO")
+      // validate the value
+      if(ParameterValue == "YES" || ParameterValue == "NO")
+      {
          tdfCanParked = ParameterValue;
+         I_TdFCanTaskParSys.Put("PARKED", std::string(ParameterValue));
+      }
+
       DEBUG("Setting up the PARKED Mode %s\n", ParameterValue.c_str());
    }
    else if ((strcmp(ParameterName.c_str(), "HA") == 0) ||
@@ -2839,9 +2917,13 @@ bool TdFCanTask::SetParameter(string &ParameterName, string &ParameterValue)
    {
       double dVal = stod(ParameterValue);
       if (strcmp(ParameterName.c_str(), "HA") == 0)
+      {
          dzeroHA = dVal;
+         I_TdFCanTaskParSys.Put("HA", (double)dVal);
+      }
       else
       {
+         I_TdFCanTaskParSys.Put("DEC", (double)dVal);
          dzeroDEC = dVal;
       }
       DEBUG("Setting up the %s to be %f\n", ParameterName.c_str(), dVal);
@@ -2855,18 +2937,35 @@ bool TdFCanTask::SetParameter(string &ParameterName, string &ParameterValue)
    {
       int iVal = stoi(ParameterValue);
       if (strcmp(ParameterName.c_str(), "STEP_SIZE") == 0)
+      {
          stepSize = iVal;
+         I_TdFCanTaskParSys.Put("STEP_SIZE", (INT32)(iVal));
+      }   
       else if (strcmp(ParameterName.c_str(), "MAX_ERROR") == 0)
+      {
          maxError = iVal;
+         I_TdFCanTaskParSys.Put("MAX_ERROR", (INT32)(iVal));
+      }
       else if (strcmp(ParameterName.c_str(), "FIBRE_IN_IMAGE") == 0)
+      {
          fibInImgThres = iVal;
+         I_TdFCanTaskParSys.Put("FIBRE_IN_IMAGE", (INT32)(iVal));
+      }
       else if (strcmp(ParameterName.c_str(), "POS_TOL") == 0)
+      {
          posTol = iVal;
-      else if (strcmp(ParameterName.c_str(), "VFG_OP_ENABLE") == 0)
+         I_TdFCanTaskParSys.Put("POS_TOL", (INT32)(iVal));
+      }
+      else if (strcmp(ParameterName.c_str(), "TIMEOUT_FAC") == 0)
+      {
          timeoutFac = iVal;
+         I_TdFCanTaskParSys.Put("TIMEOUT_FAC", (INT32)(iVal));
+      }
       else if (strcmp(ParameterName.c_str(), "VFG_OP_ENABLE") == 0)
+      {
          overlayPlaneEnabled = iVal;
-
+         I_TdFCanTaskParSys.Put("VFG_OP_ENABLE", (INT32)(iVal));
+      }
       DEBUG("Setting up the %s to be %d\n", ParameterName.c_str(), iVal);
    }
    else if ((strcmp(ParameterName.c_str(), "PLT1_CFID_OFF_X") == 0) ||
@@ -2874,55 +2973,77 @@ bool TdFCanTask::SetParameter(string &ParameterName, string &ParameterValue)
    {
       int iVal = stoi(ParameterValue);
       if (strcmp(ParameterName.c_str(), "PLT1_CFID_OFF_X") == 0)
+      {  
          shortZeroX = iVal;
-      else
+         I_TdFCanTaskParSys.Put("PLT1_CFID_OFF_X", (short)(iVal));
+      }
+      else{
          shortZeroY = iVal;
+         I_TdFCanTaskParSys.Put("PLT1_CFID_OFF_Y", (short)(iVal));
+      }
+         
       DEBUG("Setting up the %s to be %d\n", ParameterName.c_str(), iVal);
    }
    else if (strcmp(ParameterName.c_str(), "POS_ATTEMPTS") == 0)
    {
       int iVal = stoi(ParameterValue);
       attempts = iVal;
+      I_TdFCanTaskParSys.Put("POS_ATTEMPTS", (INT32)(iVal));
       DEBUG("Setting up the %s to be %d\n", ParameterName.c_str(), iVal);
    }
    else if (strcmp(ParameterName.c_str(), "SETTLE_TIME") == 0)
    {
       double dVal = stod(ParameterValue);
       settleTime = dVal;
+      I_TdFCanTaskParSys.Put("SETTLE_TIME", (double)(dVal));
       DEBUG("Setting up the %s to be %f\n", ParameterName.c_str(), dVal);
    }
    else if (strcmp(ParameterName.c_str(), "ZEROCAM_CENWAIT") == 0)
    {
       double dVal = stod(ParameterValue);
       zerocamCenWait = dVal;
+      I_TdFCanTaskParSys.Put("ZEROCAM_CENWAIT", (double)(dVal));
       DEBUG("Setting up the %s to be %f\n", ParameterName.c_str(), dVal);
    }
    else if (strcmp(ParameterName.c_str(), "GANTRY_LAMPS") == 0)
    {
       tdfGantryLamp = ParameterValue;
+      I_TdFCanTaskParSys.Put("GANTRY_LAMPS", std::string(ParameterValue));
       DEBUG("Setting up the %s to be %s\n", ParameterName.c_str(), ParameterValue);
    }
-   else if ((strcmp(ParameterName.c_str(), "Copley_LIM_X_POS") == 0) ||
-            (strcmp(ParameterName.c_str(), "Copley_LIM_X_NEG") == 0) ||
-            (strcmp(ParameterName.c_str(), "Copley_LIM_Y_POS") == 0) ||
-            (strcmp(ParameterName.c_str(), "Copley_LIM_Y_NEG") == 0))
+   else if ((strcmp(ParameterName.c_str(), "PMAC_LIM_X_POS") == 0) ||
+            (strcmp(ParameterName.c_str(), "PMAC_LIM_X_NEG") == 0) ||
+            (strcmp(ParameterName.c_str(), "PMAC_LIM_Y_POS") == 0) ||
+            (strcmp(ParameterName.c_str(), "PMAC_LIM_Y_NEG") == 0))
    {
       int iVal = stoi(ParameterValue);
-      if (strcmp(ParameterName.c_str(), "Copley_LIM_X_POS") == 0)
-         copleyXPosLim = iVal;
-      else if (strcmp(ParameterName.c_str(), "Copley_LIM_X_NEG") == 0)
-         copleyXNegLim = iVal;
-      else if (strcmp(ParameterName.c_str(), "Copley_LIM_Y_POS") == 0)
-         copleyYPosLim = iVal;
-      else if (strcmp(ParameterName.c_str(), "Copley_LIM_Y_NEG") == 0)
-         copleyYNegLim = iVal;
-
+      if (strcmp(ParameterName.c_str(), "PMAC_LIM_X_POS") == 0)
+      {
+         //copleyXPosLim = iVal;
+         I_TdFCanTaskParSys.Put("PMAC_LIM_X_POS", (INT32)(iVal));
+      }
+      else if (strcmp(ParameterName.c_str(), "PMAC_LIM_X_NEG") == 0)
+      {
+         //copleyXNegLim = iVal;
+         I_TdFCanTaskParSys.Put("PMAC_LIM_X_NEG", (INT32)(iVal));
+      }   
+      else if (strcmp(ParameterName.c_str(), "PMAC_LIM_Y_POS") == 0)
+      {
+         //copleyYPosLim = iVal;
+         I_TdFCanTaskParSys.Put("PMAC_LIM_Y_POS", (INT32)(iVal));
+      }   
+      else if (strcmp(ParameterName.c_str(), "PMAC_LIM_Y_NEG") == 0)
+      {
+         //copleyYNegLim = iVal;
+         I_TdFCanTaskParSys.Put("PMAC_LIM_Y_NEG", (INT32)(iVal));
+      }   
       DEBUG("Setting up the %s to be %d\n", ParameterName.c_str(), iVal);
    }
    else if (strcmp(ParameterName.c_str(), "DEBUG_CENTROID") == 0)
    {
       int iVal = stoi(ParameterValue);
       ushortZeroCentroid = iVal;
+      I_TdFCanTaskParSys.Put("DEBUG_CENTROID", (unsigned short)(iVal));
       DEBUG("Setting up the %s to be %d\n", ParameterName.c_str(), iVal);
    }
    return true;
@@ -4434,7 +4555,7 @@ drama::Request PSetImageActionNT::MessageReceived()
       double coeffs[6] = {0.0};
       long int bias;
       int j = 0;
-      short check;
+      short check = 0;
       drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
       drama::gitarg::String ImageArg(Arg, "image", 1, "FREE", NoFlags);
       drama::gitarg::Int<0, 255> BiasArg(Arg, "bias", 2, 0, NoFlags);
