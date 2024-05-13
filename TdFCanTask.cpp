@@ -1414,6 +1414,14 @@ TdFCanTask::TdFCanTask(const std::string &taskName) : drama::Task(taskName),
    // add new Save Defs action which saves the parameter into a file
    Add("P_SAVE_DEFS", drama::MessageHandlerPtr(&I_PSaveDefsActionNTObj, drama::nodel()));
    Add("EXIT", &drama::SimpleExitAction);
+
+   
+   {
+      I_TdFCanTaskParSys.Create("PMAC_LIM_X_POS", (INT32)(528000));
+      I_TdFCanTaskParSys.Create("PMAC_LIM_X_NEG", (INT32)(-16300));
+      I_TdFCanTaskParSys.Create("PMAC_LIM_Y_POS", (INT32)(537400));
+      I_TdFCanTaskParSys.Create("PMAC_LIM_Y_NEG", (INT32)(-3400));
+   }
 }
 
 //  ------------------------------------------------------------------------------------------------
@@ -4259,7 +4267,7 @@ drama::Request GMOVEActionNT::MessageReceived()
    std::string Error;
    std::vector<AxisDemand> AxisDemands = GetDemands(Axes, Positions, Velocities, Error);
    int NumberAxes = AxisDemands.size();
-   if (NumberAxes <= 1)
+   if (NumberAxes != 1 && Positions.find("Y")!=string::npos)
    {
       MessageUser("G_MOVE_NT can only work on one axis. If more than one axes need to move, please choose G_MOVE_AXIS_NT." + Error);
    }
@@ -4360,7 +4368,7 @@ drama::Request PTELPOSActionNT::MessageReceived()
       double dDEC = std::stod(DEC);
       DEBUG("Before the update, the current HA is:\n");
       paramHA.List();
-      DEBUG("\nBefore the update, the current DEC is:\n");
+      DEBUG("Before the update, the current DEC is:\n");
       paramDEC.List();
 
       paramHA.Put(dHA);
@@ -4368,7 +4376,7 @@ drama::Request PTELPOSActionNT::MessageReceived()
 
       DEBUG("After the update, the current HA is:\n");
       paramHA.List();
-      DEBUG("\nAfter the update, the current DEC is:\n");
+      DEBUG("After the update, the current DEC is:\n");
       paramDEC.List();
    }
    else
@@ -4900,7 +4908,7 @@ drama::Request PReportImageActionNT::MessageReceived()
       MessageUser("P_REPORT_IMAGE: the structure pointer is null, please initialise the task!\n");
    }
    DEBUG("FREE image details: \n");
-   DEBUG("The bias(centroiding) is: %hd", (short)details->freeImg.bias);
+   DEBUG("The bias(centroiding) is: %hd\n", (short)details->freeImg.bias);
    DEBUG("The Camera coeffs array is: \n");
    for (int index = 0; index < 6; ++index)
    {
