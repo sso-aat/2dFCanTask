@@ -1415,7 +1415,6 @@ TdFCanTask::TdFCanTask(const std::string &taskName) : drama::Task(taskName),
    Add("P_SAVE_DEFS", drama::MessageHandlerPtr(&I_PSaveDefsActionNTObj, drama::nodel()));
    Add("EXIT", &drama::SimpleExitAction);
 
-   
    {
       I_TdFCanTaskParSys.Create("PMAC_LIM_X_POS", (INT32)(528000));
       I_TdFCanTaskParSys.Create("PMAC_LIM_X_NEG", (INT32)(-16300));
@@ -1466,8 +1465,10 @@ bool TdFCanTask::tdFfpiDefWrite(short savingFiles, short check)
       {
          if (defId)
          {
-            fName = pathName + "tdFfpiDefs.sds";
+            fName = pathName + "tdFfpiDefsSave.sds";
             defId.Write(fName);
+            DEBUG("\nThe output parameter array is:\n");
+            defId.List();
          }
          else
          {
@@ -1510,12 +1511,14 @@ bool TdFCanTask::tdFfpiDefRead(short loadingFiles, short check)
       if (!readRes)
       {
          I_ErrorString += "Failed to read tdFfpiDefs.sds\n";
-         DEBUG("READ tdFfpiDefs.sds: %s", I_ErrorString.c_str());
+         DEBUG("\nREAD tdFfpiDefs.sds: %s", I_ErrorString.c_str());
          DramaTHROW(TDFCANTASK__READ_ERROR, "Failed to read tdFfpiDefs.sds.");
       }
       if (check & SHOW)
       {
-         DEBUG("READ tdFfpiDefs.sds: %s", fName.c_str());
+         DEBUG("\nREAD tdFfpiDefs.sds: %s", fName.c_str());
+         DEBUG("The parameter array is:\n");
+         defId.List();
       }
    }
    if (loadingFiles & FLEX_FILE)
@@ -1536,7 +1539,9 @@ bool TdFCanTask::tdFfpiDefRead(short loadingFiles, short check)
       }
       if (check & SHOW)
       {
-         DEBUG("READ tdFfpiDefs.sds: %s", fName.c_str());
+         DEBUG("\nREAD tdFfpiFlex.sds: %s", fName.c_str());
+         DEBUG("The parameter array is :\n");
+         defId.List();
       }
    }
 
@@ -1595,34 +1600,44 @@ bool TdFCanTask::tdFfpiWriteFile(drama::sds::Id &defId)
 
    tmpId = defId.CreateChildItem("parameters", SDS_STRUCT);
    lIntParam = (long int)xyVel;
-   tmpId.Put("XY_VEL", lIntParam);
+   lIntParam = I_TdFCanTaskParSys.GetInt("XY_VEL");
+   tmpId.Put("XY_VEL", (INT32)lIntParam);
 
    lIntParam = (long int)stepSize;
-   tmpId.Put("STEP_SIZE", lIntParam);
+   lIntParam = I_TdFCanTaskParSys.GetInt("STEP_SIZE");
+   tmpId.Put("STEP_SIZE", (INT32)lIntParam);
 
    lIntParam = (long int)maxError;
-   tmpId.Put("MAX_ERROR", lIntParam);
+   lIntParam = I_TdFCanTaskParSys.GetInt("MAX_ERROR");
+   tmpId.Put("MAX_ERROR", (INT32)lIntParam);
 
    lIntParam = (long int)posTol;
-   tmpId.Put("POS_TOL", lIntParam);
+   lIntParam = I_TdFCanTaskParSys.GetInt("POS_TOL");
+   tmpId.Put("POS_TOL", (INT32)lIntParam);
 
    lIntParam = (long int)attempts;
-   tmpId.Put("POS_ATTEMPTS", lIntParam);
+   lIntParam = I_TdFCanTaskParSys.GetInt("POS_ATTEMPTS");
+   tmpId.Put("POS_ATTEMPTS", (INT32)lIntParam);
 
    lIntParam = (long int)fibInImgThres;
-   tmpId.Put("FIBRE_IN_IMAGE", lIntParam);
+   lIntParam = I_TdFCanTaskParSys.GetInt("FIBRE_IN_IMAGE");
+   tmpId.Put("FIBRE_IN_IMAGE", (INT32)lIntParam);
 
    dParam = (double)settleTime;
+   dParam = I_TdFCanTaskParSys.GetDouble("SETTLE_TIME");
    tmpId.Put("SETTLE_TIME", dParam);
 
    lIntParam = (long int)timeoutFac;
-   tmpId.Put("TIMEOUT_FAC", lIntParam);
+   lIntParam = I_TdFCanTaskParSys.GetInt("TIMEOUT_FAC");
+   tmpId.Put("TIMEOUT_FAC", (INT32)lIntParam);
 
    lIntParam = (long int)xaccuracy;
-   tmpId.Put("X_ACCURACY", lIntParam);
+   lIntParam = I_TdFCanTaskParSys.GetInt("X_ACCURACY");
+   tmpId.Put("X_ACCURACY", (INT32)lIntParam);
 
    lIntParam = (long int)yaccuracy;
-   tmpId.Put("Y_ACCURACY", lIntParam);
+   lIntParam = I_TdFCanTaskParSys.GetInt("Y_ACCURACY");
+   tmpId.Put("Y_ACCURACY", (INT32)lIntParam);
 
    if (details->dprFeedback)
    {
@@ -1634,28 +1649,36 @@ bool TdFCanTask::tdFfpiWriteFile(drama::sds::Id &defId)
    }
 
    lIntParam = (long int)overlayPlaneEnabled;
-   tmpId.Put("VFG_OP_ENABLE", lIntParam);
+   lIntParam = I_TdFCanTaskParSys.GetInt("VFG_OP_ENABLE");
+   tmpId.Put("VFG_OP_ENABLE", (INT32)lIntParam);
 
    dParam = (double)zerocamCenWait;
+   dParam = I_TdFCanTaskParSys.GetDouble("ZEROCAM_CENWAIT");
    tmpId.Put("ZEROCAM_CENWAIT", dParam);
 
    // lIntParam = (long int)copleyXPosLim;
-   // tmpId.Put("PMAC_LIM_X_POS", lIntParam);
+   lIntParam = I_TdFCanTaskParSys.GetInt("PMAC_LIM_X_POS");
+   tmpId.Put("PMAC_LIM_X_POS", (INT32)lIntParam);
 
    // lIntParam = (long int)copleyXNegLim;
-   // tmpId.Put("PMAC_LIM_X_NEG", lIntParam);
+   lIntParam = I_TdFCanTaskParSys.GetInt("PMAC_LIM_X_NEG");
+   tmpId.Put("PMAC_LIM_X_NEG", (INT32)lIntParam);
 
    // lIntParam = (long int)copleyYPosLim;
-   // tmpId.Put("PMAC_LIM_Y_POS", lIntParam);
+   lIntParam = I_TdFCanTaskParSys.GetInt("PMAC_LIM_Y_POS");
+   tmpId.Put("PMAC_LIM_Y_POS", (INT32)lIntParam);
 
    // lIntParam = (long int)copleyYNegLim;
-   // tmpId.Put("PMAC_LIM_Y_NEG", lIntParam);
+   lIntParam = I_TdFCanTaskParSys.GetInt("PMAC_LIM_Y_NEG");
+   tmpId.Put("PMAC_LIM_Y_NEG", (INT32)lIntParam);
 
    lIntParam = (long int)shortZeroX;
-   tmpId.Put("PLT1_CFID_OFF_X", lIntParam);
+   lIntParam = I_TdFCanTaskParSys.GetInt("PLT1_CFID_OFF_X");
+   tmpId.Put("PLT1_CFID_OFF_X", (short)lIntParam);
 
    lIntParam = (long int)shortZeroY;
-   tmpId.Put("PLT1_CFID_OFF_Y", lIntParam);
+   lIntParam = I_TdFCanTaskParSys.GetInt("PLT1_CFID_OFF_Y");
+   tmpId.Put("PLT1_CFID_OFF_Y", (short)lIntParam);
    return true;
 }
 
@@ -2386,6 +2409,7 @@ void TdFCanTask::tdFstateBitClear(unsigned char bit)
 void TdFCanTask::tdFfpiConvertFromEnc(int xEnc, int yEnc, double plateTheta,
                                       short level, double *xCon, double *yCon)
 {
+
    long int dx = 0, dy = 0;
    double x_enc, y_enc, x_fp, y_fp, ha, dec;
 
@@ -2397,7 +2421,9 @@ void TdFCanTask::tdFfpiConvertFromEnc(int xEnc, int yEnc, double plateTheta,
    }
 
    ha = dzeroHA;
+   ha = I_TdFCanTaskParSys.GetDouble("HA");
    dec = dzeroDEC;
+   dec = I_TdFCanTaskParSys.GetDouble("DEC");
    tdFfpiFlexure((long int)xEnc, (long int)yEnc,
                  ha, dec, &I_tdFfpiMainStruct->convert.flex,
                  &dx, &dy);
@@ -2497,24 +2523,30 @@ bool TdFCanTask::tdFfpiUpdatePos(short updateIdeal, short useDpr, short displayT
       {
          xPark = I_tdFfpiMainStruct->atEnc.x;
          xCopleyPark = I_tdFfpiMainStruct->atEnc.x;
+         I_TdFCanTaskParSys.Put("X", (long int)I_tdFfpiMainStruct->atEnc.x);
+         I_TdFCanTaskParSys.Put("XCopley", (long int)I_tdFfpiMainStruct->atEnc.x);
       }
       if (yPark != I_tdFfpiMainStruct->atEnc.y)
       {
          yPark = I_tdFfpiMainStruct->atEnc.y;
          yCopleyPark = I_tdFfpiMainStruct->atEnc.y;
+         I_TdFCanTaskParSys.Put("Y", (long int)I_tdFfpiMainStruct->atEnc.y);
+         I_TdFCanTaskParSys.Put("YCopley", (long int)I_tdFfpiMainStruct->atEnc.y);
       }
    }
-
+   double dPlateTheta = I_TdFCanTaskParSys.GetDouble("PLATE_THETA");
    tdFfpiConvertFromEnc(I_tdFfpiMainStruct->atEnc.x,
                         I_tdFfpiMainStruct->atEnc.y,
-                        (double)plateTheta, _FULL,
+                        (double)dPlateTheta, _FULL,
                         &atFpX, &atFpY);
 
    if (displayText)
       DEBUG("tdFfpi:Converted encoder values %d, %d to %f, %f.\n", I_tdFfpiMainStruct->atEnc.x, I_tdFfpiMainStruct->atEnc.y, atFpX, atFpY);
 
    oldFpX = (long int)(xPark);
+   oldFpX = I_TdFCanTaskParSys.GetLong("X");
    oldFpY = (long int)(yPark);
+   oldFpY = I_TdFCanTaskParSys.GetLong("Y");
    newFpX = doubleToLong(atFpX);
    newFpY = doubleToLong(atFpY);
 
@@ -2522,11 +2554,15 @@ bool TdFCanTask::tdFfpiUpdatePos(short updateIdeal, short useDpr, short displayT
    {
       xPark = newFpX;
       xCopleyPark = newFpX;
+      I_TdFCanTaskParSys.Put("X", (long int)newFpX);
+      I_TdFCanTaskParSys.Put("XCopley", (long int)newFpX);
    }
    if (oldFpY != newFpY)
    {
       yPark = newFpY;
       yCopleyPark = newFpY;
+      I_TdFCanTaskParSys.Put("Y", (long int)newFpY);
+      I_TdFCanTaskParSys.Put("YCopley", (long int)newFpY);
    }
    if ((newFpX >= (FPI_CLEAR_X - 1000)) && (newFpY <= (FPI_CLEAR_Y + 1000)))
       tdFstateBitSet(SAFE);
@@ -2538,6 +2574,7 @@ bool TdFCanTask::tdFfpiUpdatePos(short updateIdeal, short useDpr, short displayT
       I_tdFfpiMainStruct->ideal.x = newFpX;
       I_tdFfpiMainStruct->ideal.y = newFpY;
    }
+   return true;
 }
 //  ------------------------------------------------------------------------------------------------
 
@@ -2912,7 +2949,7 @@ bool TdFCanTask::SetParameter(string &ParameterName, string &ParameterValue)
          return false;
       }
       // validate the value
-      if(ParameterValue == "YES" || ParameterValue == "NO")
+      if (ParameterValue == "YES" || ParameterValue == "NO")
       {
          tdfCanParked = ParameterValue;
          I_TdFCanTaskParSys.Put("PARKED", std::string(ParameterValue));
@@ -2948,7 +2985,7 @@ bool TdFCanTask::SetParameter(string &ParameterName, string &ParameterValue)
       {
          stepSize = iVal;
          I_TdFCanTaskParSys.Put("STEP_SIZE", (INT32)(iVal));
-      }   
+      }
       else if (strcmp(ParameterName.c_str(), "MAX_ERROR") == 0)
       {
          maxError = iVal;
@@ -2981,15 +3018,16 @@ bool TdFCanTask::SetParameter(string &ParameterName, string &ParameterValue)
    {
       int iVal = stoi(ParameterValue);
       if (strcmp(ParameterName.c_str(), "PLT1_CFID_OFF_X") == 0)
-      {  
+      {
          shortZeroX = iVal;
          I_TdFCanTaskParSys.Put("PLT1_CFID_OFF_X", (short)(iVal));
       }
-      else{
+      else
+      {
          shortZeroY = iVal;
          I_TdFCanTaskParSys.Put("PLT1_CFID_OFF_Y", (short)(iVal));
       }
-         
+
       DEBUG("Setting up the %s to be %d\n", ParameterName.c_str(), iVal);
    }
    else if (strcmp(ParameterName.c_str(), "POS_ATTEMPTS") == 0)
@@ -3027,24 +3065,24 @@ bool TdFCanTask::SetParameter(string &ParameterName, string &ParameterValue)
       int iVal = stoi(ParameterValue);
       if (strcmp(ParameterName.c_str(), "PMAC_LIM_X_POS") == 0)
       {
-         //copleyXPosLim = iVal;
+         // copleyXPosLim = iVal;
          I_TdFCanTaskParSys.Put("PMAC_LIM_X_POS", (INT32)(iVal));
       }
       else if (strcmp(ParameterName.c_str(), "PMAC_LIM_X_NEG") == 0)
       {
-         //copleyXNegLim = iVal;
+         // copleyXNegLim = iVal;
          I_TdFCanTaskParSys.Put("PMAC_LIM_X_NEG", (INT32)(iVal));
-      }   
+      }
       else if (strcmp(ParameterName.c_str(), "PMAC_LIM_Y_POS") == 0)
       {
-         //copleyYPosLim = iVal;
+         // copleyYPosLim = iVal;
          I_TdFCanTaskParSys.Put("PMAC_LIM_Y_POS", (INT32)(iVal));
-      }   
+      }
       else if (strcmp(ParameterName.c_str(), "PMAC_LIM_Y_NEG") == 0)
       {
-         //copleyYNegLim = iVal;
+         // copleyYNegLim = iVal;
          I_TdFCanTaskParSys.Put("PMAC_LIM_Y_NEG", (INT32)(iVal));
-      }   
+      }
       DEBUG("Setting up the %s to be %d\n", ParameterName.c_str(), iVal);
    }
    else if (strcmp(ParameterName.c_str(), "DEBUG_CENTROID") == 0)
@@ -4267,7 +4305,7 @@ drama::Request GMOVEActionNT::MessageReceived()
    std::string Error;
    std::vector<AxisDemand> AxisDemands = GetDemands(Axes, Positions, Velocities, Error);
    int NumberAxes = AxisDemands.size();
-   if (NumberAxes != 1 && Positions.find("Y")!=string::npos)
+   if (NumberAxes != 1 && Axes.find("Y") != string::npos)
    {
       MessageUser("G_MOVE_NT can only work on one axis. If more than one axes need to move, please choose G_MOVE_AXIS_NT." + Error);
    }
@@ -4310,6 +4348,64 @@ drama::Request GRESETActionNT::MessageReceived()
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
+   drama::sds::Id parSysId(drama::sds::Id::CreateFromSdsIdType((long)(DitsGetParId())));
+
+   parSysId.Put("ENQ_VER_NUM", TdFCanTaskVersion);
+   parSysId.Put("ENQ_VER_DATE", TdFCanTaskDate);
+   tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
+   if (details == nullptr)
+   {
+      details = (tdFfpiTaskType *)malloc(sizeof(tdFfpiTaskType));
+   }
+   drama::sds::Id id;        /* Parameter id                    */
+   unsigned long int length; /* Length of parameter item        */
+   short check = SHOW;
+
+   id = parSysId.Find("ZEROCAM_CENWAIT");
+   id.Pointer(&details->pars.zeroCamCenWait, &length);
+   if (length != sizeof(*(details->pars.zeroCamCenWait)))
+   {
+
+      DEBUG("Parameter ZEROCAM_CENWAIT length mismatch");
+      return drama::RequestCode::End;
+   }
+   length = 0;
+
+   id = parSysId.Find("PLT1_CFID_OFF_X");
+   id.Pointer(&details->pars.plt1CenterFidOffsetX, &length);
+   if (length != sizeof(*(details->pars.plt1CenterFidOffsetX)))
+   {
+      DEBUG("Parameter PLT1_CFID_OFF_X length mismatch");
+      return drama::RequestCode::End;
+   }
+   length = 0;
+
+   id = parSysId.Find("PLT1_CFID_OFF_Y");
+   id.Pointer(&details->pars.plt1CenterFidOffsetY, &length);
+   if (length != sizeof(*(details->pars.plt1CenterFidOffsetY)))
+   {
+      DEBUG("Parameter PLT1_CFID_OFF_Y length mismatch");
+      return drama::RequestCode::End;
+   }
+   length = 0;
+
+   details->inUse = YES;
+
+   bool defRead = ThisTask->tdFfpiDefRead(DEFS_FILE | FLEX_FILE,
+                                          check);
+   if (defRead == false)
+   {
+      details->inUse = NO;
+      return drama::RequestCode::End;
+   }
+
+   details->ipsMode = 0;
+   details->dprAddress = ERROR;
+   details->toEnc.x = 0;
+   details->toEnc.y = 0;
+
+   details->Initialised = YES;
+   DEBUG("Reset tdFfpiTaskType OK\n");
 
    if (ThisTask->DisableAmps() == true)
    {
@@ -4418,7 +4514,7 @@ drama::Request PSetActionNT::MessageReceived()
          return drama::RequestCode::End;
       }
    }
-   if (ParameterName.find(',') != string::npos || ParameterName.find(' ') != string::npos)
+   if (ParameterName.find(',') != string::npos || ParameterName.find(' ') != string::npos || ParameterValue.find(',') != string::npos || ParameterValue.find(' ') != string::npos)
    {
       MessageUser("P_SET: please check the name of parameter, this action only supports a single parameter.\n");
       return drama::RequestCode::End;
@@ -4522,7 +4618,8 @@ drama::Request PSetCoeffsActionNT::MessageReceived()
                   MessageUser("P_SET_COEFFS: Save Coffs failed " + ThisTask->GetError());
                }
             }
-            MessageUser("P_SET_COEFFS: Set Coffs completed.\n");
+            else
+               MessageUser("P_SET_COEFFS: Set Coffs completed.\n");
          }
          else
          {
@@ -4597,7 +4694,8 @@ drama::Request PSetImageActionNT::MessageReceived()
       {
          MessageUser("P_SET_IMAGE: Save Image failed " + ThisTask->GetError());
       }
-      MessageUser("P_SET_IMAGE: Set Image completed.\n");
+      else
+         MessageUser("P_SET_IMAGE: Set Image completed.\n");
    }
    else
    {
@@ -4663,7 +4761,8 @@ drama::Request PSetWindowActionNT::MessageReceived()
       {
          MessageUser("P_SET_WINDOW: Save Window failed " + ThisTask->GetError());
       }
-      MessageUser("P_SET_WINDOW: Set Window completed.\n");
+      else
+         MessageUser("P_SET_WINDOW: Set Window completed.\n");
    }
    else
    {
@@ -4700,7 +4799,8 @@ drama::Request PSetVelActionNT::MessageReceived()
       {
          MessageUser("P_SET_VEL: Save XY_VEL failed " + ThisTask->GetError());
       }
-      MessageUser("P_SET_VEL: Set VEL completed.\n");
+      else
+         MessageUser("P_SET_VEL: Set VEL completed.\n");
    }
    else
    {
@@ -4794,7 +4894,8 @@ drama::Request PUpdateActionNT::MessageReceived()
       {
          MessageUser("P_POLL_POSE: failed to complete the action, " + ThisTask->GetError());
       }
-      MessageUser("P_POLL_POSE: action completed");
+      else
+         MessageUser("P_POLL_POSE: action completed");
    }
    else
    {
@@ -4802,7 +4903,8 @@ drama::Request PUpdateActionNT::MessageReceived()
       {
          MessageUser("P_UPDATE_POSE: failed to complete the action, " + ThisTask->GetError());
       }
-      MessageUser("P_UPDATE_POSE: action completed.\n");
+      else
+         MessageUser("P_UPDATE_POSE: action completed.\n");
    }
    return drama::RequestCode::End;
 }
