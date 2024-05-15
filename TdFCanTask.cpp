@@ -1185,6 +1185,7 @@ const CML::Error *WaitLinkedHome(
             {
                CML::uunit value;
                TheLinkage->GetAmp(i).GetPositionActual(value);
+
                printf("Amp %d was %f now %f\n", i, AmpPositions[i], value);
                if (fabs(AmpPositions[i] - value) < MOVE_TOLERANCE)
                {
@@ -2339,7 +2340,7 @@ bool TdFCanTask::tdFfpiIlocks(long int ilocks)
 
    if (ilocks & ILOCK__GAN_PARKED)
    {
-      if (tdfCanParked == "YES")
+      if (I_TdFCanTaskParSys.GetString("PARKED") == "YES")
       {
          I_ErrorString += "The gantry has parked.\n";
          DEBUG("The gantry has parked.\n");
@@ -2349,7 +2350,7 @@ bool TdFCanTask::tdFfpiIlocks(long int ilocks)
 
    if (ilocks & ILOCK__GAN_NOT_PARKED)
    {
-      if (tdfCanParked == "NO")
+      if (I_TdFCanTaskParSys.GetString("PARKED") == "NO")
       {
          I_ErrorString += "The gantry has not parked.\n";
          DEBUG("The gantry has not parked.\n");
@@ -2477,6 +2478,7 @@ bool TdFCanTask::tdFfpiUpdatePos(short updateIdeal, short useDpr, short displayT
 {
    double atFpX, atFpY;
    long int oldFpX, oldFpY, newFpX, newFpY;
+   int ixPark, iyPark;
 
    if (I_tdFfpiMainStruct == nullptr)
    {
@@ -2495,10 +2497,12 @@ bool TdFCanTask::tdFfpiUpdatePos(short updateIdeal, short useDpr, short displayT
             if (Index < 2)
             {
                I_tdFfpiMainStruct->atEnc.x = (int)CurrentPosition;
+               DEBUG("Now the encoder position of X axis is %d", I_tdFfpiMainStruct->atEnc.x);
             }
             else if (Index == 2)
             {
                I_tdFfpiMainStruct->atEnc.y = (int)CurrentPosition;
+               DEBUG("Now the encoder position of Y axis is %d", I_tdFfpiMainStruct->atEnc.y);
             }
          }
       }
@@ -2519,17 +2523,19 @@ bool TdFCanTask::tdFfpiUpdatePos(short updateIdeal, short useDpr, short displayT
        * Update the parameters which contain the encoder values - but only if they
        * have actually changed (to avoid flooding parameter monitors)
        */
-      if (xPark != I_tdFfpiMainStruct->atEnc.x)
+      ixPark = I_TdFCanTaskParSys.GetInt("X");
+      if (ixPark != I_tdFfpiMainStruct->atEnc.x)
       {
-         xPark = I_tdFfpiMainStruct->atEnc.x;
-         xCopleyPark = I_tdFfpiMainStruct->atEnc.x;
+         // xPark = I_tdFfpiMainStruct->atEnc.x;
+         // xCopleyPark = I_tdFfpiMainStruct->atEnc.x;
          I_TdFCanTaskParSys.Put("X", (long int)I_tdFfpiMainStruct->atEnc.x);
          I_TdFCanTaskParSys.Put("XCopley", (long int)I_tdFfpiMainStruct->atEnc.x);
       }
-      if (yPark != I_tdFfpiMainStruct->atEnc.y)
+      iyPark = I_TdFCanTaskParSys.GetInt("Y");
+      if (iyPark != I_tdFfpiMainStruct->atEnc.y)
       {
-         yPark = I_tdFfpiMainStruct->atEnc.y;
-         yCopleyPark = I_tdFfpiMainStruct->atEnc.y;
+         // yPark = I_tdFfpiMainStruct->atEnc.y;
+         // yCopleyPark = I_tdFfpiMainStruct->atEnc.y;
          I_TdFCanTaskParSys.Put("Y", (long int)I_tdFfpiMainStruct->atEnc.y);
          I_TdFCanTaskParSys.Put("YCopley", (long int)I_tdFfpiMainStruct->atEnc.y);
       }
@@ -2543,9 +2549,9 @@ bool TdFCanTask::tdFfpiUpdatePos(short updateIdeal, short useDpr, short displayT
    if (displayText)
       DEBUG("tdFfpi:Converted encoder values %d, %d to %f, %f.\n", I_tdFfpiMainStruct->atEnc.x, I_tdFfpiMainStruct->atEnc.y, atFpX, atFpY);
 
-   oldFpX = (long int)(xPark);
+   oldFpX = (long int)(ixPark);
    oldFpX = I_TdFCanTaskParSys.GetLong("X");
-   oldFpY = (long int)(yPark);
+   oldFpY = (long int)(iyPark);
    oldFpY = I_TdFCanTaskParSys.GetLong("Y");
    newFpX = doubleToLong(atFpX);
    newFpY = doubleToLong(atFpY);
@@ -2744,6 +2750,8 @@ bool TdFCanTask::HomeAxes(bool HomeX, bool HomeY, bool HomeZ, bool HomeTheta, bo
    {
 
       const CML::Error *Err = NULL;
+      // lliu added on 15/05/2024 to check if a motion is in progress
+      I_tdFfpiMainStruct->inUse = YES;
 
       CML::HomeConfig HomeConfigs[MAX_TDF_AMPS];
       for (int Index = 0; Index < MAX_TDF_AMPS; Index++)
@@ -2870,7 +2878,12 @@ bool TdFCanTask::HomeAxes(bool HomeX, bool HomeY, bool HomeZ, bool HomeTheta, bo
          // DEBUG ("All complete\n");
       }
       if (Err == NULL)
+      {
          ReturnOK = true;
+         I_TdFCanTaskParSys.Put("PARKED", "YES");
+      }
+
+      I_tdFfpiMainStruct->inUse = NO;
    }
    DEBUG("HomeAxes returns\n");
    return ReturnOK;
@@ -3526,6 +3539,15 @@ drama::Request InitialiseAction::MessageReceived()
    drama::sds::Id parSysId(drama::sds::Id::CreateFromSdsIdType((long)(DitsGetParId())));
 
    ThisTask->ClearError();
+
+   // lliu added on 15/05/2024
+   tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
+   if (details != nullptr && details->Initialised == YES)
+   {
+      MessageUser("INITIALISE: TdFCanTask is already initialised.");
+      return drama::RequestCode::End;
+   }
+
    if (!(ThisTask->InitialisefpiMainStruct()))
    {
       DEBUG("Fail to allocate memory to fpiMainStruct\n");
@@ -3602,6 +3624,7 @@ drama::Request InitialiseAction::MessageReceived()
       details->toEnc.y = 0;
 
       details->Initialised = YES;
+      details->inUse = NO;
    }
 
    if (!(ThisTask->SetupAmps()))
@@ -3694,9 +3717,18 @@ drama::Request GInitActionNT::MessageReceived()
 {
 
    UnblockSIGUSR2();
+   auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   ThisTask->ClearError();
+
+   // lliu added on 15/05/2024
+   tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
+   if (details == nullptr || details->Initialised == NO)
+   {
+      MessageUser("G_INIT_NT: TdFCanTask is not initialised. Please use \"ditscmd TdFCanTask INITIALISE\" to initialise the task.");
+      return drama::RequestCode::End;
+   }
 
    drama::sds::Id Arg = GetEntry().Argument();
-
    std::string Axes("");
    if (Arg)
    {
@@ -3717,8 +3749,7 @@ drama::Request GInitActionNT::MessageReceived()
          MessageUser("Initialising Theta axis");
       if (UseJaw)
          MessageUser("Initialising Jaw axis");
-      auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
-      ThisTask->ClearError();
+
       if (!(ThisTask->SetupAmps()))
       {
          MessageUser("G_INIT_NT: " + ThisTask->GetError());
@@ -3732,6 +3763,12 @@ drama::Request GInitActionNT::MessageReceived()
          else
          {
             MessageUser("G_INIT_NT: Axes homed");
+
+            // lliu added on 15/05/2024 to update the position of gantry after initialisation
+            if (!ThisTask->tdFfpiUpdatePos(YES, details->dprFeedback, YES))
+            {
+               MessageUser("G_INIT_NT: failed to Update the current position of gantry.");
+            }
          }
       }
    }
@@ -3835,6 +3872,26 @@ drama::Request GMoveAxisActionNT::MessageReceived()
 
    UnblockSIGUSR2();
 
+   // lliu added on 15/05/2024
+   auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   ThisTask->ClearError();
+   tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
+   if (details == nullptr || details->Initialised == NO)
+   {
+      MessageUser("MOVE_AXES: TdFCanTask is not initialised. Please use \"ditscmd TdFCanTask INITIALISE\" to initialise the task.");
+      return drama::RequestCode::End;
+   }
+   if (!(ThisTask->tdFfpiIlocks(ILOCK__GAN_PARKED)))
+   {
+      MessageUser("MOVE_AXES: the gantry is parked, please unpark the gantry first.");
+      return drama::RequestCode::End;
+   }
+   if (details->inUse)
+   {
+      MessageUser("MOVE_AXES: TdFCanTask is running other actions.\n");
+      return drama::RequestCode::End;
+   }
+
    drama::sds::Id Arg = GetEntry().Argument();
 
    std::string Axes;
@@ -3879,6 +3936,8 @@ drama::Request GMoveAxisActionNT::MessageReceived()
    }
    else
    {
+      details->inUse = YES;
+
       unsigned int NumberAxes = AxisDemands.size();
       for (unsigned int Index = 0; Index < NumberAxes; Index++)
       {
@@ -3887,8 +3946,7 @@ drama::Request GMoveAxisActionNT::MessageReceived()
          DEBUG("AxisId: %d, position %f, velocity %f\n", AxisDemands[Index].AxisId,
                AxisDemands[Index].Position, AxisDemands[Index].Velocity);
       }
-      auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
-      ThisTask->ClearError();
+
       if (!(ThisTask->SetupAmps()))
       {
          MessageUser("MOVE_AXES: " + ThisTask->GetError());
@@ -3901,9 +3959,15 @@ drama::Request GMoveAxisActionNT::MessageReceived()
          }
          else
          {
+            if (!(ThisTask->tdFfpiUpdatePos(YES, details->dprFeedback, YES)))
+            {
+               MessageUser("MOVE_AXES: Failed to update the position of the gantry");
+            }
             MessageUser("MOVE_AXES: Move complete");
          }
       }
+
+      details->inUse = NO;
    }
 
    // We never re-enable the blocking of SIGUSR2 - it causes too many problems.
@@ -3989,6 +4053,29 @@ drama::Request GParkGantryActionNT::MessageReceived()
 {
 
    UnblockSIGUSR2();
+
+   // lliu added on 15/05/2024
+   auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   ThisTask->ClearError();
+   tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
+   drama::sds::Id parSysId(drama::sds::Id::CreateFromSdsIdType((long)(DitsGetParId())));
+
+   if (details == nullptr || details->Initialised == NO)
+   {
+      MessageUser("G_PARK_NT: TdFCanTask is not initialised. Please use \"ditscmd TdFCanTask INITIALISE\" to initialise the task.");
+      return drama::RequestCode::End;
+   }
+   if (!(ThisTask->tdFfpiIlocks(ILOCK__GAN_PARKED)))
+   {
+      MessageUser("G_PARK_NT: the gantry is already parked.");
+      return drama::RequestCode::End;
+   }
+   if (details->inUse)
+   {
+      MessageUser("G_PARK_NT: TdFCanTask is running other actions.\n");
+      return drama::RequestCode::End;
+   }
+
    std::string Axes("");
    std::string Positions;
    std::string Velocities;
@@ -4021,6 +4108,7 @@ drama::Request GParkGantryActionNT::MessageReceived()
       }
       else
       {
+         details->inUse = YES;
          std::string Error;
          std::vector<AxisDemand> AxisDemands = GetDemands(Axes, Positions, Velocities, Error);
          if (!(ThisTask->MoveAxes(AxisDemands)))
@@ -4030,7 +4118,13 @@ drama::Request GParkGantryActionNT::MessageReceived()
          else
          {
             MessageUser("G_PARK_NT: Axes homed");
+            parSysId.Put("PARKED", "YES");
+            if (!(ThisTask->tdFfpiUpdatePos(YES, details->dprFeedback, YES)))
+            {
+               MessageUser("G_PARK_NT: Failed to update the position of gantry.");
+            }
          }
+         details->inUse = NO;
       }
    }
    else
@@ -4053,6 +4147,29 @@ drama::Request GHomeActionNT::MessageReceived()
 {
 
    UnblockSIGUSR2();
+
+   // lliu added on 15/05/2024
+   auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   ThisTask->ClearError();
+   tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
+   drama::sds::Id parSysId(drama::sds::Id::CreateFromSdsIdType((long)(DitsGetParId())));
+
+   if (details == nullptr || details->Initialised == NO)
+   {
+      MessageUser("G_HOME_NT: TdFCanTask is not initialised. Please use \"ditscmd TdFCanTask INITIALISE\" to initialise the task.");
+      return drama::RequestCode::End;
+   }
+   if (!(ThisTask->tdFfpiIlocks(ILOCK__GAN_PARKED)))
+   {
+      MessageUser("G_HOME_NT: the gantry is already homed.");
+      return drama::RequestCode::End;
+   }
+   if (details->inUse)
+   {
+      MessageUser("G_HOME_NT: TdFCanTask is running other actions.\n");
+      return drama::RequestCode::End;
+   }
+
    std::string Axes("");
    drama::sds::Id Arg = GetEntry().Argument();
    if (Arg)
@@ -4082,6 +4199,7 @@ drama::Request GHomeActionNT::MessageReceived()
       }
       else
       {
+         details->inUse = YES;
          if (!(ThisTask->HomeAxes(X, Y, Z, Theta, Jaw)))
          {
             MessageUser("G_HOME_NT: " + ThisTask->GetError());
@@ -4089,7 +4207,14 @@ drama::Request GHomeActionNT::MessageReceived()
          else
          {
             MessageUser("G_HOME_NT: Axes homed");
+            parSysId.Put("PARKED", "YES");
+            if (!(ThisTask->tdFfpiUpdatePos(YES, details->dprFeedback, YES)))
+            {
+               MessageUser("G_HOME_NT: Failed to update the position of gantry.");
+            }
          }
+
+         details->inUse = NO;
       }
    }
    else
@@ -4108,6 +4233,28 @@ drama::Request GUnParkActionNT::MessageReceived()
    std::string Axes("");
    std::string Positions;
    std::string Velocities;
+
+   // lliu added on 15/05/2024
+   auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   ThisTask->ClearError();
+   tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
+   drama::sds::Id parSysId(drama::sds::Id::CreateFromSdsIdType((long)(DitsGetParId())));
+
+   if (details == nullptr || details->Initialised == NO)
+   {
+      MessageUser("G_UNPARK_NT: TdFCanTask is not initialised. Please use \"ditscmd TdFCanTask INITIALISE\" to initialise the task.");
+      return drama::RequestCode::End;
+   }
+   if (!(ThisTask->tdFfpiIlocks(ILOCK__GAN_NOT_PARKED)))
+   {
+      MessageUser("G_UNPARK_NT: the gantry is already not-parked.");
+      return drama::RequestCode::End;
+   }
+   if (details->inUse)
+   {
+      MessageUser("G_UNPARK_NT: TdFCanTask is running other actions.\n");
+      return drama::RequestCode::End;
+   }
 
    drama::sds::Id Arg = GetEntry().Argument();
    if (Arg)
@@ -4138,6 +4285,8 @@ drama::Request GUnParkActionNT::MessageReceived()
       }
       else
       {
+         details->inUse = YES;
+
          std::string Error;
          std::vector<AxisDemand> AxisDemands = GetDemands(Axes, Positions, Velocities, Error);
          if (!(ThisTask->MoveAxes(AxisDemands)))
@@ -4147,7 +4296,14 @@ drama::Request GUnParkActionNT::MessageReceived()
          else
          {
             MessageUser("G_UNPARK_NT: Axes unparked");
+            parSysId.Put("PARKED", "NO");
+            if (!(ThisTask->tdFfpiUpdatePos(YES, details->dprFeedback, YES)))
+            {
+               MessageUser("G_UNPARK_NT: Failed to update the position of gantry.");
+            }
          }
+
+         details->inUse = NO;
       }
    }
    else
@@ -4165,6 +4321,26 @@ drama::Request GUnParkActionNT::MessageReceived()
 drama::Request GMoveOffsetActionNT::MessageReceived()
 {
    UnblockSIGUSR2();
+   // lliu added on 15/05/2024
+   auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   ThisTask->ClearError();
+   tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
+
+   if (details == nullptr || details->Initialised == NO)
+   {
+      MessageUser("G_MOVEOFFSET_NT: TdFCanTask is not initialised. Please use \"ditscmd TdFCanTask INITIALISE\" to initialise the task.");
+      return drama::RequestCode::End;
+   }
+   if (!(ThisTask->tdFfpiIlocks(ILOCK__GAN_PARKED)))
+   {
+      MessageUser("G_MOVEOFFSET_NT: the gantry is parked.");
+      return drama::RequestCode::End;
+   }
+   if (details->inUse)
+   {
+      MessageUser("G_MOVEOFFSET_NT: TdFCanTask is running other actions.\n");
+      return drama::RequestCode::End;
+   }
 
    drama::sds::Id Arg = GetEntry().Argument();
 
@@ -4209,6 +4385,7 @@ drama::Request GMoveOffsetActionNT::MessageReceived()
    }
    else
    {
+      details->inUse = YES;
       unsigned int NumberAxes = AxisDemands.size();
       for (unsigned int Index = 0; Index < NumberAxes; Index++)
       {
@@ -4232,8 +4409,13 @@ drama::Request GMoveOffsetActionNT::MessageReceived()
          else
          {
             MessageUser("G_MOVEOFFSET_NT: Move complete");
+            if (!(ThisTask->tdFfpiUpdatePos(YES, details->dprFeedback, YES)))
+            {
+               MessageUser("G_MOVEOFFSET_NT: Failed to update the position of gantry.");
+            }
          }
       }
+      details->inUse = NO;
    }
 
    return drama::RequestCode::End;
@@ -4247,6 +4429,20 @@ drama::Request GEXITActionNT::MessageReceived()
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
+
+   tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
+
+   if (details == nullptr || details->Initialised == NO)
+   {
+      MessageUser("G_EXIT: TdFCanTask is not initialised. Please use \"ditscmd TdFCanTask INITIALISE\" to initialise the task.");
+      return drama::RequestCode::End;
+   }
+   if (details->inUse)
+   {
+      MessageUser("G_EXIT: TdFCanTask is running other actions.\n");
+      return drama::RequestCode::End;
+   }
+
    if (ThisTask->DisableAmps() == true)
    {
       DEBUG("Disable amps OK\n");
@@ -4266,6 +4462,27 @@ drama::Request GEXITActionNT::MessageReceived()
 drama::Request GMOVEActionNT::MessageReceived()
 {
    UnblockSIGUSR2();
+   auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   ThisTask->ClearError();
+
+   tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
+
+   if (details == nullptr || details->Initialised == NO)
+   {
+      MessageUser("G_MOVE_NT: TdFCanTask is not initialised. Please use \"ditscmd TdFCanTask INITIALISE\" to initialise the task.");
+      return drama::RequestCode::End;
+   }
+   if (!(ThisTask->tdFfpiIlocks(ILOCK__GAN_PARKED)))
+   {
+      MessageUser("G_MOVE_NT: the gantry is parked, please unpark the gantry first.");
+      return drama::RequestCode::End;
+   }
+   if (details->inUse)
+   {
+      MessageUser("G_MOVE_NT: TdFCanTask is running other actions.\n");
+      return drama::RequestCode::End;
+   }
+
    drama::sds::Id Arg = GetEntry().Argument();
 
    std::string Axes;
@@ -4319,8 +4536,6 @@ drama::Request GMOVEActionNT::MessageReceived()
          DEBUG("AxisId: %d, position %f, velocity %f\n", AxisDemands[Index].AxisId,
                AxisDemands[Index].Position, AxisDemands[Index].Velocity);
       }
-      auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
-      ThisTask->ClearError();
       if (!(ThisTask->SetupAmps()))
       {
          MessageUser("G_MOVE_NT: " + ThisTask->GetError());
@@ -4334,6 +4549,10 @@ drama::Request GMOVEActionNT::MessageReceived()
          else
          {
             MessageUser("G_MOVE_NT: Move complete");
+            if (!(ThisTask->tdFfpiUpdatePos(YES, details->dprFeedback, YES)))
+            {
+               MessageUser("G_MOVE_NT: Failed to update the position of gantry.");
+            }
          }
       }
    }
@@ -4425,7 +4644,7 @@ drama::Request GRESETActionNT::MessageReceived()
       DEBUG("Reset Amps fails\n");
       MessageUser("G_RESET: " + ThisTask->GetError());
    }
-
+   details->inUse = NO;
    return drama::RequestCode::End;
 }
 
