@@ -1518,7 +1518,7 @@ bool TdFCanTask::tdFfpiDefRead(short loadingFiles, short check)
       if (check & SHOW)
       {
          DEBUG("\nREAD tdFfpiDefs.sds: %s", fName.c_str());
-         DEBUG("The parameter array is:\n");
+         DEBUG("\nThe parameter array is:\n");
          defId.List();
       }
    }
@@ -1541,7 +1541,7 @@ bool TdFCanTask::tdFfpiDefRead(short loadingFiles, short check)
       if (check & SHOW)
       {
          DEBUG("\nREAD tdFfpiFlex.sds: %s", fName.c_str());
-         DEBUG("The parameter array is :\n");
+         DEBUG("\nThe parameter array is :\n");
          defId.List();
       }
    }
@@ -1793,26 +1793,26 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
       tmpId.Get("xCen", &dParam);
       DEBUG("xCen from file is %f\n", dParam);
       details->normWin.xCen = dParam;
-      DEBUG("normWin.xCen is %f\n", details->normWin.xCen);
+      // DEBUG("normWin.xCen is %f\n", details->normWin.xCen);
 
       // ArgGetd(tmpId, "yCen", &dParam, status);
       tmpId.Get("yCen", &dParam);
       DEBUG("yCen from file is %f\n", dParam);
       details->normWin.yCen = dParam;
-      DEBUG("normWin.yCen is %f\n", details->normWin.yCen);
+      // DEBUG("normWin.yCen is %f\n", details->normWin.yCen);
 
       // ArgGets(tmpId, "xSpan", &sParam, status);
       tmpId.Get("xSpan", &sParam);
       DEBUG("xSpan from file is %hd\n", sParam);
       details->normWin.xSpan = (int)sParam;
-      DEBUG("normWin.xSpan is %d\n", details->normWin.xSpan);
+      // DEBUG("normWin.xSpan is %d\n", details->normWin.xSpan);
 
       // ArgGets(tmpId, "ySpan", &sParam, status);
       tmpId.Get("ySpan", &sParam);
       DEBUG("ySpan from file is %hd\n", sParam);
       details->normWin.ySpan = (int)sParam;
-      DEBUG("normWin.ySpan is %d\n", details->normWin.ySpan);
-      // SdsFreeId(tmpId, status);
+      // DEBUG("normWin.ySpan is %d\n", details->normWin.ySpan);
+      //  SdsFreeId(tmpId, status);
    }
 
    /*
@@ -1919,9 +1919,9 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
          // I_TdFCanTaskParSys.Put("XY_VEL", lIntParam);
          DEBUG("XY_VEL from file is %ld\n", lIntParam);
          // xyVel = static_cast<INT32>(lIntParam);
-         DEBUG("xyVel original is %d\n", this->xyVel);
+         // DEBUG("xyVel original is %d\n", this->xyVel);
          I_TdFCanTaskParSys.Put("XY_VEL", (INT32)lIntParam);
-         DEBUG("xyVel after altering is %d\n", this->xyVel);
+         // DEBUG("xyVel after altering is %d\n", this->xyVel);
          lIntParam = 0;
       }
 
@@ -1939,7 +1939,7 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
          stepSize = lIntParam;
          DEBUG("STEP_SIZE from file is %ld\n", lIntParam);
          I_TdFCanTaskParSys.Put("STEP_SIZE", (INT32)lIntParam);
-         DEBUG("stepSize is %d\n", stepSize);
+         // DEBUG("stepSize is %d\n", stepSize);
          lIntParam = 0;
       }
 
@@ -1957,7 +1957,7 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
          maxError = lIntParam;
          DEBUG("MAX_ERROR from file is %ld\n", lIntParam);
          I_TdFCanTaskParSys.Put("MAX_ERROR", (INT32)lIntParam);
-         DEBUG("maxError is %d\n", maxError);
+         // DEBUG("maxError is %d\n", maxError);
          lIntParam = 0;
       }
 
@@ -1975,7 +1975,7 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
          posTol = lIntParam;
          DEBUG("POS_TOL from file is %ld\n", lIntParam);
          I_TdFCanTaskParSys.Put("POS_TOL", (INT32)lIntParam);
-         DEBUG("posTol is %d\n", posTol);
+         // DEBUG("posTol is %d\n", posTol);
          lIntParam = 0;
       }
 
@@ -1993,7 +1993,7 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
          attempts = sParam;
          DEBUG("POS_ATTEMPTS from file is %hd\n", sParam);
          I_TdFCanTaskParSys.Put("POS_ATTEMPTS", (short)sParam);
-         DEBUG("attempts is %hd\n", attempts);
+         // DEBUG("attempts is %hd\n", attempts);
          sParam = 0;
       }
 
@@ -2012,7 +2012,7 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
          fibInImgThres = lIntParam;
          DEBUG("FIBRE_IN_IMAGE from file is %ld\n", lIntParam);
          I_TdFCanTaskParSys.Put("POS_ATTEMPTS", (INT32)lIntParam);
-         DEBUG("fibInImgThres is %d\n", fibInImgThres);
+         // DEBUG("fibInImgThres is %d\n", fibInImgThres);
          lIntParam = 0;
       }
 
@@ -2030,7 +2030,7 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
          settleTime = dParam;
          DEBUG("SETTLE_TIME from file is %f\n", dParam);
          I_TdFCanTaskParSys.Put("SETTLE_TIME", (double)dParam);
-         DEBUG("settleTime is %f\n", settleTime);
+         // DEBUG("settleTime is %f\n", settleTime);
          dParam = 0.0;
       }
 
@@ -2048,7 +2048,7 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
          xaccuracy = lIntParam;
          DEBUG("X_ACCURACY from file is %ld\n", lIntParam);
          I_TdFCanTaskParSys.Put("X_ACCURACY", (INT32)lIntParam);
-         DEBUG("xaccuracy is %d\n", xaccuracy);
+         // DEBUG("xaccuracy is %d\n", xaccuracy);
          lIntParam = 0;
       }
 
@@ -2066,7 +2066,7 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
          yaccuracy = lIntParam;
          DEBUG("Y_ACCURACY from file is %ld\n", lIntParam);
          I_TdFCanTaskParSys.Put("Y_ACCURACY", (INT32)lIntParam);
-         DEBUG("yaccuracy is %d\n", yaccuracy);
+         // DEBUG("yaccuracy is %d\n", yaccuracy);
          lIntParam = 0;
       }
 
@@ -2084,7 +2084,7 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
          timeoutFac = lIntParam;
          DEBUG("TIMEOUT_FAC from file is %ld\n", lIntParam);
          I_TdFCanTaskParSys.Put("TIMEOUT_FAC", (INT32)lIntParam);
-         DEBUG("timeoutFac is %d\n", timeoutFac);
+         // DEBUG("timeoutFac is %d\n", timeoutFac);
          lIntParam = 0;
       }
 
@@ -2102,7 +2102,7 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
       {
          DEBUG("DPR_FEEDBACK from file is %s\n", strParam.c_str());
          details->dprFeedback = strcmp("NO", strParam.c_str()) ? YES : NO;
-         DEBUG("details->dprFeedback is %hd\n", details->dprFeedback);
+         // DEBUG("details->dprFeedback is %hd\n", details->dprFeedback);
          strParam = "";
       }
 
@@ -2120,7 +2120,7 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
          overlayPlaneEnabled = lIntParam;
          DEBUG("VFG_OP_ENABLE from file is %ld\n", lIntParam);
          I_TdFCanTaskParSys.Put("VFG_OP_ENABLE", (INT32)lIntParam);
-         DEBUG("overlayPlaneEnabled is %d\n", overlayPlaneEnabled);
+         // DEBUG("overlayPlaneEnabled is %d\n", overlayPlaneEnabled);
          lIntParam = 0;
       }
 
@@ -2138,7 +2138,7 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
          zerocamCenWait = dParam;
          DEBUG("ZEROCAM_CENWAIT from file is %f\n", dParam);
          I_TdFCanTaskParSys.Put("ZEROCAM_CENWAIT", (double)dParam);
-         DEBUG("zerocamCenWait is %f\n", zerocamCenWait);
+         // DEBUG("zerocamCenWait is %f\n", zerocamCenWait);
          dParam = 0.0;
       }
 
@@ -2228,7 +2228,7 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
          shortZeroX = lIntParam;
          DEBUG("PLT1_CFID_OFF_X from file is %d\n", lIntParam);
          I_TdFCanTaskParSys.Put("PLT1_CFID_OFF_X", (short)lIntParam);
-         DEBUG("shortZeroX is %hd\n", shortZeroX);
+         // DEBUG("shortZeroX is %hd\n", shortZeroX);
          lIntParam = 0;
       }
 
@@ -2246,7 +2246,7 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
          shortZeroY = lIntParam;
          DEBUG("PLT1_CFID_OFF_Y from file is %d\n", lIntParam);
          I_TdFCanTaskParSys.Put("PLT1_CFID_OFF_Y", (short)lIntParam);
-         DEBUG("shortZeroY is %hd\n", shortZeroY);
+         // DEBUG("shortZeroY is %hd\n", shortZeroY);
          lIntParam = 0;
       }
 
@@ -2497,12 +2497,12 @@ bool TdFCanTask::tdFfpiUpdatePos(short updateIdeal, short useDpr, short displayT
             if (Index < 2)
             {
                I_tdFfpiMainStruct->atEnc.x = (int)CurrentPosition;
-               DEBUG("Now the encoder position of X axis is %d", I_tdFfpiMainStruct->atEnc.x);
+               DEBUG("\nNow the encoder position of X axis is %d", I_tdFfpiMainStruct->atEnc.x);
             }
             else if (Index == 2)
             {
                I_tdFfpiMainStruct->atEnc.y = (int)CurrentPosition;
-               DEBUG("Now the encoder position of Y axis is %d", I_tdFfpiMainStruct->atEnc.y);
+               DEBUG("\nNow the encoder position of Y axis is %d", I_tdFfpiMainStruct->atEnc.y);
             }
          }
       }
@@ -2547,7 +2547,7 @@ bool TdFCanTask::tdFfpiUpdatePos(short updateIdeal, short useDpr, short displayT
                         &atFpX, &atFpY);
 
    if (displayText)
-      DEBUG("tdFfpi:Converted encoder values %d, %d to %f, %f.\n", I_tdFfpiMainStruct->atEnc.x, I_tdFfpiMainStruct->atEnc.y, atFpX, atFpY);
+      DEBUG("\ntdFfpi:Converted encoder values %d, %d to %f, %f.\n", I_tdFfpiMainStruct->atEnc.x, I_tdFfpiMainStruct->atEnc.y, atFpX, atFpY);
 
    oldFpX = (long int)(ixPark);
    oldFpX = I_TdFCanTaskParSys.GetLong("X");
@@ -3656,6 +3656,9 @@ void GInitAction::ActionThread(const drama::sds::Id &Arg)
 {
 
    UnblockSIGUSR2();
+   auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+      ThisTask->ClearError();
+   drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
 
    std::string Axes("");
    if (Arg)
@@ -3677,8 +3680,7 @@ void GInitAction::ActionThread(const drama::sds::Id &Arg)
          MessageUser("Initialising Theta axis");
       if (UseJaw)
          MessageUser("Initialising Jaw axis");
-      auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
-      ThisTask->ClearError();
+      
       if (!(ThisTask->SetupAmps()))
       {
          MessageUser("G_INIT: " + ThisTask->GetError());
@@ -3795,6 +3797,9 @@ void GMoveAxisAction::ActionThread(const drama::sds::Id &Arg)
 {
 
    UnblockSIGUSR2();
+   auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   ThisTask->ClearError();
+   drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
 
    std::string Axes;
    std::string Positions;
@@ -3834,8 +3839,7 @@ void GMoveAxisAction::ActionThread(const drama::sds::Id &Arg)
          DEBUG("AxisId: %d, position %f, velocity %f\n", AxisDemands[Index].AxisId,
                AxisDemands[Index].Position, AxisDemands[Index].Velocity);
       }
-      auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
-      ThisTask->ClearError();
+
       if (!(ThisTask->SetupAmps()))
       {
          MessageUser("MOVE_AXES: " + ThisTask->GetError());
@@ -3991,7 +3995,10 @@ void GHomeAction::ActionThread(const drama::sds::Id &Arg)
 {
 
    UnblockSIGUSR2();
+   auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   ThisTask->ClearError();
 
+   drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
    std::string Axes("");
    if (Arg)
    {
@@ -4012,8 +4019,7 @@ void GHomeAction::ActionThread(const drama::sds::Id &Arg)
          MessageUser("Homing Theta axis");
       if (Jaw)
          MessageUser("Homing Jaw axis");
-      auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
-      ThisTask->ClearError();
+
       if (!(ThisTask->SetupAmps()))
       {
          MessageUser("G_HOME: " + ThisTask->GetError());
