@@ -172,14 +172,14 @@ private:
 };
 
 // G_HOME_NT is a non-threaded version of G_HOME
-class GHomeActionNT : public drama::MessageHandler
+class GHomeActionNT : public drama::thread::TAction
 {
 public:
-   GHomeActionNT() {}
+   GHomeActionNT(std::weak_ptr<drama::Task> theTask): drama::thread::TAction(theTask) {}
    ~GHomeActionNT() {}
 
 private:
-   drama::Request MessageReceived() override;
+   void ActionThread(const drama::sds::Id &) override;
 };
 
 //  G_MOVE_AXIS - move one (or more) 2dF positioner gantry axes to specified position(s).
@@ -219,58 +219,58 @@ private:
 };
 
 // G_Park_Gantry_NT is a newly-added action to park the gantry
-class GParkGantryActionNT : public drama::MessageHandler
+class GParkGantryActionNT : public drama::thread::TAction
 {
 public:
-   GParkGantryActionNT() {}
+   GParkGantryActionNT(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask) {}
    ~GParkGantryActionNT() {}
 
 private:
-   drama::Request MessageReceived() override;
+   void ActionThread(const drama::sds::Id &) override;
 };
 
 // G_UNPARK_NT is a non-thread version of UnParkGantry action
-class GUnParkActionNT : public drama::MessageHandler
+class GUnParkActionNT : public drama::thread::TAction
 {
 public:
-   GUnParkActionNT() {}
+   GUnParkActionNT(std::weak_ptr<drama::Task> theTask): drama::thread::TAction(theTask) {}
    ~GUnParkActionNT() {}
 
 private:
-   drama::Request MessageReceived() override;
+   void ActionThread(const drama::sds::Id &) override;
 };
 
 // G_MOVEOFFSET_NT is a non-thread version of MoveOffset action
-class GMoveOffsetActionNT : public drama::MessageHandler
+class GMoveOffsetActionNT : public drama::thread::TAction
 {
 public:
-   GMoveOffsetActionNT() {}
+   GMoveOffsetActionNT(std::weak_ptr<drama::Task> theTask): drama::thread::TAction(theTask) {}
    ~GMoveOffsetActionNT() {}
 
 private:
-   drama::Request MessageReceived() override;
+   void ActionThread(const drama::sds::Id &) override;
 };
 
 // G_EXIT is a non-thread version of Exit action
-class GEXITActionNT : public drama::MessageHandler
+class GEXITActionNT : public drama::thread::TAction
 {
 public:
-   GEXITActionNT() {}
+   GEXITActionNT(std::weak_ptr<drama::Task> theTask): drama::thread::TAction(theTask) {}
    ~GEXITActionNT() {}
 
 private:
-   drama::Request MessageReceived() override;
+   void ActionThread(const drama::sds::Id &) override;
 };
 
 // G_MOVEActionNT is a non-thread version of Move action, it moves a particular axis
-class GMOVEActionNT : public drama::MessageHandler
+class GMOVEActionNT :  public drama::thread::TAction
 {
 public:
-   GMOVEActionNT() {}
+   GMOVEActionNT(std::weak_ptr<drama::Task> theTask): drama::thread::TAction(theTask) {}
    ~GMOVEActionNT() {}
 
 private:
-   drama::Request MessageReceived() override;
+  void ActionThread(const drama::sds::Id &) override;
 };
 
 // G_RESETActionNT is a non-thread version of Move action, it moves a particular axis
@@ -522,6 +522,9 @@ private:
                       double ha, double dec, TdfFlexType *pars, long int *dx, long int *dy);
    void tdFstateBitSet(unsigned char bit);
    void tdFstateBitClear(unsigned char bit);
+
+   //lliu added on 17-05-2024 to check the target poisiton
+   void tdFfpiPositionCheck(int Index, CML::uunit &Position);
 
    // --------------------------------------------------------------------------
    // Gantry movement related actions
@@ -1305,6 +1308,12 @@ TdFCanTask::TdFCanTask(const std::string &taskName) : drama::Task(taskName),
                                                       I_GHomeActionObj(TaskPtr()),
                                                       I_CanAccessInitialised(false),
                                                       I_TdFCanTaskParSys(TaskPtr()),
+                                                      I_GParkGantryActionNTObj(TaskPtr()),
+                                                      I_GUnParkActionNTObj(TaskPtr()),
+                                                      I_GHomeActionNTObj(TaskPtr()),
+                                                      I_GMoveOffsetActionNTObj(TaskPtr()),
+                                                      I_GMoveActionNTObj(TaskPtr()),
+                                                      I_GExitActionNTObj(TaskPtr()),
                                                       tdfTaskStr(TaskPtr(), "ENQ_DEV_DESCR", "2dF Focal Plane Imager Gantry Task"),
                                                       tdfSimSearchRunStr(TaskPtr(), "SIM_SEARCH_RAN", "No"),
                                                       tdfVersionStr(TaskPtr(), "ENQ_VER_NUM", ""),
@@ -3261,6 +3270,43 @@ bool TdFCanTask::SetupLinkage(
 
 //  ------------------------------------------------------------------------------------------------
 
+//                    T d F  C a n  T a s k  : :  
+void TdFCanTask::tdFfpiPositionCheck(int Index, CML::uunit &Position)
+{
+   switch (Index){
+      case 0:
+      case 1:
+      {
+         if(Position<XMIN)
+         {
+            Position=XMIN;
+         }else if(Position>XMAX) 
+            Position=XMAX;
+         break;
+      }
+      case 2:
+      {
+         if(Position<YMIN)
+         {
+            Position=YMIN;
+         }else if(Position>YMAX) 
+            Position=YMAX;
+         break;
+      }
+      case 3:
+      {
+         if(Position<ZMIN)
+         {
+            Position=ZMIN;
+         }else if(Position>ZMAX) 
+            Position=ZMAX;
+         break;
+      }
+   }
+}
+
+//  ------------------------------------------------------------------------------------------------
+
 //                    T d F  C a n  T a s k  : :  M o v e  A x e s
 //
 //  Moves the specified axes to a set of positions specified in a vector of AxisDemands, which
@@ -3321,6 +3367,8 @@ bool TdFCanTask::MoveAxes(const std::vector<AxisDemand> &AxisDemands, bool MoveO
          {
             (*MoveLinkage)[Index].GetPositionActual(TargetPosition);
          }
+
+         tdFfpiPositionCheck(Index, TargetPosition);
          Targets[Index] = TargetPosition;
          TargetPoint[Index] = TargetPosition;
          DEBUG("Target for axis %d is %f\n", Index, TargetPosition);
@@ -3656,8 +3704,9 @@ void GInitAction::ActionThread(const drama::sds::Id &Arg)
 {
 
    UnblockSIGUSR2();
+   //lliu added on 16/05/2024 to add the lock
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
-      ThisTask->ClearError();
+   ThisTask->ClearError();
    drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
 
    std::string Axes("");
@@ -3680,7 +3729,7 @@ void GInitAction::ActionThread(const drama::sds::Id &Arg)
          MessageUser("Initialising Theta axis");
       if (UseJaw)
          MessageUser("Initialising Jaw axis");
-      
+
       if (!(ThisTask->SetupAmps()))
       {
          MessageUser("G_INIT: " + ThisTask->GetError());
@@ -3797,6 +3846,7 @@ void GMoveAxisAction::ActionThread(const drama::sds::Id &Arg)
 {
 
    UnblockSIGUSR2();
+   //lliu added on 16/05/2024 to add the lock
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
    drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
@@ -3995,6 +4045,7 @@ void GHomeAction::ActionThread(const drama::sds::Id &Arg)
 {
 
    UnblockSIGUSR2();
+   //lliu added on 16/05/2024 to add the lock
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
 
@@ -4055,7 +4106,7 @@ void GHomeAction::ActionThread(const drama::sds::Id &Arg)
 // end position, and moves based on the curve. The end position of the curve is not necessarily
 // the exact position we want.
 
-drama::Request GParkGantryActionNT::MessageReceived()
+void GParkGantryActionNT::ActionThread(const drama::sds::Id &Arg)
 {
 
    UnblockSIGUSR2();
@@ -4063,29 +4114,31 @@ drama::Request GParkGantryActionNT::MessageReceived()
    // lliu added on 15/05/2024
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
+   drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
    drama::sds::Id parSysId(drama::sds::Id::CreateFromSdsIdType((long)(DitsGetParId())));
 
    if (details == nullptr || details->Initialised == NO)
    {
       MessageUser("G_PARK_NT: TdFCanTask is not initialised. Please use \"ditscmd TdFCanTask INITIALISE\" to initialise the task.");
-      return drama::RequestCode::End;
+      return;
    }
    if (!(ThisTask->tdFfpiIlocks(ILOCK__GAN_PARKED)))
    {
       MessageUser("G_PARK_NT: the gantry is already parked.");
-      return drama::RequestCode::End;
+      return;
    }
    if (details->inUse)
    {
       MessageUser("G_PARK_NT: TdFCanTask is running other actions.\n");
-      return drama::RequestCode::End;
+      return;
    }
 
    std::string Axes("");
    std::string Positions;
    std::string Velocities;
-   drama::sds::Id Arg = GetEntry().Argument();
+   
    if (Arg)
    {
       drama::gitarg::String AxesArg(Arg, "AXES", 1);
@@ -4106,8 +4159,7 @@ drama::Request GParkGantryActionNT::MessageReceived()
          MessageUser("Park Theta axis");
       if (Jaw)
          MessageUser("Park Jaw axis");
-      auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
-      ThisTask->ClearError();
+      
       if (!(ThisTask->SetupAmps()))
       {
          MessageUser("G_PARK_NT: " + ThisTask->GetError());
@@ -4138,7 +4190,6 @@ drama::Request GParkGantryActionNT::MessageReceived()
       MessageUser("G_PARK_NT: Invalid axis specification");
    }
 
-   return drama::RequestCode::End;
 }
 
 //  ------------------------------------------------------------------------------------------------
@@ -4149,7 +4200,7 @@ drama::Request GParkGantryActionNT::MessageReceived()
 // G_HOME fails to process the Home action whilst G_INIT_NT functions properly. The error may result from the thread version drama?
 // Need to check if the non-threaded version works.
 
-drama::Request GHomeActionNT::MessageReceived()
+void GHomeActionNT::ActionThread(const drama::sds::Id &Arg)
 {
 
    UnblockSIGUSR2();
@@ -4157,27 +4208,28 @@ drama::Request GHomeActionNT::MessageReceived()
    // lliu added on 15/05/2024
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
+   drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
    drama::sds::Id parSysId(drama::sds::Id::CreateFromSdsIdType((long)(DitsGetParId())));
 
    if (details == nullptr || details->Initialised == NO)
    {
       MessageUser("G_HOME_NT: TdFCanTask is not initialised. Please use \"ditscmd TdFCanTask INITIALISE\" to initialise the task.");
-      return drama::RequestCode::End;
+      return;
    }
    if (!(ThisTask->tdFfpiIlocks(ILOCK__GAN_PARKED)))
    {
       MessageUser("G_HOME_NT: the gantry is already homed.");
-      return drama::RequestCode::End;
+      return;
    }
    if (details->inUse)
    {
       MessageUser("G_HOME_NT: TdFCanTask is running other actions.\n");
-      return drama::RequestCode::End;
+      return;
    }
 
    std::string Axes("");
-   drama::sds::Id Arg = GetEntry().Argument();
+   
    if (Arg)
    {
       drama::gitarg::String AxesArg(Arg, "AXES", 1);
@@ -4197,8 +4249,7 @@ drama::Request GHomeActionNT::MessageReceived()
          MessageUser("Home Theta axis");
       if (Jaw)
          MessageUser("Home Jaw axis");
-      auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
-      ThisTask->ClearError();
+      
       if (!(ThisTask->SetupAmps()))
       {
          MessageUser("G_HOME_NT: " + ThisTask->GetError());
@@ -4219,7 +4270,6 @@ drama::Request GHomeActionNT::MessageReceived()
                MessageUser("G_HOME_NT: Failed to update the position of gantry.");
             }
          }
-
          details->inUse = NO;
       }
    }
@@ -4227,13 +4277,13 @@ drama::Request GHomeActionNT::MessageReceived()
    {
       MessageUser("G_HOME_NT: Invalid axis specification");
    }
-   return drama::RequestCode::End;
+   
 }
 
 //  ------------------------------------------------------------------------------------------------
 
 //         G  UnPark   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
-drama::Request GUnParkActionNT::MessageReceived()
+void GUnParkActionNT::ActionThread(const drama::sds::Id &Arg)
 {
    UnblockSIGUSR2();
    std::string Axes("");
@@ -4243,26 +4293,27 @@ drama::Request GUnParkActionNT::MessageReceived()
    // lliu added on 15/05/2024
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
+   drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
    drama::sds::Id parSysId(drama::sds::Id::CreateFromSdsIdType((long)(DitsGetParId())));
 
    if (details == nullptr || details->Initialised == NO)
    {
       MessageUser("G_UNPARK_NT: TdFCanTask is not initialised. Please use \"ditscmd TdFCanTask INITIALISE\" to initialise the task.");
-      return drama::RequestCode::End;
+      return;
    }
    if (!(ThisTask->tdFfpiIlocks(ILOCK__GAN_NOT_PARKED)))
    {
       MessageUser("G_UNPARK_NT: the gantry is already not-parked.");
-      return drama::RequestCode::End;
+      return;
    }
    if (details->inUse)
    {
       MessageUser("G_UNPARK_NT: TdFCanTask is running other actions.\n");
-      return drama::RequestCode::End;
+      return;
    }
 
-   drama::sds::Id Arg = GetEntry().Argument();
    if (Arg)
    {
       drama::gitarg::String AxesArg(Arg, "AXES", 1);
@@ -4283,8 +4334,7 @@ drama::Request GUnParkActionNT::MessageReceived()
          MessageUser("UnPark Theta axis");
       if (Jaw)
          MessageUser("UnPark Jaw axis");
-      auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
-      ThisTask->ClearError();
+     
       if (!(ThisTask->SetupAmps()))
       {
          MessageUser("G_UNPARK_NT: " + ThisTask->GetError());
@@ -4316,7 +4366,7 @@ drama::Request GUnParkActionNT::MessageReceived()
    {
       MessageUser("G_HOME_NT: Invalid axis specification");
    }
-   return drama::RequestCode::End;
+   
 }
 
 //  ------------------------------------------------------------------------------------------------
@@ -4324,31 +4374,30 @@ drama::Request GUnParkActionNT::MessageReceived()
 //         G  MoveOffset   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
 // The G_MOVEOFFSET Action moves an offset amount from its current position. This is a non-thread version.
 
-drama::Request GMoveOffsetActionNT::MessageReceived()
+void GMoveOffsetActionNT::ActionThread(const drama::sds::Id &Arg)
 {
    UnblockSIGUSR2();
    // lliu added on 15/05/2024
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
+   drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
 
    if (details == nullptr || details->Initialised == NO)
    {
       MessageUser("G_MOVEOFFSET_NT: TdFCanTask is not initialised. Please use \"ditscmd TdFCanTask INITIALISE\" to initialise the task.");
-      return drama::RequestCode::End;
+      return;
    }
    if (!(ThisTask->tdFfpiIlocks(ILOCK__GAN_PARKED)))
    {
       MessageUser("G_MOVEOFFSET_NT: the gantry is parked.");
-      return drama::RequestCode::End;
+      return;
    }
    if (details->inUse)
    {
       MessageUser("G_MOVEOFFSET_NT: TdFCanTask is running other actions.\n");
-      return drama::RequestCode::End;
+      return;
    }
-
-   drama::sds::Id Arg = GetEntry().Argument();
 
    std::string Axes;
    std::string Positions;
@@ -4400,8 +4449,7 @@ drama::Request GMoveOffsetActionNT::MessageReceived()
          DEBUG("AxisId: %d, offset position %f, velocity %f\n", AxisDemands[Index].AxisId,
                AxisDemands[Index].Position, AxisDemands[Index].Velocity);
       }
-      auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
-      ThisTask->ClearError();
+     
       if (!(ThisTask->SetupAmps()))
       {
          MessageUser("G_MOVEOFFSET_NT: " + ThisTask->GetError());
@@ -4423,30 +4471,29 @@ drama::Request GMoveOffsetActionNT::MessageReceived()
       }
       details->inUse = NO;
    }
-
-   return drama::RequestCode::End;
 }
 
 //  ------------------------------------------------------------------------------------------------
 
 //         G  Exit   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
-drama::Request GEXITActionNT::MessageReceived()
+void GEXITActionNT::ActionThread(const drama::sds::Id &Arg)
 {
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
+   drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
 
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
 
    if (details == nullptr || details->Initialised == NO)
    {
       MessageUser("G_EXIT: TdFCanTask is not initialised. Please use \"ditscmd TdFCanTask INITIALISE\" to initialise the task.");
-      return drama::RequestCode::End;
+      return;
    }
    if (details->inUse)
    {
       MessageUser("G_EXIT: TdFCanTask is running other actions.\n");
-      return drama::RequestCode::End;
+      return;
    }
 
    if (ThisTask->DisableAmps() == true)
@@ -4459,37 +4506,36 @@ drama::Request GEXITActionNT::MessageReceived()
       DEBUG("DisableAmps fails\n");
       MessageUser("G_EXIT: " + ThisTask->GetError());
    }
-   return drama::RequestCode::End;
+   return;
 }
 
 //  ------------------------------------------------------------------------------------------------
 
 //         G  Move   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
-drama::Request GMOVEActionNT::MessageReceived()
+void GMOVEActionNT::ActionThread(const drama::sds::Id &Arg)
 {
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
+   drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
 
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
 
    if (details == nullptr || details->Initialised == NO)
    {
       MessageUser("G_MOVE_NT: TdFCanTask is not initialised. Please use \"ditscmd TdFCanTask INITIALISE\" to initialise the task.");
-      return drama::RequestCode::End;
+      return;
    }
    if (!(ThisTask->tdFfpiIlocks(ILOCK__GAN_PARKED)))
    {
       MessageUser("G_MOVE_NT: the gantry is parked, please unpark the gantry first.");
-      return drama::RequestCode::End;
+      return;
    }
    if (details->inUse)
    {
       MessageUser("G_MOVE_NT: TdFCanTask is running other actions.\n");
-      return drama::RequestCode::End;
+      return;
    }
-
-   drama::sds::Id Arg = GetEntry().Argument();
 
    std::string Axes;
    std::string Positions;
@@ -4562,7 +4608,7 @@ drama::Request GMOVEActionNT::MessageReceived()
          }
       }
    }
-   return drama::RequestCode::End;
+   
 }
 
 //  ------------------------------------------------------------------------------------------------

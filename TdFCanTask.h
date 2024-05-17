@@ -97,6 +97,13 @@
 #define FPI_XY_FR_MAX   1000000  /* FPI XY axes maximum feedrate value (?)        */
 #define PLATE_FR_MIN          1  /* Plate rotators minimum feedrate value (?)     */
 #define PLATE_FR_MAX    3000000  /* Plate rotators maximum feedrate value (?)     */
+#define XMIN              -1000  /* X-axis minimum value (microns)                */
+#define XMAX             145000  /* X-axis maximum value (microns)                */
+#define YMIN              -1000  /* Y-axis minimum value (microns)                */
+#define YMAX             145000  /* Y-axis maximum value (microns)                */
+#define ZMIN                  0  /* Z-axis minimum value (microns)                */
+#define ZMAX              60000  /* Z-axis maximum value (microns)                */
+
 
 #define TDFFPI_MSG_BUFFER       20000  /* Size of message buffer for TDFFPI          */
 
