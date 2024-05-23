@@ -175,7 +175,7 @@ private:
 class GHomeActionNT : public drama::thread::TAction
 {
 public:
-   GHomeActionNT(std::weak_ptr<drama::Task> theTask): drama::thread::TAction(theTask) {}
+   GHomeActionNT(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask) {}
    ~GHomeActionNT() {}
 
 private:
@@ -196,26 +196,26 @@ private:
 
 //  G_MOVE_AXIS_NT is a non-threaded version of G_MOVE_AXIS, purely for testing purposes.
 
-class GMoveAxisActionNT : public drama::MessageHandler
+class GMoveAxisActionNT : public drama::thread::TAction
 {
 public:
-   GMoveAxisActionNT() {}
+   GMoveAxisActionNT(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask) {}
    ~GMoveAxisActionNT() {}
 
 private:
-   drama::Request MessageReceived() override;
+   void ActionThread(const drama::sds::Id &) override;
 };
 
 //  G_INIT_NT is a non-threaded version of G_INIT, purely for testing purposes.
 
-class GInitActionNT : public drama::MessageHandler
+class GInitActionNT : public drama::thread::TAction
 {
 public:
-   GInitActionNT() {}
+   GInitActionNT(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask) {}
    ~GInitActionNT() {}
 
 private:
-   drama::Request MessageReceived() override;
+   void ActionThread(const drama::sds::Id &) override;
 };
 
 // G_Park_Gantry_NT is a newly-added action to park the gantry
@@ -233,7 +233,7 @@ private:
 class GUnParkActionNT : public drama::thread::TAction
 {
 public:
-   GUnParkActionNT(std::weak_ptr<drama::Task> theTask): drama::thread::TAction(theTask) {}
+   GUnParkActionNT(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask) {}
    ~GUnParkActionNT() {}
 
 private:
@@ -244,7 +244,7 @@ private:
 class GMoveOffsetActionNT : public drama::thread::TAction
 {
 public:
-   GMoveOffsetActionNT(std::weak_ptr<drama::Task> theTask): drama::thread::TAction(theTask) {}
+   GMoveOffsetActionNT(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask) {}
    ~GMoveOffsetActionNT() {}
 
 private:
@@ -255,7 +255,7 @@ private:
 class GEXITActionNT : public drama::thread::TAction
 {
 public:
-   GEXITActionNT(std::weak_ptr<drama::Task> theTask): drama::thread::TAction(theTask) {}
+   GEXITActionNT(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask) {}
    ~GEXITActionNT() {}
 
 private:
@@ -263,200 +263,200 @@ private:
 };
 
 // G_MOVEActionNT is a non-thread version of Move action, it moves a particular axis
-class GMOVEActionNT :  public drama::thread::TAction
+class GMOVEActionNT : public drama::thread::TAction
 {
 public:
-   GMOVEActionNT(std::weak_ptr<drama::Task> theTask): drama::thread::TAction(theTask) {}
+   GMOVEActionNT(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask) {}
    ~GMOVEActionNT() {}
 
 private:
-  void ActionThread(const drama::sds::Id &) override;
+   void ActionThread(const drama::sds::Id &) override;
 };
 
 // G_RESETActionNT is a non-thread version of Move action, it moves a particular axis
-class GRESETActionNT : public drama::MessageHandler
+class GRESETActionNT : public drama::thread::TAction
 {
 public:
-   GRESETActionNT() {}
+   GRESETActionNT(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask) {}
    ~GRESETActionNT() {}
 
 private:
-   drama::Request MessageReceived() override;
+   void ActionThread(const drama::sds::Id &) override;
 };
 
 // P_TELPOSActionNT is a non-thread version of TELPOS action, it sets the current position of telescope
-class PTELPOSActionNT : public drama::MessageHandler
+class PTELPOSActionNT : public drama::thread::TAction
 {
 public:
-   PTELPOSActionNT() {}
+   PTELPOSActionNT(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask) {}
    ~PTELPOSActionNT() {}
 
 private:
-   drama::Request MessageReceived() override;
+   void ActionThread(const drama::sds::Id &) override;
 };
 
 // P_SetActionNT is a non-thread version of SET action, it sets a signal parameter of tdffpi task
-class PSetActionNT : public drama::MessageHandler
+class PSetActionNT : public drama::thread::TAction
 {
 public:
-   PSetActionNT() {}
+   PSetActionNT(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask) {}
    ~PSetActionNT() {}
 
 private:
-   drama::Request MessageReceived() override;
+   void ActionThread(const drama::sds::Id &) override;
 };
 
 // P_ResetLockActionNT is a non-thread version of RESET_LOCK action, it resets the internal lock
-class PResetLockActionNT : public drama::MessageHandler
+class PResetLockActionNT : public drama::thread::TAction
 {
 public:
-   PResetLockActionNT() {}
+   PResetLockActionNT(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask) {}
    ~PResetLockActionNT() {}
 
 private:
-   drama::Request MessageReceived() override;
+   void ActionThread(const drama::sds::Id &) override;
 };
 
 // P_SetCoeffsActionNT is a non-thread version of SET_COFFS action, it resets the image cofficients
-class PSetCoeffsActionNT : public drama::MessageHandler
+class PSetCoeffsActionNT : public drama::thread::TAction
 {
 public:
-   PSetCoeffsActionNT() {}
+   PSetCoeffsActionNT(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask) {}
    ~PSetCoeffsActionNT() {}
 
 private:
-   drama::Request MessageReceived() override;
+   void ActionThread(const drama::sds::Id &) override;
 };
 
 // P_SetImageActionNT is a non-thread version of SET_IMAGE action, it sets the image
-class PSetImageActionNT : public drama::MessageHandler
+class PSetImageActionNT : public drama::thread::TAction
 {
 public:
-   PSetImageActionNT() {}
+   PSetImageActionNT(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask) {}
    ~PSetImageActionNT() {}
 
 private:
-   drama::Request MessageReceived() override;
+   void ActionThread(const drama::sds::Id &) override;
 };
 
-class PSetWindowActionNT : public drama::MessageHandler
+class PSetWindowActionNT : public drama::thread::TAction
 {
 public:
-   PSetWindowActionNT() {}
+   PSetWindowActionNT(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask) {}
    ~PSetWindowActionNT() {}
 
 private:
-   drama::Request MessageReceived() override;
+   void ActionThread(const drama::sds::Id &) override;
 };
 
 // P_SetVelActionNT is a non-thread version of SET_VEL action, it sets the velocity of the gantry
-class PSetVelActionNT : public drama::MessageHandler
+class PSetVelActionNT : public drama::thread::TAction
 {
 public:
-   PSetVelActionNT() {}
+   PSetVelActionNT(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask) {}
    ~PSetVelActionNT() {}
 
 private:
-   drama::Request MessageReceived() override;
+   void ActionThread(const drama::sds::Id &) override;
 };
 
 // P_SetPlateActionNT is a non-thread version of SET_PLATE action, it sets the status of the plate
-class PSetPlateActionNT : public drama::MessageHandler
+class PSetPlateActionNT : public drama::thread::TAction
 {
 public:
-   PSetPlateActionNT() {}
+   PSetPlateActionNT(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask) {}
    ~PSetPlateActionNT() {}
 
 private:
-   drama::Request MessageReceived() override;
+   void ActionThread(const drama::sds::Id &) override;
 };
 
 // P_UpdateFlexActionNT is a non-thread version of UPDATE_FLEX action, it rereads the flex file
-class PUpdateFlexActionNT : public drama::MessageHandler
+class PUpdateFlexActionNT : public drama::thread::TAction
 {
 public:
-   PUpdateFlexActionNT() {}
+   PUpdateFlexActionNT(std::weak_ptr<drama::Task> theTask): drama::thread::TAction(theTask) {}
    ~PUpdateFlexActionNT() {}
 
 private:
-   drama::Request MessageReceived() override;
+   void ActionThread(const drama::sds::Id &) override;
 };
 
 // P_UpdateActionNT is a non-thread version of UPDATE action, it updates the pose
-class PUpdateActionNT : public drama::MessageHandler
+class PUpdateActionNT : public drama::thread::TAction
 {
 public:
-   PUpdateActionNT() {}
+   PUpdateActionNT(std::weak_ptr<drama::Task> theTask): drama::thread::TAction(theTask) {}
    ~PUpdateActionNT() {}
 
 private:
-   drama::Request MessageReceived() override;
+   void ActionThread(const drama::sds::Id &) override;
 };
 
 // P_ReportActionNT is a non-thread version of Report action, it reports the value of a fpi task parameter
-class PReportActionNT : public drama::MessageHandler
+class PReportActionNT : public drama::thread::TAction
 {
 public:
-   PReportActionNT() {}
+   PReportActionNT(std::weak_ptr<drama::Task> theTask): drama::thread::TAction(theTask) {}
    ~PReportActionNT() {}
 
 private:
-   drama::Request MessageReceived() override;
+   void ActionThread(const drama::sds::Id &) override;
 };
 
 // P_ReportLocksActionNT is a non-thread version of ReportLocks action, it reports the status of internal lock
-class PReportLocksActionNT : public drama::MessageHandler
+class PReportLocksActionNT : public drama::thread::TAction
 {
 public:
-   PReportLocksActionNT() {}
+   PReportLocksActionNT(std::weak_ptr<drama::Task> theTask): drama::thread::TAction(theTask) {}
    ~PReportLocksActionNT() {}
 
 private:
-   drama::Request MessageReceived() override;
+   void ActionThread(const drama::sds::Id &) override;
 };
 
 // P_ReportCoeffsActionNT is a non-thread version of ReportCoeffs action, it reports the coeffs
-class PReportCoeffsActionNT : public drama::MessageHandler
+class PReportCoeffsActionNT : public drama::thread::TAction
 {
 public:
-   PReportCoeffsActionNT() {}
+   PReportCoeffsActionNT(std::weak_ptr<drama::Task> theTask): drama::thread::TAction(theTask) {}
    ~PReportCoeffsActionNT() {}
 
 private:
-   drama::Request MessageReceived() override;
+   void ActionThread(const drama::sds::Id &) override;
 };
 
 // P_ReportImageActionNT is a non-thread version of ReportImage action, it reports the details of image
-class PReportImageActionNT : public drama::MessageHandler
+class PReportImageActionNT : public drama::thread::TAction
 {
 public:
-   PReportImageActionNT() {}
+   PReportImageActionNT(std::weak_ptr<drama::Task> theTask): drama::thread::TAction(theTask) {}
    ~PReportImageActionNT() {}
 
 private:
-   drama::Request MessageReceived() override;
+   void ActionThread(const drama::sds::Id &) override;
 };
 
 // P_ReportWindowActionNT is a non-thread version of ReportWindow action, it reports the details of window
-class PReportWindowActionNT : public drama::MessageHandler
+class PReportWindowActionNT : public drama::thread::TAction
 {
 public:
-   PReportWindowActionNT() {}
+   PReportWindowActionNT(std::weak_ptr<drama::Task> theTask): drama::thread::TAction(theTask) {}
    ~PReportWindowActionNT() {}
 
 private:
-   drama::Request MessageReceived() override;
+   void ActionThread(const drama::sds::Id &) override;
 };
 
 // P_SaveDefsActionNT is a non-thread version of SaveDef action, it saves Def into the tdfFpiDef.sds
-class PSaveDefsActionNT : public drama::MessageHandler
+class PSaveDefsActionNT : public drama::thread::TAction
 {
 public:
-   PSaveDefsActionNT() {}
+   PSaveDefsActionNT(std::weak_ptr<drama::Task> theTask): drama::thread::TAction(theTask) {}
    ~PSaveDefsActionNT() {}
 
 private:
-   drama::Request MessageReceived() override;
+   void ActionThread(const drama::sds::Id &) override;
 };
 
 //  ------------------------------------------------------------------------------------------------
@@ -523,7 +523,7 @@ private:
    void tdFstateBitSet(unsigned char bit);
    void tdFstateBitClear(unsigned char bit);
 
-   //lliu added on 17-05-2024 to check the target poisiton
+   // lliu added on 17-05-2024 to check the target poisiton
    void tdFfpiPositionCheck(int Index, CML::uunit &Position);
 
    // --------------------------------------------------------------------------
@@ -1308,12 +1308,35 @@ TdFCanTask::TdFCanTask(const std::string &taskName) : drama::Task(taskName),
                                                       I_GHomeActionObj(TaskPtr()),
                                                       I_CanAccessInitialised(false),
                                                       I_TdFCanTaskParSys(TaskPtr()),
+
                                                       I_GParkGantryActionNTObj(TaskPtr()),
                                                       I_GUnParkActionNTObj(TaskPtr()),
                                                       I_GHomeActionNTObj(TaskPtr()),
                                                       I_GMoveOffsetActionNTObj(TaskPtr()),
                                                       I_GMoveActionNTObj(TaskPtr()),
+                                                      I_GMoveAxisActionNTObj(TaskPtr()),
                                                       I_GExitActionNTObj(TaskPtr()),
+                                                      I_GResetActionNTObj(TaskPtr()),
+                                                      I_GInitActionNTObj(TaskPtr()),
+
+                                                      I_PTelposActionNTObj(TaskPtr()),
+                                                      I_PSetActionNTObj(TaskPtr()),
+                                                      I_PResetLockNTObj(TaskPtr()),
+                                                      I_PSetCoeffsActionNTObj(TaskPtr()),
+                                                      I_PSetImageActionNTObj(TaskPtr()),
+                                                      I_PSetWindowActionNTObj(TaskPtr()),
+                                                      I_PSetVelActionNTObj(TaskPtr()),
+                                                      I_PSetPlateActionNTObj(TaskPtr()),
+                                                      I_PUpdateFlexActionNTObj(TaskPtr()),
+                                                      I_PUpdateActionNTObj(TaskPtr()),
+
+                                                      I_PReportActionNTObj(TaskPtr()),
+                                                      I_PReportLocksActionNTObj(TaskPtr()),
+                                                      I_PReportCoeffsActionNTObj(TaskPtr()),
+                                                      I_PReportImageActionNTObj(TaskPtr()),
+                                                      I_PReportWindowActionNTObj(TaskPtr()),
+                                                      I_PSaveDefsActionNTObj(TaskPtr()),
+
                                                       tdfTaskStr(TaskPtr(), "ENQ_DEV_DESCR", "2dF Focal Plane Imager Gantry Task"),
                                                       tdfSimSearchRunStr(TaskPtr(), "SIM_SEARCH_RAN", "No"),
                                                       tdfVersionStr(TaskPtr(), "ENQ_VER_NUM", ""),
@@ -1945,10 +1968,12 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
       if (lIntParam)
       {
          // I_TdFCanTaskParSys.Put("STEP_SIZE", lIntParam);
+         //DEBUG("stepSize before setting is %d\n", stepSize);
          stepSize = lIntParam;
+         //DEBUG("stepSize after setting directly is %d\n", stepSize);
          DEBUG("STEP_SIZE from file is %ld\n", lIntParam);
          I_TdFCanTaskParSys.Put("STEP_SIZE", (INT32)lIntParam);
-         // DEBUG("stepSize is %d\n", stepSize);
+         //DEBUG("stepSize after setting using Parsys is %d\n", stepSize);
          lIntParam = 0;
       }
 
@@ -3270,38 +3295,42 @@ bool TdFCanTask::SetupLinkage(
 
 //  ------------------------------------------------------------------------------------------------
 
-//                    T d F  C a n  T a s k  : :  
+//                    T d F  C a n  T a s k  : :
 void TdFCanTask::tdFfpiPositionCheck(int Index, CML::uunit &Position)
 {
-   switch (Index){
-      case 0:
-      case 1:
+   switch (Index)
+   {
+   case 0:
+   case 1:
+   {
+      if (Position < XMIN)
       {
-         if(Position<XMIN)
-         {
-            Position=XMIN;
-         }else if(Position>XMAX) 
-            Position=XMAX;
-         break;
+         Position = XMIN;
       }
-      case 2:
+      else if (Position > XMAX)
+         Position = XMAX;
+      break;
+   }
+   case 2:
+   {
+      if (Position < YMIN)
       {
-         if(Position<YMIN)
-         {
-            Position=YMIN;
-         }else if(Position>YMAX) 
-            Position=YMAX;
-         break;
+         Position = YMIN;
       }
-      case 3:
+      else if (Position > YMAX)
+         Position = YMAX;
+      break;
+   }
+   case 3:
+   {
+      if (Position < ZMIN)
       {
-         if(Position<ZMIN)
-         {
-            Position=ZMIN;
-         }else if(Position>ZMAX) 
-            Position=ZMAX;
-         break;
+         Position = ZMIN;
       }
+      else if (Position > ZMAX)
+         Position = ZMAX;
+      break;
+   }
    }
 }
 
@@ -3704,15 +3733,15 @@ void GInitAction::ActionThread(const drama::sds::Id &Arg)
 {
 
    UnblockSIGUSR2();
-   //lliu added on 16/05/2024 to add the lock
+   // lliu added on 16/05/2024 to add the lock
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
-   drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
 
    std::string Axes("");
    if (Arg)
    {
-      drama::gitarg::String AxesArg(Arg, "AXES", 1);
+      drama::gitarg::String AxesArg(this, Arg, "AXES", 1);
       Axes = AxesArg;
    }
    MessageUser("G_INIT: " + Axes);
@@ -3764,26 +3793,31 @@ void GInitAction::ActionThread(const drama::sds::Id &Arg)
 //  I now believe I understand the problem, which is connected to CML and use of signals. This
 //  action is probably no longer needed.
 
-drama::Request GInitActionNT::MessageReceived()
+void GInitActionNT::ActionThread(const drama::sds::Id &Arg)
 {
 
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
+  // drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
 
    // lliu added on 15/05/2024
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
    if (details == nullptr || details->Initialised == NO)
    {
       MessageUser("G_INIT_NT: TdFCanTask is not initialised. Please use \"ditscmd TdFCanTask INITIALISE\" to initialise the task.");
-      return drama::RequestCode::End;
+      return;
+   }
+   if (details->inUse)
+   {
+      MessageUser("MOVE_AXES: TdFCanTask is running other actions.\n");
+      return;
    }
 
-   drama::sds::Id Arg = GetEntry().Argument();
    std::string Axes("");
    if (Arg)
    {
-      drama::gitarg::String AxesArg(Arg, "AXES", 1);
+      drama::gitarg::String AxesArg(this, Arg, "AXES", 1);
       Axes = AxesArg;
    }
    MessageUser("G_INIT_NT: " + Axes);
@@ -3807,6 +3841,7 @@ drama::Request GInitActionNT::MessageReceived()
       }
       else
       {
+         details->inUse = YES;
          if (!(ThisTask->HomeAxes(UseX, UseY, UseZ, UseTheta, UseJaw)))
          {
             MessageUser("G_INIT_NT: " + ThisTask->GetError());
@@ -3814,13 +3849,15 @@ drama::Request GInitActionNT::MessageReceived()
          else
          {
             MessageUser("G_INIT_NT: Axes homed");
-
+            MessageUser("G_INIT_NT: Waiting to receive signals about the current position of the gantry.");
             // lliu added on 15/05/2024 to update the position of gantry after initialisation
+            std::this_thread::sleep_for(2000ms);
             if (!ThisTask->tdFfpiUpdatePos(YES, details->dprFeedback, YES))
             {
                MessageUser("G_INIT_NT: failed to Update the current position of gantry.");
             }
          }
+         details->inUse = NO;
       }
    }
    else
@@ -3829,8 +3866,6 @@ drama::Request GInitActionNT::MessageReceived()
    }
    // We never re-enable the blocking of SIGUSR2 - it causes too many problems.
    // BlockSIGUSR2();
-
-   return drama::RequestCode::End;
 }
 
 //  ------------------------------------------------------------------------------------------------
@@ -3846,10 +3881,10 @@ void GMoveAxisAction::ActionThread(const drama::sds::Id &Arg)
 {
 
    UnblockSIGUSR2();
-   //lliu added on 16/05/2024 to add the lock
+   // lliu added on 16/05/2024 to add the lock
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
-   drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
 
    std::string Axes;
    std::string Positions;
@@ -3862,11 +3897,11 @@ void GMoveAxisAction::ActionThread(const drama::sds::Id &Arg)
       try
       {
          drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
-         drama::gitarg::String AxesArg(Arg, "AXES", 1, "", NoFlags);
+         drama::gitarg::String AxesArg(this, Arg, "AXES", 1, "", NoFlags);
          Axes = AxesArg;
-         drama::gitarg::String PositionsArg(Arg, "POSITIONS", 2, "", NoFlags);
+         drama::gitarg::String PositionsArg(this, Arg, "POSITIONS", 2, "", NoFlags);
          Positions = PositionsArg;
-         drama::gitarg::String VelocitiesArg(Arg, "VELOCITIES", 3, "", NoFlags);
+         drama::gitarg::String VelocitiesArg(this, Arg, "VELOCITIES", 3, "", NoFlags);
          Velocities = VelocitiesArg;
       }
       catch (...)
@@ -3921,7 +3956,7 @@ void GMoveAxisAction::ActionThread(const drama::sds::Id &Arg)
 //  the way it accesses the arguments, the value it returns and the fact that it doesn't pass
 //  a thread pointer to MoveAxes().
 
-drama::Request GMoveAxisActionNT::MessageReceived()
+void GMoveAxisActionNT::ActionThread(const drama::sds::Id &Arg)
 {
 
    UnblockSIGUSR2();
@@ -3929,24 +3964,24 @@ drama::Request GMoveAxisActionNT::MessageReceived()
    // lliu added on 15/05/2024
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
+   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
    if (details == nullptr || details->Initialised == NO)
    {
-      MessageUser("MOVE_AXES: TdFCanTask is not initialised. Please use \"ditscmd TdFCanTask INITIALISE\" to initialise the task.");
-      return drama::RequestCode::End;
+      MessageUser("G_MOVE_AXIS_NT: TdFCanTask is not initialised. Please use \"ditscmd TdFCanTask INITIALISE\" to initialise the task.");
+      return;
    }
    if (!(ThisTask->tdFfpiIlocks(ILOCK__GAN_PARKED)))
    {
-      MessageUser("MOVE_AXES: the gantry is parked, please unpark the gantry first.");
-      return drama::RequestCode::End;
+      MessageUser("G_MOVE_AXIS_NT: the gantry is parked, please unpark the gantry first.");
+      return;
    }
    if (details->inUse)
    {
-      MessageUser("MOVE_AXES: TdFCanTask is running other actions.\n");
-      return drama::RequestCode::End;
+      MessageUser("G_MOVE_AXIS_NT: TdFCanTask is running other actions.\n");
+      return;
    }
-
-   drama::sds::Id Arg = GetEntry().Argument();
 
    std::string Axes;
    std::string Positions;
@@ -3960,13 +3995,13 @@ drama::Request GMoveAxisActionNT::MessageReceived()
       try
       {
          drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
-         drama::gitarg::String AxesArg(Arg, "AXES", 1, "", NoFlags);
+         drama::gitarg::String AxesArg(this, Arg, "AXES", 1, "", NoFlags);
          Axes = AxesArg;
-         drama::gitarg::String PositionsArg(Arg, "POSITIONS", 2, "", NoFlags);
+         drama::gitarg::String PositionsArg(this, Arg, "POSITIONS", 2, "", NoFlags);
          Positions = PositionsArg;
-         drama::gitarg::String VelocitiesArg(Arg, "VELOCITIES", 3, "", NoFlags);
+         drama::gitarg::String VelocitiesArg(this, Arg, "VELOCITIES", 3, "", NoFlags);
          Velocities = VelocitiesArg;
-         drama::gitarg::String OffsetFlagArg(Arg, "OFFSET", 4, "", NoFlags);
+         drama::gitarg::String OffsetFlagArg(this, Arg, "OFFSET", 4, "", NoFlags);
          OffsetFlag = OffsetFlagArg;
       }
       catch (...)
@@ -3986,7 +4021,7 @@ drama::Request GMoveAxisActionNT::MessageReceived()
    int NumberAxes = AxisDemands.size();
    if (NumberAxes <= 0)
    {
-      MessageUser("MOVE_AXES: " + Error);
+      MessageUser("G_MOVE_AXIS_NT: " + Error);
    }
    else
    {
@@ -4003,21 +4038,24 @@ drama::Request GMoveAxisActionNT::MessageReceived()
 
       if (!(ThisTask->SetupAmps()))
       {
-         MessageUser("MOVE_AXES: " + ThisTask->GetError());
+         MessageUser("G_MOVE_AXIS_NT: " + ThisTask->GetError());
       }
       else
       {
          if (!(ThisTask->MoveAxes(AxisDemands, MoveOffset)))
          {
-            MessageUser("MOVE_AXES: " + ThisTask->GetError());
+            MessageUser("G_MOVE_AXIS_NT: " + ThisTask->GetError());
          }
          else
          {
+            MessageUser("G_MOVE_AXIS_NT: Move complete");
+            MessageUser("G_MOVE_AXIS_NT: Waiting to receive signals about the current position of the gantry.");
+            std::this_thread::sleep_for(2000ms);
             if (!(ThisTask->tdFfpiUpdatePos(YES, details->dprFeedback, YES)))
             {
-               MessageUser("MOVE_AXES: Failed to update the position of the gantry");
+               MessageUser("G_MOVE_AXIS_NT: Failed to update the position of the gantry");
             }
-            MessageUser("MOVE_AXES: Move complete");
+            
          }
       }
 
@@ -4026,8 +4064,6 @@ drama::Request GMoveAxisActionNT::MessageReceived()
 
    // We never re-enable the blocking of SIGUSR2 - it causes too many problems.
    // BlockSIGUSR2();
-
-   return drama::RequestCode::End;
 }
 
 //  ------------------------------------------------------------------------------------------------
@@ -4045,15 +4081,15 @@ void GHomeAction::ActionThread(const drama::sds::Id &Arg)
 {
 
    UnblockSIGUSR2();
-   //lliu added on 16/05/2024 to add the lock
+   // lliu added on 16/05/2024 to add the lock
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
 
-   drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
    std::string Axes("");
    if (Arg)
    {
-      drama::gitarg::String AxesArg(Arg, "AXES", 1);
+      drama::gitarg::String AxesArg(this, Arg, "AXES", 1);
       Axes = AxesArg;
    }
    MessageUser("G_HOME: " + Axes);
@@ -4114,7 +4150,7 @@ void GParkGantryActionNT::ActionThread(const drama::sds::Id &Arg)
    // lliu added on 15/05/2024
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
-   drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
 
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
    drama::sds::Id parSysId(drama::sds::Id::CreateFromSdsIdType((long)(DitsGetParId())));
@@ -4138,10 +4174,10 @@ void GParkGantryActionNT::ActionThread(const drama::sds::Id &Arg)
    std::string Axes("");
    std::string Positions;
    std::string Velocities;
-   
+
    if (Arg)
    {
-      drama::gitarg::String AxesArg(Arg, "AXES", 1);
+      drama::gitarg::String AxesArg(this, Arg, "AXES", 1);
       Axes = AxesArg;
    }
    MessageUser("G_PARK_NT: " + Axes);
@@ -4159,7 +4195,7 @@ void GParkGantryActionNT::ActionThread(const drama::sds::Id &Arg)
          MessageUser("Park Theta axis");
       if (Jaw)
          MessageUser("Park Jaw axis");
-      
+
       if (!(ThisTask->SetupAmps()))
       {
          MessageUser("G_PARK_NT: " + ThisTask->GetError());
@@ -4175,8 +4211,10 @@ void GParkGantryActionNT::ActionThread(const drama::sds::Id &Arg)
          }
          else
          {
-            MessageUser("G_PARK_NT: Axes homed");
+            MessageUser("G_PARK_NT: Axes parked");
+            MessageUser("G_PARK_NT: Waiting to receive signals about the current position of the gantry.");
             parSysId.Put("PARKED", "YES");
+            std::this_thread::sleep_for(2000ms);
             if (!(ThisTask->tdFfpiUpdatePos(YES, details->dprFeedback, YES)))
             {
                MessageUser("G_PARK_NT: Failed to update the position of gantry.");
@@ -4189,7 +4227,6 @@ void GParkGantryActionNT::ActionThread(const drama::sds::Id &Arg)
    {
       MessageUser("G_PARK_NT: Invalid axis specification");
    }
-
 }
 
 //  ------------------------------------------------------------------------------------------------
@@ -4208,7 +4245,7 @@ void GHomeActionNT::ActionThread(const drama::sds::Id &Arg)
    // lliu added on 15/05/2024
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
-   drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
    drama::sds::Id parSysId(drama::sds::Id::CreateFromSdsIdType((long)(DitsGetParId())));
 
@@ -4229,10 +4266,10 @@ void GHomeActionNT::ActionThread(const drama::sds::Id &Arg)
    }
 
    std::string Axes("");
-   
+
    if (Arg)
    {
-      drama::gitarg::String AxesArg(Arg, "AXES", 1);
+      drama::gitarg::String AxesArg(this, Arg, "AXES", 1);
       Axes = AxesArg;
    }
    MessageUser("G_HOME_NT: " + Axes);
@@ -4249,7 +4286,7 @@ void GHomeActionNT::ActionThread(const drama::sds::Id &Arg)
          MessageUser("Home Theta axis");
       if (Jaw)
          MessageUser("Home Jaw axis");
-      
+
       if (!(ThisTask->SetupAmps()))
       {
          MessageUser("G_HOME_NT: " + ThisTask->GetError());
@@ -4264,7 +4301,9 @@ void GHomeActionNT::ActionThread(const drama::sds::Id &Arg)
          else
          {
             MessageUser("G_HOME_NT: Axes homed");
+            MessageUser("G_HOME_NT: Waiting to receive signals about the current position of the gantry.");
             parSysId.Put("PARKED", "YES");
+            std::this_thread::sleep_for(2000ms);
             if (!(ThisTask->tdFfpiUpdatePos(YES, details->dprFeedback, YES)))
             {
                MessageUser("G_HOME_NT: Failed to update the position of gantry.");
@@ -4277,7 +4316,6 @@ void GHomeActionNT::ActionThread(const drama::sds::Id &Arg)
    {
       MessageUser("G_HOME_NT: Invalid axis specification");
    }
-   
 }
 
 //  ------------------------------------------------------------------------------------------------
@@ -4293,7 +4331,7 @@ void GUnParkActionNT::ActionThread(const drama::sds::Id &Arg)
    // lliu added on 15/05/2024
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
-   drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
 
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
    drama::sds::Id parSysId(drama::sds::Id::CreateFromSdsIdType((long)(DitsGetParId())));
@@ -4316,7 +4354,7 @@ void GUnParkActionNT::ActionThread(const drama::sds::Id &Arg)
 
    if (Arg)
    {
-      drama::gitarg::String AxesArg(Arg, "AXES", 1);
+      drama::gitarg::String AxesArg(this, Arg, "AXES", 1);
       Axes = AxesArg;
    }
    MessageUser("G_UNPARK_NT: " + Axes);
@@ -4334,7 +4372,7 @@ void GUnParkActionNT::ActionThread(const drama::sds::Id &Arg)
          MessageUser("UnPark Theta axis");
       if (Jaw)
          MessageUser("UnPark Jaw axis");
-     
+
       if (!(ThisTask->SetupAmps()))
       {
          MessageUser("G_UNPARK_NT: " + ThisTask->GetError());
@@ -4352,7 +4390,9 @@ void GUnParkActionNT::ActionThread(const drama::sds::Id &Arg)
          else
          {
             MessageUser("G_UNPARK_NT: Axes unparked");
+            MessageUser("G_UNPARK_NT: Waiting to receive signals about the current position of the gantry.");
             parSysId.Put("PARKED", "NO");
+            std::this_thread::sleep_for(2000ms);
             if (!(ThisTask->tdFfpiUpdatePos(YES, details->dprFeedback, YES)))
             {
                MessageUser("G_UNPARK_NT: Failed to update the position of gantry.");
@@ -4366,7 +4406,6 @@ void GUnParkActionNT::ActionThread(const drama::sds::Id &Arg)
    {
       MessageUser("G_HOME_NT: Invalid axis specification");
    }
-   
 }
 
 //  ------------------------------------------------------------------------------------------------
@@ -4380,7 +4419,7 @@ void GMoveOffsetActionNT::ActionThread(const drama::sds::Id &Arg)
    // lliu added on 15/05/2024
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
-   drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
 
    if (details == nullptr || details->Initialised == NO)
@@ -4411,13 +4450,13 @@ void GMoveOffsetActionNT::ActionThread(const drama::sds::Id &Arg)
       try
       {
          drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
-         drama::gitarg::String AxesArg(Arg, "AXES", 1, "", NoFlags);
+         drama::gitarg::String AxesArg(this, Arg, "AXES", 1, "", NoFlags);
          Axes = AxesArg;
-         drama::gitarg::String PositionsArg(Arg, "POSITIONS", 2, "", NoFlags);
+         drama::gitarg::String PositionsArg(this, Arg, "POSITIONS", 2, "", NoFlags);
          Positions = PositionsArg;
-         drama::gitarg::String VelocitiesArg(Arg, "VELOCITIES", 3, "", NoFlags);
+         drama::gitarg::String VelocitiesArg(this, Arg, "VELOCITIES", 3, "", NoFlags);
          Velocities = VelocitiesArg;
-         drama::gitarg::String OffsetFlagArg(Arg, "OFFSET", 4, "", NoFlags);
+         drama::gitarg::String OffsetFlagArg(this, Arg, "OFFSET", 4, "", NoFlags);
          OffsetFlag = OffsetFlagArg;
       }
       catch (...)
@@ -4449,7 +4488,7 @@ void GMoveOffsetActionNT::ActionThread(const drama::sds::Id &Arg)
          DEBUG("AxisId: %d, offset position %f, velocity %f\n", AxisDemands[Index].AxisId,
                AxisDemands[Index].Position, AxisDemands[Index].Velocity);
       }
-     
+
       if (!(ThisTask->SetupAmps()))
       {
          MessageUser("G_MOVEOFFSET_NT: " + ThisTask->GetError());
@@ -4462,7 +4501,9 @@ void GMoveOffsetActionNT::ActionThread(const drama::sds::Id &Arg)
          }
          else
          {
-            MessageUser("G_MOVEOFFSET_NT: Move complete");
+            MessageUser("G_MOVEOFFSET_NT: Move complete.");
+            MessageUser("G_MOVEOFFSET_NT: Waiting to receive signals about the current position of the gantry.");
+            std::this_thread::sleep_for(2000ms);
             if (!(ThisTask->tdFfpiUpdatePos(YES, details->dprFeedback, YES)))
             {
                MessageUser("G_MOVEOFFSET_NT: Failed to update the position of gantry.");
@@ -4481,7 +4522,7 @@ void GEXITActionNT::ActionThread(const drama::sds::Id &Arg)
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
-   drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
 
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
 
@@ -4517,7 +4558,7 @@ void GMOVEActionNT::ActionThread(const drama::sds::Id &Arg)
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
-   drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
 
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
 
@@ -4549,13 +4590,13 @@ void GMOVEActionNT::ActionThread(const drama::sds::Id &Arg)
       try
       {
          drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
-         drama::gitarg::String AxesArg(Arg, "AXES", 1, "", NoFlags);
+         drama::gitarg::String AxesArg(this, Arg, "AXES", 1, "", NoFlags);
          Axes = AxesArg;
-         drama::gitarg::String PositionsArg(Arg, "POSITIONS", 2, "", NoFlags);
+         drama::gitarg::String PositionsArg(this, Arg, "POSITIONS", 2, "", NoFlags);
          Positions = PositionsArg;
-         drama::gitarg::String VelocitiesArg(Arg, "VELOCITIES", 3, "", NoFlags);
+         drama::gitarg::String VelocitiesArg(this, Arg, "VELOCITIES", 3, "", NoFlags);
          Velocities = VelocitiesArg;
-         drama::gitarg::String OffsetFlagArg(Arg, "OFFSET", 4, "", NoFlags);
+         drama::gitarg::String OffsetFlagArg(this, Arg, "OFFSET", 4, "", NoFlags);
          OffsetFlag = OffsetFlagArg;
       }
       catch (...)
@@ -4570,13 +4611,17 @@ void GMOVEActionNT::ActionThread(const drama::sds::Id &Arg)
       if (!OffsetFlag.compare("-"))
          MoveBackward = true;
    }
-
+   if(Axes.size() >1 || Velocities.find(",")!=string::npos || Positions.find(",")!=string::npos)
+   {
+      MessageUser("G_MOVE_NT can only work on one axis. If more than one axes need to move, please choose G_MOVE_AXIS_NT.\n");
+      return;
+   }
    std::string Error;
    std::vector<AxisDemand> AxisDemands = GetDemands(Axes, Positions, Velocities, Error);
    int NumberAxes = AxisDemands.size();
-   if (NumberAxes != 1 && Axes.find("Y") != string::npos)
+   if ((NumberAxes != 1 && Axes!="X"))
    {
-      MessageUser("G_MOVE_NT can only work on one axis. If more than one axes need to move, please choose G_MOVE_AXIS_NT." + Error);
+      MessageUser("G_MOVE_NT can only work on one axis. If more than one axes need to move, please choose G_MOVE_AXIS_NT.\n" + Error);
    }
    else
    {
@@ -4601,6 +4646,8 @@ void GMOVEActionNT::ActionThread(const drama::sds::Id &Arg)
          else
          {
             MessageUser("G_MOVE_NT: Move complete");
+            MessageUser("G_MOVE_NT: Waiting to receive signals about the current position of the gantry.");
+            std::this_thread::sleep_for(2000ms);
             if (!(ThisTask->tdFfpiUpdatePos(YES, details->dprFeedback, YES)))
             {
                MessageUser("G_MOVE_NT: Failed to update the position of gantry.");
@@ -4608,17 +4655,17 @@ void GMOVEActionNT::ActionThread(const drama::sds::Id &Arg)
          }
       }
    }
-   
 }
 
 //  ------------------------------------------------------------------------------------------------
 
 //         G  Reset   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
-drama::Request GRESETActionNT::MessageReceived()
+void GRESETActionNT::ActionThread(const drama::sds::Id &Arg)
 {
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
+   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
    drama::sds::Id parSysId(drama::sds::Id::CreateFromSdsIdType((long)(DitsGetParId())));
 
    parSysId.Put("ENQ_VER_NUM", TdFCanTaskVersion);
@@ -4638,7 +4685,7 @@ drama::Request GRESETActionNT::MessageReceived()
    {
 
       DEBUG("Parameter ZEROCAM_CENWAIT length mismatch");
-      return drama::RequestCode::End;
+      return;
    }
    length = 0;
 
@@ -4647,7 +4694,7 @@ drama::Request GRESETActionNT::MessageReceived()
    if (length != sizeof(*(details->pars.plt1CenterFidOffsetX)))
    {
       DEBUG("Parameter PLT1_CFID_OFF_X length mismatch");
-      return drama::RequestCode::End;
+      return;
    }
    length = 0;
 
@@ -4656,7 +4703,7 @@ drama::Request GRESETActionNT::MessageReceived()
    if (length != sizeof(*(details->pars.plt1CenterFidOffsetY)))
    {
       DEBUG("Parameter PLT1_CFID_OFF_Y length mismatch");
-      return drama::RequestCode::End;
+      return;
    }
    length = 0;
 
@@ -4667,7 +4714,7 @@ drama::Request GRESETActionNT::MessageReceived()
    if (defRead == false)
    {
       details->inUse = NO;
-      return drama::RequestCode::End;
+      return;
    }
 
    details->ipsMode = 0;
@@ -4697,22 +4744,21 @@ drama::Request GRESETActionNT::MessageReceived()
       MessageUser("G_RESET: " + ThisTask->GetError());
    }
    details->inUse = NO;
-   return drama::RequestCode::End;
 }
 
 //  ------------------------------------------------------------------------------------------------
 
 //         P  TELPOS   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
-drama::Request PTELPOSActionNT::MessageReceived()
+void PTELPOSActionNT::ActionThread(const drama::sds::Id &Arg)
 {
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
    ThisTask->ClearError();
 
    drama::ParId paramHA(GetTask(), "HA");
    drama::ParId paramDEC(GetTask(), "DEC");
 
-   drama::sds::Id Arg = GetEntry().Argument();
    string HA = "";
    string DEC = "";
    if (Arg)
@@ -4720,9 +4766,9 @@ drama::Request PTELPOSActionNT::MessageReceived()
       try
       {
          drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
-         drama::gitarg::String HAArg(Arg, "HA", 1, "", NoFlags);
+         drama::gitarg::String HAArg(this, Arg, "HA", 1, "", NoFlags);
          HA = HAArg;
-         drama::gitarg::String DECArg(Arg, "DEC", 2, "", NoFlags);
+         drama::gitarg::String DECArg(this, Arg, "DEC", 2, "", NoFlags);
          DEC = DECArg;
       }
       catch (...)
@@ -4751,19 +4797,18 @@ drama::Request PTELPOSActionNT::MessageReceived()
       DEBUG("P_TELPOS please check your input arguments\n");
       MessageUser("P_TELPOS: " + ThisTask->GetError());
    }
-   return drama::RequestCode::End;
 }
 
 //  ------------------------------------------------------------------------------------------------
 
 //         P  Set   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
-drama::Request PSetActionNT::MessageReceived()
+void PSetActionNT::ActionThread(const drama::sds::Id &Arg)
 {
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
    ThisTask->ClearError();
 
-   drama::sds::Id Arg = GetEntry().Argument();
    drama::ParSys parSys(GetTask()); // this is duplicated;
    drama::sds::Id parSysId(drama::sds::Id::CreateFromSdsIdType((long)(DitsGetParId())));
 
@@ -4774,21 +4819,21 @@ drama::Request PSetActionNT::MessageReceived()
       try
       {
          drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
-         drama::gitarg::String ParameterNameArg(Arg, "ParameterName", 1, "", NoFlags);
+         drama::gitarg::String ParameterNameArg(this, Arg, "ParameterName", 1, "", NoFlags);
          ParameterName = ParameterNameArg;
-         drama::gitarg::String ParameterValueArg(Arg, "ParameterValue", 2, "", NoFlags);
+         drama::gitarg::String ParameterValueArg(this, Arg, "ParameterValue", 2, "", NoFlags);
          ParameterValue = ParameterValueArg;
       }
       catch (exception &e)
       {
          MessageUser("P_SET: " + string(e.what()));
-         return drama::RequestCode::End;
+         return;
       }
    }
    if (ParameterName.find(',') != string::npos || ParameterName.find(' ') != string::npos || ParameterValue.find(',') != string::npos || ParameterValue.find(' ') != string::npos)
    {
       MessageUser("P_SET: please check the name of parameter, this action only supports a single parameter.\n");
-      return drama::RequestCode::End;
+      return;
    }
    if (!ParameterName.empty() && !ParameterValue.empty())
    {
@@ -4813,16 +4858,16 @@ drama::Request PSetActionNT::MessageReceived()
          MessageUser("P_SET: the parameter does not exist. Please use ditscmd _ALL_ to check the current parameters\n");
       }
    }
-   return drama::RequestCode::End;
 }
 
 //  ------------------------------------------------------------------------------------------------
 
 //         P  ResetLock   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
-drama::Request PResetLockActionNT::MessageReceived()
+void PResetLockActionNT::ActionThread(const drama::sds::Id &Arg)
 {
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
    ThisTask->ClearError();
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
    if (details != nullptr)
@@ -4834,20 +4879,19 @@ drama::Request PResetLockActionNT::MessageReceived()
    {
       MessageUser("P_RESET_LOCK: the structure pointer is null, please initialise the task first.\n");
    }
-
-   return drama::RequestCode::End;
 }
 
 //  ------------------------------------------------------------------------------------------------
 
 //         P  SetCoeffs   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
-drama::Request PSetCoeffsActionNT::MessageReceived()
+void PSetCoeffsActionNT::ActionThread(const drama::sds::Id &Arg)
 {
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
    ThisTask->ClearError();
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
-   drama::sds::Id Arg = GetEntry().Argument();
+
    string CoffsVal;
    string SaveFlag;
    int j = 0;
@@ -4859,29 +4903,38 @@ drama::Request PSetCoeffsActionNT::MessageReceived()
          try
          {
             drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
-            drama::gitarg::String CoffsValArg(Arg, "CoffsVal", 1, "", NoFlags);
+            drama::gitarg::String CoffsValArg(this, Arg, "CoffsVal", 1, "", NoFlags);
             CoffsVal = CoffsValArg;
-            drama::gitarg::String SaveFlagArg(Arg, "SaveFlag", 2, "", NoFlags);
+            drama::gitarg::String SaveFlagArg(this, Arg, "SaveFlag", 2, "", NoFlags);
             SaveFlag = SaveFlagArg;
          }
          catch (exception &e)
          {
             MessageUser("P_SET_COEFFS: " + string(e.what()));
-            return drama::RequestCode::End;
+            return;
          }
          std::vector<string> ParameterVec = SplitString(CoffsVal);
          if ((int)ParameterVec.size() == 6)
          {
+            DEBUG("The Coeffs array is:\n");
             for (int index = 0; index < 6; index++)
             {
                details->convert.coeffs[index] = stod(ParameterVec[index]);
+               DEBUG("%f ",details->convert.coeffs[index]);
             }
+            DEBUG("\n");
             slaInvf(details->convert.coeffs, details->convert.invCoeffs, &j);
+            DEBUG("The Inverse Coeffs array is:\n");
             if (j != 0)
             {
                for (int index = 0; index < 6; index++)
                   details->convert.invCoeffs[index] = details->convert.coeffs[index];
             }
+            for (int index = 0; index < 6; index++)
+            {
+               DEBUG("%f ",details->convert.invCoeffs[index]);
+            }
+            DEBUG("\n");
             if (SaveFlag == "SAVE" || SaveFlag == "save")
             {
                if (!ThisTask->tdFfpiDefWrite(DEFS_FILE + FLEX_FILE, check))
@@ -4906,25 +4959,25 @@ drama::Request PSetCoeffsActionNT::MessageReceived()
    {
       MessageUser("P_SET_COEFFS: the structure pointer is null, please initialise the task first.\n");
    }
-   return drama::RequestCode::End;
 }
 
 //  ------------------------------------------------------------------------------------------------
 
 //         P  SetImage   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
-drama::Request PSetImageActionNT::MessageReceived()
+void PSetImageActionNT::ActionThread(const drama::sds::Id &Arg)
 {
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+
    ThisTask->ClearError();
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
    if (details == nullptr)
    {
       MessageUser("P_SET_IMAGE: the structure pointer is null, please initialise the task first.\n");
-      return drama::RequestCode::End;
+      return;
    }
 
-   drama::sds::Id Arg = GetEntry().Argument();
    if (Arg)
    {
 
@@ -4933,27 +4986,34 @@ drama::Request PSetImageActionNT::MessageReceived()
       int j = 0;
       short check = 0;
       drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
-      drama::gitarg::String ImageArg(Arg, "image", 1, "FREE", NoFlags);
-      drama::gitarg::Int<0, 255> BiasArg(Arg, "bias", 2, 0, NoFlags);
+      drama::gitarg::String ImageArg(this, Arg, "image", 1, "FREE", NoFlags);
+      drama::gitarg::Int<0, 255> BiasArg(this, Arg, "bias", 2, 0, NoFlags);
       bias = BiasArg;
 
-      drama::gitarg::String Coeffs1Arg(Arg, "camCoeffs0", 3, "", NoFlags);
+      drama::gitarg::String Coeffs1Arg(this, Arg, "camCoeffs0", 3, "", NoFlags);
       coeffs[0] = (Coeffs1Arg.empty() ? 0.0 : stod(Coeffs1Arg));
-      drama::gitarg::String Coeffs2Arg(Arg, "camCoeffs1", 4, "", NoFlags);
+      drama::gitarg::String Coeffs2Arg(this, Arg, "camCoeffs1", 4, "", NoFlags);
       coeffs[1] = (Coeffs2Arg.empty() ? 0.0 : stod(Coeffs2Arg));
-      drama::gitarg::String Coeffs3Arg(Arg, "camCoeffs2", 5, "", NoFlags);
+      drama::gitarg::String Coeffs3Arg(this, Arg, "camCoeffs2", 5, "", NoFlags);
       coeffs[2] = (Coeffs3Arg.empty() ? 0.0 : stod(Coeffs3Arg));
-      drama::gitarg::String Coeffs4Arg(Arg, "camCoeffs3", 6, "", NoFlags);
+      drama::gitarg::String Coeffs4Arg(this, Arg, "camCoeffs3", 6, "", NoFlags);
       coeffs[3] = (Coeffs4Arg.empty() ? 0.0 : stod(Coeffs4Arg));
-      drama::gitarg::String Coeffs5Arg(Arg, "camCoeffs4", 7, "", NoFlags);
+      drama::gitarg::String Coeffs5Arg(this, Arg, "camCoeffs4", 7, "", NoFlags);
       coeffs[4] = (Coeffs5Arg.empty() ? 0.0 : stod(Coeffs5Arg));
-      drama::gitarg::String Coeffs6Arg(Arg, "camCoeffs5", 8, "", NoFlags);
+      drama::gitarg::String Coeffs6Arg(this, Arg, "camCoeffs5", 8, "", NoFlags);
       coeffs[5] = (Coeffs6Arg.empty() ? 0.0 : stod(Coeffs6Arg));
 
       details->freeImg.bias = (int)bias;
+      DEBUG("The free image bias is %d\n", details->freeImg.bias);
+      DEBUG("The camCoeffs array is:\n");
       for (int counter = 0; counter < 6; counter++)
+      {
          details->freeImg.camCoeffs[counter] = coeffs[counter];
+         DEBUG("%f ",details->freeImg.camCoeffs[counter]);
+      }
+      DEBUG("\n");   
 
+      DEBUG("The Inverse camCoeffs array is:\n");
       slaInvf(details->freeImg.camCoeffs, details->freeImg.invCoeffs, &j);
       if (j != 0)
       {
@@ -4961,6 +5021,12 @@ drama::Request PSetImageActionNT::MessageReceived()
          for (i = 0; i < 6; i++)
             details->freeImg.invCoeffs[i] = details->freeImg.camCoeffs[i];
       }
+      for(int i=0; i<6; i++)
+      {
+         DEBUG("%f ",details->freeImg.invCoeffs[i]);
+      }
+      DEBUG("\n");
+
       if (!ThisTask->tdFfpiDefWrite(DEFS_FILE, check))
       {
          MessageUser("P_SET_IMAGE: Save Image failed " + ThisTask->GetError());
@@ -4972,25 +5038,24 @@ drama::Request PSetImageActionNT::MessageReceived()
    {
       MessageUser("P_SET_IMAGE: No input arguments.\n");
    }
-
-   return drama::RequestCode::End;
 }
 
 //  ------------------------------------------------------------------------------------------------
 
 //         P  SetWindow   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
-drama::Request PSetWindowActionNT::MessageReceived()
+void PSetWindowActionNT::ActionThread(const drama::sds::Id &Arg)
 {
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+
    ThisTask->ClearError();
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
    if (details == nullptr)
    {
       MessageUser("P_SET_WINDOW: the structure pointer is null, please initialise the task first.\n");
-      return drama::RequestCode::End;
+      return;
    }
-   drama::sds::Id Arg = GetEntry().Argument();
    if (Arg)
    {
       std::string SearchStr = "SEARCH";
@@ -4998,20 +5063,20 @@ drama::Request PSetWindowActionNT::MessageReceived()
       long int iXPan, iYPan;
 
       drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
-      drama::gitarg::String WindowArg(Arg, "window", 1, "SEARCH", NoFlags);
+      drama::gitarg::String WindowArg(this, Arg, "window", 1, "SEARCH", NoFlags);
       if (WindowArg == "SEARCH" || WindowArg == "NORM" || WindowArg == "FULL")
          SearchStr = WindowArg;
-      drama::gitarg::String xCenArg(Arg, "xCen", 2, "0.0", NoFlags);
+      drama::gitarg::String xCenArg(this, Arg, "xCen", 2, "0.0", NoFlags);
       double xCent = stod(xCenArg);
       if (xCent >= 0 && xCent <= CAM_X_SPAN)
          dXCen = xCent;
-      drama::gitarg::String yCenArg(Arg, "yCen", 3, "0.0", NoFlags);
+      drama::gitarg::String yCenArg(this, Arg, "yCen", 3, "0.0", NoFlags);
       double yCent = stod(yCenArg);
       if (yCent >= 0 && yCent <= CAM_Y_SPAN)
          dYCen = yCent;
-      drama::gitarg::Int<0, 2 * CAM_X_SPAN> xSpanArg(Arg, "xSpan", 4, 0, NoFlags);
+      drama::gitarg::Int<0, 2 * CAM_X_SPAN> xSpanArg(this, Arg, "xSpan", 4, 0, NoFlags);
       iXPan = xSpanArg;
-      drama::gitarg::Int<0, 2 * CAM_Y_SPAN> ySpanArg(Arg, "ySpan", 5, 0, NoFlags);
+      drama::gitarg::Int<0, 2 * CAM_Y_SPAN> ySpanArg(this, Arg, "ySpan", 5, 0, NoFlags);
       iYPan = ySpanArg;
 
       if (SearchStr == "SEARCH")
@@ -5039,25 +5104,23 @@ drama::Request PSetWindowActionNT::MessageReceived()
    {
       MessageUser("P_SET_WINDOW: No input arguments.\n");
    }
-
-   return drama::RequestCode::End;
 }
 
 //  ------------------------------------------------------------------------------------------------
 
 //         P  SetVel   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
-drama::Request PSetVelActionNT::MessageReceived()
+void PSetVelActionNT::ActionThread(const drama::sds::Id &Arg)
 {
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
    ThisTask->ClearError();
    long int iFeedrate;
-   drama::sds::Id Arg = GetEntry().Argument();
 
    if (Arg)
    {
       drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
-      drama::gitarg::Int<FPI_XY_FR_MIN, FPI_XY_FR_MAX> feedRateArg(Arg, "feedrate", 1, 0, NoFlags);
+      drama::gitarg::Int<FPI_XY_FR_MIN, FPI_XY_FR_MAX> feedRateArg(this, Arg, "feedrate", 1, 0, NoFlags);
       iFeedrate = feedRateArg;
       drama::ParId paramFeedRate(GetTask(), "XY_VEL");
       MessageUser("P_SET_VEL: before the setting, the value of XY_VEL is: \n");
@@ -5077,29 +5140,29 @@ drama::Request PSetVelActionNT::MessageReceived()
    {
       MessageUser("P_SET_VEL: No input arguments.\n");
    }
-   return drama::RequestCode::End;
 }
 
 //  ------------------------------------------------------------------------------------------------
 
 //         P  SetPlate   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
-drama::Request PSetPlateActionNT::MessageReceived()
+void PSetPlateActionNT::ActionThread(const drama::sds::Id &Arg)
 {
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
    ThisTask->ClearError();
    long int iPlate;
-   drama::sds::Id Arg = GetEntry().Argument();
+
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
    if (details == nullptr)
    {
       MessageUser("P_SET_PLATE: the structure pointer is null, please initialise the task first.\n");
-      return drama::RequestCode::End;
+      return;
    }
    if (Arg)
    {
       drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
-      drama::gitarg::Int<-1, 1> plateArg(Arg, "PLATE", 1, 0, NoFlags);
+      drama::gitarg::Int<-1, 1> plateArg(this, Arg, "PLATE", 1, 0, NoFlags);
       iPlate = plateArg;
       DEBUG("P_SET_PLATE: before the setting, the value of plate is: %hd\n", details->currentPlate);
       details->currentPlate = (short)iPlate;
@@ -5110,17 +5173,17 @@ drama::Request PSetPlateActionNT::MessageReceived()
    {
       MessageUser("P_SET_PLATE: No input arguments.\n");
    }
-
-   return drama::RequestCode::End;
 }
 
 //  ------------------------------------------------------------------------------------------------
 
 //         P  UpdateFlex   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
-drama::Request PUpdateFlexActionNT::MessageReceived()
+void PUpdateFlexActionNT::ActionThread(const drama::sds::Id &Arg)
 {
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+
    ThisTask->ClearError();
    short check = SHOW;
    if (!ThisTask->tdFfpiDefRead(FLEX_FILE, check))
@@ -5132,34 +5195,35 @@ drama::Request PUpdateFlexActionNT::MessageReceived()
    {
       MessageUser("P_UPDATE_FLEX: Update Flex completed.\n");
    }
-   return drama::RequestCode::End;
 }
 
 //  ------------------------------------------------------------------------------------------------
 
 //         P  Update   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
-drama::Request PUpdateActionNT::MessageReceived()
+void PUpdateActionNT::ActionThread(const drama::sds::Id &Arg)
 {
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
    ThisTask->ClearError();
+
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
    if (details == nullptr || (details && details->Initialised == NO))
    {
       MessageUser("P_UPDATE: the structure pointer is null, please initialise the task first.\n");
-      return drama::RequestCode::End;
+      return;
    }
    if (!ThisTask->tdFfpiIlocks(ILOCK__TASK_INIT))
    {
       MessageUser("Unable to execute this action: " + ThisTask->GetError());
-      return drama::RequestCode::End;
+      return;
    }
    double dTimeout = 0.0;
-   drama::sds::Id Arg = GetEntry().Argument();
+   
    if (Arg)
    {
       drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
-      drama::gitarg::String dTimeoutArg(Arg, "timeout", 1, "0.0", NoFlags);
+      drama::gitarg::String dTimeoutArg(this, Arg, "timeout", 1, "0.0", NoFlags);
       dTimeout = stod(dTimeoutArg) > 0.0 ? stod(dTimeoutArg) : 0.0;
       if (!ThisTask->tdFfpiUpdatePos(NO, YES, YES))
       {
@@ -5167,6 +5231,9 @@ drama::Request PUpdateActionNT::MessageReceived()
       }
       else
          MessageUser("P_POLL_POSE: action completed");
+
+      //confirmed with Tony that this action is no longer used by users and he suggested blocking this action.
+      //MessageUser("P_POLL_POSE: this action is not supported any more.\n");
    }
    else
    {
@@ -5177,23 +5244,24 @@ drama::Request PUpdateActionNT::MessageReceived()
       else
          MessageUser("P_UPDATE_POSE: action completed.\n");
    }
-   return drama::RequestCode::End;
+   
 }
 
 //  ------------------------------------------------------------------------------------------------
 
 //         P  Report   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
-drama::Request PReportActionNT::MessageReceived()
+void PReportActionNT::ActionThread(const drama::sds::Id &Arg)
 {
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
    ThisTask->ClearError();
-   drama::sds::Id Arg = GetEntry().Argument();
+   
    drama::sds::Id parSysId(drama::sds::Id::CreateFromSdsIdType((long)(DitsGetParId())));
    if (Arg)
    {
       drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
-      drama::gitarg::String parameterNameArg(Arg, "parameter", 1, "", NoFlags);
+      drama::gitarg::String parameterNameArg(this, Arg, "parameter", 1, "", NoFlags);
       string parameterName = parameterNameArg;
       if (parameterName == "_ALL_")
       {
@@ -5216,21 +5284,22 @@ drama::Request PReportActionNT::MessageReceived()
       MessageUser("P_REPORT: no input argument.\n");
    }
    MessageUser("P_REPORT: action completed.\n");
-   return drama::RequestCode::End;
 }
 
 //  ------------------------------------------------------------------------------------------------
 
 //         P  ReportLock   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
-drama::Request PReportLocksActionNT::MessageReceived()
+void PReportLocksActionNT::ActionThread(const drama::sds::Id &)
 {
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
    ThisTask->ClearError();
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
    if (details == nullptr)
    {
       MessageUser("P_REPORT_LOCKS: the structure pointer is null, please initialise the task!\n");
+      return;
    }
    if (details->inUse)
    {
@@ -5241,21 +5310,22 @@ drama::Request PReportLocksActionNT::MessageReceived()
       MessageUser("P_REPORT_LOCKS:LOCK NOT IN USE");
    }
    MessageUser("P_REPORT_LOCKS: action completed.\n");
-   return drama::RequestCode::End;
 }
 
 //  ------------------------------------------------------------------------------------------------
 
 //         P  ReportCoeffs   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
-drama::Request PReportCoeffsActionNT::MessageReceived()
+void PReportCoeffsActionNT::ActionThread(const drama::sds::Id &)
 {
-   UnblockSIGUSR2();
+  // UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
    ThisTask->ClearError();
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
    if (details == nullptr)
    {
       MessageUser("P_REPORT_COEFFS: the structure pointer is null, please initialise the task!\n");
+      return;
    }
    DEBUG("The coeffs array is: \n");
    for (int index = 0; index < 6; ++index)
@@ -5264,21 +5334,23 @@ drama::Request PReportCoeffsActionNT::MessageReceived()
    }
    DEBUG("\n");
    MessageUser("P_REPORT_COEFFS: action completed.\n");
-   return drama::RequestCode::End;
 }
 
 //  ------------------------------------------------------------------------------------------------
 
 //         P  ReportImage   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
-drama::Request PReportImageActionNT::MessageReceived()
+void PReportImageActionNT::ActionThread(const drama::sds::Id &)
 {
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+
    ThisTask->ClearError();
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
    if (details == nullptr)
    {
       MessageUser("P_REPORT_IMAGE: the structure pointer is null, please initialise the task!\n");
+      return;
    }
    DEBUG("FREE image details: \n");
    DEBUG("The bias(centroiding) is: %hd\n", (short)details->freeImg.bias);
@@ -5295,28 +5367,30 @@ drama::Request PReportImageActionNT::MessageReceived()
    }
    DEBUG("\n");
    MessageUser("P_REPORT_COEFFS: action completed.\n");
-   return drama::RequestCode::End;
 }
 
 //  ------------------------------------------------------------------------------------------------
 
 //         P  ReportWindow   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
-drama::Request PReportWindowActionNT::MessageReceived()
+void PReportWindowActionNT::ActionThread(const drama::sds::Id &Arg)
 {
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+
    ThisTask->ClearError();
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
    if (details == nullptr)
    {
       MessageUser("P_REPORT_WINDOW: the structure pointer is null, please initialise the task!\n");
+      return;
    }
-   drama::sds::Id Arg = GetEntry().Argument();
+   
    string windowStr = "SEARCH";
    if (Arg)
    {
       drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
-      drama::gitarg::String windowArg(Arg, "window", 1, "SEARCH", NoFlags);
+      drama::gitarg::String windowArg(this, Arg, "window", 1, "SEARCH", NoFlags);
       if (windowArg == "SEARCH" || windowArg == "NORM" || windowArg == "FULL")
       {
          windowStr = windowArg;
@@ -5342,23 +5416,22 @@ drama::Request PReportWindowActionNT::MessageReceived()
    }
 
    MessageUser("P_REPORT_WINDOW: action completed.\n");
-   return drama::RequestCode::End;
 }
 
 //  ------------------------------------------------------------------------------------------------
 
 //         P  SaveDefs   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
-drama::Request PSaveDefsActionNT::MessageReceived()
+void PSaveDefsActionNT::ActionThread(const drama::sds::Id &)
 {
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
    ThisTask->ClearError();
    if (!ThisTask->tdFfpiDefWrite(DEFS_FILE + FLEX_FILE, 0))
    {
       MessageUser("P_SAVE_DEFS: Save DEFS_FILE failed " + ThisTask->GetError());
    }
    MessageUser("P_SAVE_DEFS: action completed.\n");
-   return drama::RequestCode::End;
 }
 
 //  ------------------------------------------------------------------------------------------------
