@@ -171,7 +171,7 @@ private:
    void ActionThread(const drama::sds::Id &) override;
 };
 
-// G_HOME_NT is a non-threaded version of G_HOME
+// G_HOME_NT is a threaded version of G_HOME
 class GHomeActionNT : public drama::thread::TAction
 {
 public:
@@ -194,7 +194,7 @@ private:
    void ActionThread(const drama::sds::Id &) override;
 };
 
-//  G_MOVE_AXIS_NT is a non-threaded version of G_MOVE_AXIS, purely for testing purposes.
+//  G_MOVE_AXIS_NT is a threaded version of G_MOVE_AXIS, purely for testing purposes.
 
 class GMoveAxisActionNT : public drama::thread::TAction
 {
@@ -206,7 +206,7 @@ private:
    void ActionThread(const drama::sds::Id &) override;
 };
 
-//  G_INIT_NT is a non-threaded version of G_INIT, purely for testing purposes.
+//  G_INIT_NT is a threaded version of G_INIT, purely for testing purposes.
 
 class GInitActionNT : public drama::thread::TAction
 {
@@ -229,7 +229,7 @@ private:
    void ActionThread(const drama::sds::Id &) override;
 };
 
-// G_UNPARK_NT is a non-thread version of UnParkGantry action
+// G_UNPARK_NT is a thread version of UnParkGantry action
 class GUnParkActionNT : public drama::thread::TAction
 {
 public:
@@ -240,7 +240,7 @@ private:
    void ActionThread(const drama::sds::Id &) override;
 };
 
-// G_MOVEOFFSET_NT is a non-thread version of MoveOffset action
+// G_MOVEOFFSET_NT is a thread version of MoveOffset action
 class GMoveOffsetActionNT : public drama::thread::TAction
 {
 public:
@@ -251,7 +251,7 @@ private:
    void ActionThread(const drama::sds::Id &) override;
 };
 
-// G_EXIT is a non-thread version of Exit action
+// G_EXIT is a thread version of Exit action
 class GEXITActionNT : public drama::thread::TAction
 {
 public:
@@ -262,7 +262,7 @@ private:
    void ActionThread(const drama::sds::Id &) override;
 };
 
-// G_MOVEActionNT is a non-thread version of Move action, it moves a particular axis
+// G_MOVEActionNT is a thread version of Move action, it moves a particular axis
 class GMOVEActionNT : public drama::thread::TAction
 {
 public:
@@ -273,7 +273,7 @@ private:
    void ActionThread(const drama::sds::Id &) override;
 };
 
-// G_RESETActionNT is a non-thread version of Move action, it moves a particular axis
+// G_RESETActionNT is a thread version of Move action, it moves a particular axis
 class GRESETActionNT : public drama::thread::TAction
 {
 public:
@@ -284,7 +284,7 @@ private:
    void ActionThread(const drama::sds::Id &) override;
 };
 
-// P_TELPOSActionNT is a non-thread version of TELPOS action, it sets the current position of telescope
+// P_TELPOSActionNT is a thread version of TELPOS action, it sets the current position of telescope
 class PTELPOSActionNT : public drama::thread::TAction
 {
 public:
@@ -295,7 +295,7 @@ private:
    void ActionThread(const drama::sds::Id &) override;
 };
 
-// P_SetActionNT is a non-thread version of SET action, it sets a signal parameter of tdffpi task
+// P_SetActionNT is a thread version of SET action, it sets a signal parameter of tdffpi task
 class PSetActionNT : public drama::thread::TAction
 {
 public:
@@ -306,7 +306,7 @@ private:
    void ActionThread(const drama::sds::Id &) override;
 };
 
-// P_ResetLockActionNT is a non-thread version of RESET_LOCK action, it resets the internal lock
+// P_ResetLockActionNT is a thread version of RESET_LOCK action, it resets the internal lock
 class PResetLockActionNT : public drama::thread::TAction
 {
 public:
@@ -317,7 +317,7 @@ private:
    void ActionThread(const drama::sds::Id &) override;
 };
 
-// P_SetCoeffsActionNT is a non-thread version of SET_COFFS action, it resets the image cofficients
+// P_SetCoeffsActionNT is a thread version of SET_COFFS action, it resets the image cofficients
 class PSetCoeffsActionNT : public drama::thread::TAction
 {
 public:
@@ -328,7 +328,7 @@ private:
    void ActionThread(const drama::sds::Id &) override;
 };
 
-// P_SetImageActionNT is a non-thread version of SET_IMAGE action, it sets the image
+// P_SetImageActionNT is a thread version of SET_IMAGE action, it sets the image
 class PSetImageActionNT : public drama::thread::TAction
 {
 public:
@@ -339,6 +339,7 @@ private:
    void ActionThread(const drama::sds::Id &) override;
 };
 
+// P_SetWindowActionNT is a thread version of SET_Window action, it sets the window size
 class PSetWindowActionNT : public drama::thread::TAction
 {
 public:
@@ -349,7 +350,7 @@ private:
    void ActionThread(const drama::sds::Id &) override;
 };
 
-// P_SetVelActionNT is a non-thread version of SET_VEL action, it sets the velocity of the gantry
+// P_SetVelActionNT is a thread version of SET_VEL action, it sets the velocity of the gantry
 class PSetVelActionNT : public drama::thread::TAction
 {
 public:
@@ -360,7 +361,7 @@ private:
    void ActionThread(const drama::sds::Id &) override;
 };
 
-// P_SetPlateActionNT is a non-thread version of SET_PLATE action, it sets the status of the plate
+// P_SetPlateActionNT is a thread version of SET_PLATE action, it sets the status of the plate
 class PSetPlateActionNT : public drama::thread::TAction
 {
 public:
@@ -371,93 +372,104 @@ private:
    void ActionThread(const drama::sds::Id &) override;
 };
 
-// P_UpdateFlexActionNT is a non-thread version of UPDATE_FLEX action, it rereads the flex file
+// P_UpdateFlexActionNT is a thread version of UPDATE_FLEX action, it rereads the flex file
 class PUpdateFlexActionNT : public drama::thread::TAction
 {
 public:
-   PUpdateFlexActionNT(std::weak_ptr<drama::Task> theTask): drama::thread::TAction(theTask) {}
+   PUpdateFlexActionNT(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask) {}
    ~PUpdateFlexActionNT() {}
 
 private:
    void ActionThread(const drama::sds::Id &) override;
 };
 
-// P_UpdateActionNT is a non-thread version of UPDATE action, it updates the pose
+// P_UpdateActionNT is a thread version of UPDATE action, it updates the pose
 class PUpdateActionNT : public drama::thread::TAction
 {
 public:
-   PUpdateActionNT(std::weak_ptr<drama::Task> theTask): drama::thread::TAction(theTask) {}
+   PUpdateActionNT(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask) {}
    ~PUpdateActionNT() {}
 
 private:
    void ActionThread(const drama::sds::Id &) override;
 };
 
-// P_ReportActionNT is a non-thread version of Report action, it reports the value of a fpi task parameter
+// P_ReportActionNT is a thread version of Report action, it reports the value of a fpi task parameter
 class PReportActionNT : public drama::thread::TAction
 {
 public:
-   PReportActionNT(std::weak_ptr<drama::Task> theTask): drama::thread::TAction(theTask) {}
+   PReportActionNT(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask) {}
    ~PReportActionNT() {}
 
 private:
    void ActionThread(const drama::sds::Id &) override;
 };
 
-// P_ReportLocksActionNT is a non-thread version of ReportLocks action, it reports the status of internal lock
+// P_ReportLocksActionNT is a thread version of ReportLocks action, it reports the status of internal lock
 class PReportLocksActionNT : public drama::thread::TAction
 {
 public:
-   PReportLocksActionNT(std::weak_ptr<drama::Task> theTask): drama::thread::TAction(theTask) {}
+   PReportLocksActionNT(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask) {}
    ~PReportLocksActionNT() {}
 
 private:
    void ActionThread(const drama::sds::Id &) override;
 };
 
-// P_ReportCoeffsActionNT is a non-thread version of ReportCoeffs action, it reports the coeffs
+// P_ReportCoeffsActionNT is a thread version of ReportCoeffs action, it reports the coeffs
 class PReportCoeffsActionNT : public drama::thread::TAction
 {
 public:
-   PReportCoeffsActionNT(std::weak_ptr<drama::Task> theTask): drama::thread::TAction(theTask) {}
+   PReportCoeffsActionNT(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask) {}
    ~PReportCoeffsActionNT() {}
 
 private:
    void ActionThread(const drama::sds::Id &) override;
 };
 
-// P_ReportImageActionNT is a non-thread version of ReportImage action, it reports the details of image
+// P_ReportImageActionNT is a thread version of ReportImage action, it reports the details of image
 class PReportImageActionNT : public drama::thread::TAction
 {
 public:
-   PReportImageActionNT(std::weak_ptr<drama::Task> theTask): drama::thread::TAction(theTask) {}
+   PReportImageActionNT(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask) {}
    ~PReportImageActionNT() {}
 
 private:
    void ActionThread(const drama::sds::Id &) override;
 };
 
-// P_ReportWindowActionNT is a non-thread version of ReportWindow action, it reports the details of window
+// P_ReportWindowActionNT is a thread version of ReportWindow action, it reports the details of window
 class PReportWindowActionNT : public drama::thread::TAction
 {
 public:
-   PReportWindowActionNT(std::weak_ptr<drama::Task> theTask): drama::thread::TAction(theTask) {}
+   PReportWindowActionNT(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask) {}
    ~PReportWindowActionNT() {}
 
 private:
    void ActionThread(const drama::sds::Id &) override;
 };
 
-// P_SaveDefsActionNT is a non-thread version of SaveDef action, it saves Def into the tdfFpiDef.sds
+// P_SaveDefsActionNT is a thread version of SaveDef action, it saves Def into the tdfFpiDef.sds
 class PSaveDefsActionNT : public drama::thread::TAction
 {
 public:
-   PSaveDefsActionNT(std::weak_ptr<drama::Task> theTask): drama::thread::TAction(theTask) {}
+   PSaveDefsActionNT(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask) {}
    ~PSaveDefsActionNT() {}
 
 private:
    void ActionThread(const drama::sds::Id &) override;
 };
+
+// C_Search is a thread version of Search action, it searches the fibre-end or fiducial
+class CSearchAction : public drama::thread::TAction
+{
+public:
+   CSearchAction(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask) {}
+   ~CSearchAction() {}
+
+private:
+   void ActionThread(const drama::sds::Id &) override;
+}
 
 //  ------------------------------------------------------------------------------------------------
 
@@ -499,6 +511,12 @@ public:
    bool tdFfpiIlocks(long int ilocks);
    // lliu added on 09-05-2024 to update the pos;
    bool tdFfpiUpdatePos(short updateIdeal, short useDpr, short displayText);
+   // lliu added on 06-06-2024 to compute the theata based on the gantry position;
+   double tdFautoThetaPos(long int x, long int y);
+   // lliu added on 06-06-2024 to check if a position is forbidden
+   int tdFforbidden(double x, double y, double theta, double rq, double ri,
+                    double ro, double hw, double jhwp, double jhwm, double jl, double clearance,
+                    int *inside, int *outside);
 
 private:
    //  Set up the homing configuration for a specified amplifier.
@@ -525,7 +543,9 @@ private:
 
    // lliu added on 17-05-2024 to check the target poisiton
    void tdFfpiPositionCheck(int Index, CML::uunit &Position);
-
+   bool MoveToSearchPosition(const long searchX, const long searchY, short *const atSearchXY,
+                             short *const searchStarted);
+   bool PerformCentroid(const GCamWindowType *cenWin, unsigned char **data, const double settletime, short *const centroided);
    // --------------------------------------------------------------------------
    // Gantry movement related actions
    // --------------------------------------------------------------------------
@@ -599,6 +619,11 @@ private:
    PReportWindowActionNT I_PReportWindowActionNTObj;
    // The new action handler for Parameter Saving action
    PSaveDefsActionNT I_PSaveDefsActionNTObj;
+
+   // --------------------------------------------------------------------------
+   // Camera related actions
+   // --------------------------------------------------------------------------
+   CSearchAction I_CSearchActionObj;
 
    //  Interface to the CanAccess layer.
    CanAccess I_CanAccess;
@@ -1106,6 +1131,150 @@ static bool WhichAxes(const std::string &Axes, bool &X, bool &Y, bool &Z, bool &
    return Valid;
 }
 
+int TdFCanTask::tdFforbidden(double x, double y, double theta, double rq, double ri,
+                             double ro, double hw, double jhwp, double jhwm, double jl, double clearance,
+                             int *inside, int *outside)
+{
+   double t;      /* temporary					*/
+   double rr;     /* positioner radius squared			*/
+   double xb, yb; /* coordinates after rotation			*/
+   double jhw;    /* greater jaw halfwidth                        */
+   double jo;     /* jaw offset from reference position		*/
+   double jjo;    /* jaw offset squared				*/
+   int sector;    /* 0 = guide sector, otherwise > 0              */
+
+   if (clearance < CLEARANCE)
+      clearance = CLEARANCE;
+
+   jhw = jhwp;
+   if (jhwm > jhw)
+      jhw = jhwm;
+   rr = x * x + y * y;
+   jjo = jhw * jhw + jl * jl;
+   jo = sqrt(jjo) + clearance;
+
+   if (rr < (ri - jo) * (ri - jo))
+   {
+      *inside = 1;
+      *outside = 0;
+      return (0);
+   }
+
+   /* quick check for outside						*/
+
+   if (rr > (ro + jo) * (ro + jo))
+   {
+      *inside = 0;
+      *outside = 1;
+      return (0);
+   }
+
+   *outside = 0;
+
+   theta += PION2;
+
+   /* Flip to get mirror image.  *** MAY NEED TO REMOVE THIS. ***		*/
+
+   x = -x;
+   theta = TWOPI - theta;
+
+   /* Collapse to single quadrant.						*/
+
+   if (x < hw && y >= hw)
+   {
+      t = -x;
+      x = y;
+      y = t;
+      theta -= PION2;
+   }
+   else if (x < -hw && y < hw)
+   {
+      x = -x;
+      y = -y;
+      theta += PI;
+   }
+   else if (x >= -hw && y < -hw)
+   {
+      t = -y;
+      y = x;
+      x = t;
+      theta += PION2;
+   }
+
+   while (theta > PI)
+      theta -= TWOPI;
+   while (theta < -PI)
+      theta += TWOPI;
+
+   x -= hw;
+   y -= hw;
+
+   xb = x * COS4P5 + y * SIN4P5;
+   yb = y * COS4P5 - x * SIN4P5;
+   x = xb;
+   y = yb;
+   theta -= R4P5;
+   sector = 0;
+
+   while (y / x > TAN4P5)
+   {
+      xb = x * COS9 + y * SIN9;
+      yb = y * COS9 - x * SIN9;
+      x = xb;
+      y = yb;
+      theta -= R9;
+      sector++;
+   }
+
+   jo = jl * cos(theta) + clearance;
+   if (theta > 0.0)
+      jo += jhwp * sin(theta); /* REMINDER: I have fliped   */
+   else
+      jo -= jhwm * sin(theta); /* the coordinate system !   */
+
+   if (x < rq - jo)
+   {
+
+      /*  So far, so good.  What about the adjacent sector ?                  */
+
+      if (y > 0.0)
+      {
+         /* Next sector                                                          */
+         if (sector == 9)
+            x -= 2. * hw;          /* Next sector may be the  */
+         xb = x * COS9 + y * SIN9; /* next quadrant !         */
+         yb = y * COS9 - x * SIN9;
+         theta -= R9;
+         jo = jl * cos(theta) + clearance - jhwm * sin(theta);
+
+         if (xb < rq - jo)
+         {
+            *inside = 1;
+            return (0);
+         }
+      }
+      else
+      {
+         /* Previous sector                                                      */
+         if (sector == 0)
+            y += 2. * hw;          /* Previous sector can be   */
+         xb = x * COS9 - y * SIN9; /* the previous quadrant !  */
+         yb = y * COS9 + x * SIN9;
+         theta += R9;
+         jo = jl * cos(theta) + clearance + jhwp * sin(theta);
+
+         if (xb < rq - jo)
+         {
+            *inside = 1;
+            return (0);
+         }
+      }
+   }
+
+   *inside = 0;
+   return (1);
+}
+
 //  ------------------------------------------------------------------------------------------------
 
 //                               W a i t  L i n k e d  H o m e
@@ -1336,6 +1505,7 @@ TdFCanTask::TdFCanTask(const std::string &taskName) : drama::Task(taskName),
                                                       I_PReportImageActionNTObj(TaskPtr()),
                                                       I_PReportWindowActionNTObj(TaskPtr()),
                                                       I_PSaveDefsActionNTObj(TaskPtr()),
+                                                      I_CSearchActionObj(TaskPtr()),
 
                                                       tdfTaskStr(TaskPtr(), "ENQ_DEV_DESCR", "2dF Focal Plane Imager Gantry Task"),
                                                       tdfSimSearchRunStr(TaskPtr(), "SIM_SEARCH_RAN", "No"),
@@ -1446,6 +1616,10 @@ TdFCanTask::TdFCanTask(const std::string &taskName) : drama::Task(taskName),
    Add("P_REPORT_WINDOW", drama::MessageHandlerPtr(&I_PReportWindowActionNTObj, drama::nodel()));
    // add new Save Defs action which saves the parameter into a file
    Add("P_SAVE_DEFS", drama::MessageHandlerPtr(&I_PSaveDefsActionNTObj, drama::nodel()));
+
+   // add new Search action which looks for fibre-end or fiducial
+   Add("C_SEARCH", drama::MessageHandlerPtr(&I_CSearchActionObj, drama::nodel()));
+
    Add("EXIT", &drama::SimpleExitAction);
 
    {
@@ -1968,12 +2142,12 @@ bool TdFCanTask::tdFfpiReadFile(drama::sds::Id &defId)
       if (lIntParam)
       {
          // I_TdFCanTaskParSys.Put("STEP_SIZE", lIntParam);
-         //DEBUG("stepSize before setting is %d\n", stepSize);
+         // DEBUG("stepSize before setting is %d\n", stepSize);
          stepSize = lIntParam;
-         //DEBUG("stepSize after setting directly is %d\n", stepSize);
+         // DEBUG("stepSize after setting directly is %d\n", stepSize);
          DEBUG("STEP_SIZE from file is %ld\n", lIntParam);
          I_TdFCanTaskParSys.Put("STEP_SIZE", (INT32)lIntParam);
-         //DEBUG("stepSize after setting using Parsys is %d\n", stepSize);
+         // DEBUG("stepSize after setting using Parsys is %d\n", stepSize);
          lIntParam = 0;
       }
 
@@ -2616,6 +2790,108 @@ bool TdFCanTask::tdFfpiUpdatePos(short updateIdeal, short useDpr, short displayT
    }
    return true;
 }
+
+bool TdFCanTask::MoveToSearchPosition(const long searchX, const long searchY, short *const atSearchXY,
+                                      short *const searchStarted)
+{
+   *searchStarted = YES;
+   *atSearchXY = YES;
+   if (!(SetupAmps()))
+   {
+      DEBUG("MoveToSearchPosition: Failed to set up the amplifiers %s.\n", I_ErrorString.c_str());
+      return false;
+   }
+   else
+   {
+      std::string Error;
+      std::string Axes = "X,Y";
+      std::string Velocities;
+      std::Positions Positions = to_string(searchX) + "," + to_string(searchY);
+      printf("MoveToSearchPosition: the position is %s.\n", Positions.c_str());
+      std::vector<AxisDemand> AxisDemands = GetDemands(Axes, Positions, Velocities, Error);
+      if (!(MoveAxes(AxisDemands, false, this)))
+      {
+         DEBUG("MoveToSearchPosition: failed to move to the position %s.\n", I_ErrorString.c_str());
+         return false;
+      }
+   }
+   return true;
+}
+
+char *Dul___FitsImgErrStr(int status)
+{
+   static char errorMessage[80];
+   fits_get_errstatus(status, errorMessage);
+
+   return (errorMessage);
+}
+
+bool TdFCanTask::PerformCentroid(const GCamWindowType *cenWin, unsigned char **data, const double settletime, short *const centroided)
+{
+   *centroided = YES;
+   if (settletime > 0)
+   {
+      std::this_thread::sleep_for(settletime * 1000);
+   }
+   fitsfile *fptr = 0;
+   int status = 0;
+   std::string filename = "";
+   fits_open_file(&fptr, filename.c_str(), READONLY, &status);
+
+   if (status != 0)
+   {
+      DEBUG("FitsImgOpen:Failed to open fits file \"%s\", FITSIO error \"%s\"", filenamfilename.c_str(), Dul___FitsImgErrStr(status));
+      return false;
+   }
+#define MAXDIM 20
+   int simple;         /* Does file confirm to fits standard*/
+   int bitpix;         /* Number of bits per pixel value */
+   int naxis;          /* Number of axes in data aray	*/
+   long naxes[MAXDIM]; /* Array of length of each axis	*/
+   long pcount;        /* Number of group parameters 	*/
+   long gcount;        /* Number of random groups	*/
+   int extend;         /* May extensions be present	*/
+
+   long nelem; /* Number of data elements to read  */
+   int anynul; /* Set true if any values were null */
+
+   fits_read_imghdr(fptr, MAXDIM, &simple, &bitpix, &naxis, naxes,
+                    &pcount, &gcount, &extend, &status);
+   if (status != 0)
+   {
+      DEBUG("FitsImgRead: Failed to read fits file keywords, FITSIO error \"%s\"", Dul___FitsImgErrStr(status));
+      return false;
+   }
+
+   nelem = naxes[0] * naxes[1];
+   if ((*data = (unsigned char *)DitsMalloc(nelem * (sizeof *data))) == 0)
+   {
+      DEBUG("FitsImgRead:Failed to allocate memory for %ld pixels", nelem);
+      fits_close_file(fptr, &status);
+      return false;
+   }
+
+   fits_read_img_byt(fptr, 0, 1, nelem, 0, *data, &anynul, &status);
+   if (status != 0)
+   {
+      DitsFree(*data);
+      DEBUG("FitsImgRead:Failed to read data from fits file, FITSIO error \"%s\"", Dul___FitsImgErrStr(status));
+      status = 0;
+      fits_close_file(fptr, &status);
+   }
+
+   fits_close_file(fptr, &status);
+   if (status != 0)
+   {
+      DitsFree(*data);
+      DEBUG("FitsImgRead:Failed to close fits file \"%s\", FITSIO error \"%s\"",
+            fileName.c_str(), Dul___FitsImgErrStr(status));
+      return false;
+   }
+
+   return true;
+}
+
 //  ------------------------------------------------------------------------------------------------
 
 //                    T d F  C a n  T a s k  : :  S e t u p  A m p s
@@ -2710,6 +2986,35 @@ bool TdFCanTask::InitialisefpiMainStruct()
       }
    }
    return true;
+}
+double TdFCanTask::tdFautoThetaPos(long int x, long int y)
+{
+   double tmpdx, tmpdy;
+   double theta;
+
+   if ((x == 0) && (y == 0))
+      return 0;
+
+   tmpdx = (x < 0) ? -1 * x : x;
+   tmpdy = (y < 0) ? -1 * y : y;
+   if (x > 0 && y == 0)
+      theta = 3 * PI / 2;
+   else if (x > 0 && y > 0)
+      theta = 3 * PI / 2 + atan(tmpdy / tmpdx);
+   else if (x == 0 && y > 0)
+      theta = 0;
+   else if (x < 0 && y > 0)
+      theta = PI / 2 - atan(tmpdy / tmpdx);
+   else if (x < 0 && y == 0)
+      theta = PI / 2;
+   else if (x < 0 && y < 0)
+      theta = PI / 2 + atan(tmpdy / tmpdx);
+   else if (x == 0 && y < 0)
+      theta = PI;
+   else /* (x>0 && y<0) */
+      theta = 3 * PI / 2 - atan(tmpdy / tmpdx);
+
+   return theta;
 }
 
 bool TdFCanTask::DisableAmps()
@@ -3736,7 +4041,7 @@ void GInitAction::ActionThread(const drama::sds::Id &Arg)
    // lliu added on 16/05/2024 to add the lock
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
-   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   // drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
 
    std::string Axes("");
    if (Arg)
@@ -3799,7 +4104,7 @@ void GInitActionNT::ActionThread(const drama::sds::Id &Arg)
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
-  // drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   // drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
 
    // lliu added on 15/05/2024
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
@@ -3884,7 +4189,7 @@ void GMoveAxisAction::ActionThread(const drama::sds::Id &Arg)
    // lliu added on 16/05/2024 to add the lock
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
-   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   // drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
 
    std::string Axes;
    std::string Positions;
@@ -3964,7 +4269,7 @@ void GMoveAxisActionNT::ActionThread(const drama::sds::Id &Arg)
    // lliu added on 15/05/2024
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
-   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   // drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
 
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
    if (details == nullptr || details->Initialised == NO)
@@ -4055,7 +4360,6 @@ void GMoveAxisActionNT::ActionThread(const drama::sds::Id &Arg)
             {
                MessageUser("G_MOVE_AXIS_NT: Failed to update the position of the gantry");
             }
-            
          }
       }
 
@@ -4085,7 +4389,7 @@ void GHomeAction::ActionThread(const drama::sds::Id &Arg)
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
 
-   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   // drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
    std::string Axes("");
    if (Arg)
    {
@@ -4150,7 +4454,7 @@ void GParkGantryActionNT::ActionThread(const drama::sds::Id &Arg)
    // lliu added on 15/05/2024
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
-   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   // drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
 
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
    drama::sds::Id parSysId(drama::sds::Id::CreateFromSdsIdType((long)(DitsGetParId())));
@@ -4245,7 +4549,7 @@ void GHomeActionNT::ActionThread(const drama::sds::Id &Arg)
    // lliu added on 15/05/2024
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
-   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   // drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
    drama::sds::Id parSysId(drama::sds::Id::CreateFromSdsIdType((long)(DitsGetParId())));
 
@@ -4331,7 +4635,7 @@ void GUnParkActionNT::ActionThread(const drama::sds::Id &Arg)
    // lliu added on 15/05/2024
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
-   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   // drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
 
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
    drama::sds::Id parSysId(drama::sds::Id::CreateFromSdsIdType((long)(DitsGetParId())));
@@ -4419,7 +4723,7 @@ void GMoveOffsetActionNT::ActionThread(const drama::sds::Id &Arg)
    // lliu added on 15/05/2024
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
-   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   // drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
 
    if (details == nullptr || details->Initialised == NO)
@@ -4522,7 +4826,7 @@ void GEXITActionNT::ActionThread(const drama::sds::Id &Arg)
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
-   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   // drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
 
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
 
@@ -4558,7 +4862,7 @@ void GMOVEActionNT::ActionThread(const drama::sds::Id &Arg)
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
-   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   // drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
 
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
 
@@ -4611,7 +4915,7 @@ void GMOVEActionNT::ActionThread(const drama::sds::Id &Arg)
       if (!OffsetFlag.compare("-"))
          MoveBackward = true;
    }
-   if(Axes.size() >1 || Velocities.find(",")!=string::npos || Positions.find(",")!=string::npos)
+   if (Axes.size() > 1 || Velocities.find(",") != string::npos || Positions.find(",") != string::npos)
    {
       MessageUser("G_MOVE_NT can only work on one axis. If more than one axes need to move, please choose G_MOVE_AXIS_NT.\n");
       return;
@@ -4619,7 +4923,7 @@ void GMOVEActionNT::ActionThread(const drama::sds::Id &Arg)
    std::string Error;
    std::vector<AxisDemand> AxisDemands = GetDemands(Axes, Positions, Velocities, Error);
    int NumberAxes = AxisDemands.size();
-   if ((NumberAxes != 1 && Axes!="X"))
+   if ((NumberAxes != 1 && Axes != "X"))
    {
       MessageUser("G_MOVE_NT can only work on one axis. If more than one axes need to move, please choose G_MOVE_AXIS_NT.\n" + Error);
    }
@@ -4665,7 +4969,7 @@ void GRESETActionNT::ActionThread(const drama::sds::Id &Arg)
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
    ThisTask->ClearError();
-   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   // drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
    drama::sds::Id parSysId(drama::sds::Id::CreateFromSdsIdType((long)(DitsGetParId())));
 
    parSysId.Put("ENQ_VER_NUM", TdFCanTaskVersion);
@@ -4753,7 +5057,7 @@ void PTELPOSActionNT::ActionThread(const drama::sds::Id &Arg)
 {
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
-   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   // drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
    ThisTask->ClearError();
 
    drama::ParId paramHA(GetTask(), "HA");
@@ -4806,7 +5110,7 @@ void PSetActionNT::ActionThread(const drama::sds::Id &Arg)
 {
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
-   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   // drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
    ThisTask->ClearError();
 
    drama::ParSys parSys(GetTask()); // this is duplicated;
@@ -4867,7 +5171,7 @@ void PResetLockActionNT::ActionThread(const drama::sds::Id &Arg)
 {
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
-   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   // drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
    ThisTask->ClearError();
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
    if (details != nullptr)
@@ -4888,7 +5192,7 @@ void PSetCoeffsActionNT::ActionThread(const drama::sds::Id &Arg)
 {
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
-   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   // drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
    ThisTask->ClearError();
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
 
@@ -4920,7 +5224,7 @@ void PSetCoeffsActionNT::ActionThread(const drama::sds::Id &Arg)
             for (int index = 0; index < 6; index++)
             {
                details->convert.coeffs[index] = stod(ParameterVec[index]);
-               DEBUG("%f ",details->convert.coeffs[index]);
+               DEBUG("%f ", details->convert.coeffs[index]);
             }
             DEBUG("\n");
             slaInvf(details->convert.coeffs, details->convert.invCoeffs, &j);
@@ -4932,7 +5236,7 @@ void PSetCoeffsActionNT::ActionThread(const drama::sds::Id &Arg)
             }
             for (int index = 0; index < 6; index++)
             {
-               DEBUG("%f ",details->convert.invCoeffs[index]);
+               DEBUG("%f ", details->convert.invCoeffs[index]);
             }
             DEBUG("\n");
             if (SaveFlag == "SAVE" || SaveFlag == "save")
@@ -4968,7 +5272,7 @@ void PSetImageActionNT::ActionThread(const drama::sds::Id &Arg)
 {
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
-   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   // drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
 
    ThisTask->ClearError();
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
@@ -5009,9 +5313,9 @@ void PSetImageActionNT::ActionThread(const drama::sds::Id &Arg)
       for (int counter = 0; counter < 6; counter++)
       {
          details->freeImg.camCoeffs[counter] = coeffs[counter];
-         DEBUG("%f ",details->freeImg.camCoeffs[counter]);
+         DEBUG("%f ", details->freeImg.camCoeffs[counter]);
       }
-      DEBUG("\n");   
+      DEBUG("\n");
 
       DEBUG("The Inverse camCoeffs array is:\n");
       slaInvf(details->freeImg.camCoeffs, details->freeImg.invCoeffs, &j);
@@ -5021,9 +5325,9 @@ void PSetImageActionNT::ActionThread(const drama::sds::Id &Arg)
          for (i = 0; i < 6; i++)
             details->freeImg.invCoeffs[i] = details->freeImg.camCoeffs[i];
       }
-      for(int i=0; i<6; i++)
+      for (int i = 0; i < 6; i++)
       {
-         DEBUG("%f ",details->freeImg.invCoeffs[i]);
+         DEBUG("%f ", details->freeImg.invCoeffs[i]);
       }
       DEBUG("\n");
 
@@ -5047,7 +5351,7 @@ void PSetWindowActionNT::ActionThread(const drama::sds::Id &Arg)
 {
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
-   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   // drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
 
    ThisTask->ClearError();
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
@@ -5113,7 +5417,7 @@ void PSetVelActionNT::ActionThread(const drama::sds::Id &Arg)
 {
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
-   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   // drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
    ThisTask->ClearError();
    long int iFeedrate;
 
@@ -5182,7 +5486,7 @@ void PUpdateFlexActionNT::ActionThread(const drama::sds::Id &Arg)
 {
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
-   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   // drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
 
    ThisTask->ClearError();
    short check = SHOW;
@@ -5204,7 +5508,7 @@ void PUpdateActionNT::ActionThread(const drama::sds::Id &Arg)
 {
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
-   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   // drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
    ThisTask->ClearError();
 
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
@@ -5219,7 +5523,7 @@ void PUpdateActionNT::ActionThread(const drama::sds::Id &Arg)
       return;
    }
    double dTimeout = 0.0;
-   
+
    if (Arg)
    {
       drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
@@ -5232,8 +5536,8 @@ void PUpdateActionNT::ActionThread(const drama::sds::Id &Arg)
       else
          MessageUser("P_POLL_POSE: action completed");
 
-      //confirmed with Tony that this action is no longer used by users and he suggested blocking this action.
-      //MessageUser("P_POLL_POSE: this action is not supported any more.\n");
+      // confirmed with Tony that this action is no longer used by users and he suggested blocking this action.
+      // MessageUser("P_POLL_POSE: this action is not supported any more.\n");
    }
    else
    {
@@ -5244,7 +5548,6 @@ void PUpdateActionNT::ActionThread(const drama::sds::Id &Arg)
       else
          MessageUser("P_UPDATE_POSE: action completed.\n");
    }
-   
 }
 
 //  ------------------------------------------------------------------------------------------------
@@ -5254,9 +5557,9 @@ void PReportActionNT::ActionThread(const drama::sds::Id &Arg)
 {
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
-   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   // drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
    ThisTask->ClearError();
-   
+
    drama::sds::Id parSysId(drama::sds::Id::CreateFromSdsIdType((long)(DitsGetParId())));
    if (Arg)
    {
@@ -5293,7 +5596,7 @@ void PReportLocksActionNT::ActionThread(const drama::sds::Id &)
 {
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
-   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   // drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
    ThisTask->ClearError();
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
    if (details == nullptr)
@@ -5317,9 +5620,9 @@ void PReportLocksActionNT::ActionThread(const drama::sds::Id &)
 //         P  ReportCoeffs   A c t i o n  N T  : :  M e s s a g e  R e c e i v e d
 void PReportCoeffsActionNT::ActionThread(const drama::sds::Id &)
 {
-  // UnblockSIGUSR2();
+   // UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
-   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   // drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
    ThisTask->ClearError();
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
    if (details == nullptr)
@@ -5343,7 +5646,7 @@ void PReportImageActionNT::ActionThread(const drama::sds::Id &)
 {
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
-   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   // drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
 
    ThisTask->ClearError();
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
@@ -5376,7 +5679,7 @@ void PReportWindowActionNT::ActionThread(const drama::sds::Id &Arg)
 {
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
-   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   // drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
 
    ThisTask->ClearError();
    tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
@@ -5385,7 +5688,7 @@ void PReportWindowActionNT::ActionThread(const drama::sds::Id &Arg)
       MessageUser("P_REPORT_WINDOW: the structure pointer is null, please initialise the task!\n");
       return;
    }
-   
+
    string windowStr = "SEARCH";
    if (Arg)
    {
@@ -5425,13 +5728,192 @@ void PSaveDefsActionNT::ActionThread(const drama::sds::Id &)
 {
    UnblockSIGUSR2();
    auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
-   //drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
+   // drama::Task::guardType DramaLock(std::shared_ptr<drama::Task>(ThisTask)->Lock());
    ThisTask->ClearError();
    if (!ThisTask->tdFfpiDefWrite(DEFS_FILE + FLEX_FILE, 0))
    {
       MessageUser("P_SAVE_DEFS: Save DEFS_FILE failed " + ThisTask->GetError());
    }
    MessageUser("P_SAVE_DEFS: action completed.\n");
+}
+
+//  ------------------------------------------------------------------------------------------------
+
+//         C  Search   A c t i o n  N T  : :  A c t i o n N T
+void CSearchAction::ActionThread(const drama::sds::Id &Arg)
+{
+   auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   ThisTask->ClearError();
+   tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
+   if (details == nullptr)
+   {
+      MessageUser("C_SEARCH: the structure pointer is null, please initialise the task!\n");
+      return;
+   }
+   if (details->inUse)
+   {
+      MessageUser("C_SEARCH: TdFCanTask is running other actions.\n");
+      return;
+   }
+   if (Arg)
+   {
+      details->inUse = YES;
+      drama::sds::Id parSysId(drama::sds::Id::CreateFromSdsIdType((long)(DitsGetParId())));
+      drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
+      drama::gitarg::Int<XMIN, XMAX> XFArg(this, Arg, "XF", 1, 0, NoFlags);
+      long int searchStartX = XFArg;
+      drama::gitarg::Int<YMIN, YMAX> YFArg(this, Arg, "YF", 2, 0, NoFlags);
+      long int searchStartY = YFArg;
+
+      int stepsize, maxerror, tolerance;
+      short attempts;
+      int inside, outside, forbidden;
+      double settletime;
+
+      parSysId.Get("STEP_SIZE", &stepsize);
+      parSysId.Get("MAX_ERROR", &maxerror);
+      parSysId.Get("POS_TOL", &tolerance);
+      parSysId.Get("POS_ATTEMPTS", &attempts);
+      parSysId.Get("SETTLE_TIME", &settletime);
+
+      double theta = ThisTask->tdFautoThetaPos(searchStartX, searchStartY);
+      forbidden = ThisTask->tdFforbidden(searchStartX, searchStartY,
+                                         theta, QUADRANT_RADIUS, INSIDE_RADIUS,
+                                         OUTSIDE_RADIUS, HALF_GUIDE_EXPAN,
+                                         JAW_HWP, JAW_HWM, JAW_LENGTH, 0, &inside, &outside);
+      if (forbidden || outside)
+      {
+         MessageUser("C_SEARCH: Initial search position (%d,%d) invalid.\n", searchStartX, searchStartY);
+         details->inUse = NO;
+         return;
+      }
+      details->imagePos.enable = 1;
+      details->imagePos.displayText = 1;
+      details->imagePos.useDpr = details->dprFeedback;
+
+      ThisTask->tdFfpiUpdatePos(YES, details->dprFeedback, YES);
+      static GCamWindowType cenWin;
+      static int i = 1, j = 1, k = 0; /* Used to determine next search point  */
+      static short atSearchXY = NO,   /* Flag - above fibre-end location      */
+          centroided = NO,            /*      - fibre-end centroided          */
+          checkedCentroid = NO,       /*      - analysed last centroid        */
+          attempts = NO,              /* Current number of positioning trys   */
+          foundIt = NO,               /* Have we found the fibre              */
+          searchStarted = NO,         /* Have we completed our first move     */
+          centroidRepeated = NO,      /* Have we repeated the centroid        */
+          repeatChecked = NO;         /* Has te repeated centroid been checks */
+      long XErr = 0, YErr = 0;
+
+      cenWin->MaxX = details->freeImg.xMax;
+      cenWin->MaxY = details->freeImg.yMax;
+      cenWin->PixelSize = details->freeImg.PixelSize;
+      cenWin->Xoffset = details->searchWin.xCen - details->searchWin.xSpan / 2;
+      cenWin->Yoffset = details->searchWin.yCen - details->searchWin.ySpan / 2;
+      if (cenWin->Xoffset < 0)
+         cenWin->Xoffset = 0;
+      if (cenWin->Yoffset < 0)
+         cenWin->Yoffset = 0;
+      cenWin->Xdim = details->searchWin.xSpan;
+      cenWin->Ydim = details->searchWin.ySpan;
+      if (cenWin->Xdim + cenWin->Xoffset > cenWin->MaxX)
+         cenWin->Xdim = cenWin->MaxX - cenWin->Xoffset;
+      if (cenWin->Ydim + cenWin->Yoffset > cenWin->MaxY)
+         cenWin->Ydim = cenWin->MaxY - cenWin->Yoffset;
+
+      if (!atSearchXY)
+      {
+         if (!ThisTask->MoveToSearchPosition(searchStartX, searchStartY, &atSearchXY, &searchStarted))
+         {
+            MessageUser("C_SEARCH: Fail to move to search position (%d,%d).\n", searchStartX, searchStartY);
+            details->inUse = NO;
+            return;
+         }
+      }
+      else if (!centroided)
+      {
+         unsigned char *Imgdata;
+         if (!ThisTask->PerformCentroid(&cenWin, &Imgdata, settletime, &centroided))
+         {
+            MessageUser("C_SEARCH: Fail to perform centroid at position (%d,%d).\n", searchStartX, searchStartY);
+            details->inUse = NO;
+            DitsFree(Imgdata);
+            return;
+         }
+         else
+         {
+            double xCen = 0.0, yCen = 0.0,
+                   xErr = 0.0, yErr = 0.0;
+            int saturated = 0;
+            short fibreInImage = YES;
+            short debugCentroid = 0;
+            short imageThresh = 0;
+            short multCompAna = 0;
+
+            parSysId.Get("FIBRE_IN_IMAGE", &imageThresh);
+            parSysId.Get("DEBUG_CENTROID", &debugCentroid);
+            parSysId.Get("DEBUG_CENTROID", &debugCentroid);
+            GCam2dfCalCentroid_8Bit(
+                0, /* Fibre number, 0 = none */ debugCentroid == 1,        /* Debug Centroid, yes  (DEBUG_CENTROID parameter) */
+                imageThresh, /* Threshold (FIBRE_IN_IMAGE parameter) */ 1, /* Noisy image ? (FPI image) */
+                Imgdata, cenWin->Xdim, cenWin->Ydim, details->freeImg.bias, &xCen, &yCen, &fibreInImage, &multCompAna, &saturated, status);
+
+            if ((debugCentroid) && (saturated))
+            {
+               MessageUser("C_SEARCH: CENTROID Image Saturated.");
+            }
+            if ((!fibreInImage) && (*status == STATUS__OK))
+            {
+               MessageUser("C_SEARCH: No Fibre in image.");
+               details->inUse = NO;
+               DitsFree(Imgdata);
+               return;
+            }
+            slaXy2xy(((double)window->Xoffset+xCen), ((double)window->Yoffset+yCen),
+                 details->freeImg->camCoeffs,
+                 &xErr,&yErr);
+            
+         }
+      }
+      else if (!checkedCentroid)
+      {
+         if (!ThisTask->CheckCentroid(&searchX, &searchY, &atSearchXY, &XErr, &YErr,
+                                      &centroided, &attempts, &foundIt, &i, &j, &k,
+                                      &checkedCentroid, &centroidRepeated, &repeatChecked))
+         {
+            MessageUser("C_SEARCH: Fail to check centroid at position (%d,%d).\n", searchStartX, searchStartY);
+            details->inUse = NO;
+            return;
+         }
+      }
+      else if (!centroidRepeated)
+      {
+         if (!ThisTask->PerformCentroid(&cenWin, &Imgdata, settletime, &centroided))
+         {
+            MessageUser("C_SEARCH: Fail to perform centroid again at position (%d,%d).\n", searchStartX, searchStartY);
+            details->inUse = NO;
+            return;
+         }
+      }
+      else if (!repeatChecked)
+      {
+         if (!CheckRepeatCentroid(&centroidRepeated, &repeatChecked))
+         {
+            MessageUser("C_SEARCH: Fail to check centroid again at position (%d,%d).\n", searchStartX, searchStartY);
+            details->inUse = NO;
+            return;
+         }
+      }
+      else
+      {
+         ActionComplete(searchX, searchY, foundIt);
+      }
+      details->inUse = NO;
+   }
+   else
+   {
+      MessageUser("C_SEARCH: no input argument.\n");
+   }
+   MessageUser("C_SEARCH: action completed.\n");
 }
 
 //  ------------------------------------------------------------------------------------------------

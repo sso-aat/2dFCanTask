@@ -14,6 +14,9 @@
 #include "Git.h"
 #include "gcam.h"
 #include "slalib.h"
+#include <math.h>
+#include "fitsio.h"
+#include "dul.h"
 
 //to check if a directory exists
 #include <boost/filesystem.hpp>
@@ -24,9 +27,7 @@
 #define NO                          0
 #define YES                         1
 
-#define NUM_FIDUCIALS              21  /* Number of fiducial marks/plate             */
-
-#define PI               3.1415926535
+#define NUM_FIDUCIALS              21  /* Number of fiducial marks/plate             */  
 
 #define _XI                         0  /* Used as array indexes                      */
 #define _YI                         1
@@ -104,11 +105,32 @@
 #define ZMIN                  0  /* Z-axis minimum value (microns)                */
 #define ZMAX              60000  /* Z-axis maximum value (microns)                */
 
+#define QUADRANT_RADIUS	277000
+#define INSIDE_RADIUS	270430
+#define OUTSIDE_RADIUS  347300
+#define HALF_GUIDE_EXPAN 2250
+
+#define JAW_HWP		12220	/* Jaw half with +ve theta */
+#define JAW_HWM		8300	/* Jaw half with -ve theta */	
+#define JAW_LENGTH 	5250	/* Jaw length		*/
 
 #define TDFFPI_MSG_BUFFER       20000  /* Size of message buffer for TDFFPI          */
 
 #define FPI_CLEAR_X 253513
 #define FPI_CLEAR_Y -240488
+
+#define TAN4P5 0.07870171
+#define SIN9   0.156434465
+#define COS9   0.987688341
+#define SIN4P5 0.0784590957
+#define COS4P5  0.9969173337
+#define CLEARANCE 500.0
+#define PI     3.1415926535
+#define TWOPI  6.283185308
+#define PION2  1.570796327
+#define R4P5   0.07853981634
+#define R9     0.1570796327
+
 
 #ifndef SAFE
 #define SAFE 2

@@ -182,7 +182,7 @@ DramaCPPProgramTarget(TdFCanTask, Obj(TdFCanTask), Lib(TdFCanTask), $(LIBS),)
  */
 DramaReleaseCheck()
 DramaReleaseCommon(TdFCanTask.h TdFCanTask_err.h TdFCanTask_err_msgt.h CanAccess.h)
-DramaReleaseTarget(TdFCanTask,Lib(TdFCanTask),,))
+DramaReleaseTarget(TdFCanTask,Lib(TdFCanTask),,)
 DramaReleaseDramaStart()
 
 /*
