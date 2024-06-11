@@ -130,6 +130,7 @@
 #define PION2  1.570796327
 #define R4P5   0.07853981634
 #define R9     0.1570796327
+#define  SF_IMAGES    10
 
 
 #ifndef SAFE
