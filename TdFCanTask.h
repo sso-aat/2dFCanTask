@@ -46,8 +46,8 @@
 #define POLL 1
 
 #define FPI_CAM_NUM "/grabber/1"  /* Focal Plane Imager camera device name      */
-#define CAM_X_SPAN 768            /* Pixels along the fpi camera x axis         */
-#define CAM_Y_SPAN 576            /* Pixels along the fpi camera y axis         */
+#define CAM_X_SPAN 1456           /* Pixels along the fpi camera x axis         */
+#define CAM_Y_SPAN 1088           /* Pixels along the fpi camera y axis         */
 #define PIXEL_SIZE 1              /* Pixel size of Pulnix CCD fpi camera        */
 #define FIBRE_IN_IMAGE_LIMIT 1000 /* If the sum of the pixel values in an image */
                                   /* is less than this we consider there to be  */
@@ -264,7 +264,26 @@ public:
         statCheck = 0;
         reset = YES;
     }
-}tdFfpiSFtype;
+} tdFfpiSFtype;
+
+typedef struct tdFfpiZCtype
+{
+public:
+    DitsActionRoutineType handler;
+    DitsActionRoutineType kickHandler;
+    double xFull;
+    double yFull;
+    short reset;
+    short centroidOK;
+
+    tdFfpiZCtype()
+    {
+        handler = 0;
+        kickHandler = 0;
+        xFull = yFull = 0;
+        reset = centroidOK = YES;
+    }
+} tdFfpiZCtype;
 
 typedef struct TdfFlexType
 {

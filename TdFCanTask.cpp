@@ -137,14 +137,14 @@ typedef struct
 
 //  INITIALISE - initialise the task as a whole.
 
-class InitialiseAction : public drama::MessageHandler
+class InitialiseAction : public drama::thread::TAction
 {
 public:
-   InitialiseAction() {}
+   InitialiseAction(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask) {}
    ~InitialiseAction() {}
 
 private:
-   drama::Request MessageReceived() override;
+   void ActionThread(const drama::sds::Id &) override;
 };
 
 //  G_INIT - initialise and home the 2dF positioner gantry.
@@ -527,6 +527,27 @@ private:
    void ActionThread(const drama::sds::Id &) override;
 };
 
+class CZeroCamAction : public drama::thread::TAction
+{
+public:
+   CZeroCamAction(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask), _theTask(theTask) {}
+   ~CZeroCamAction()
+   {
+      if (m_tdFfpiZCStruct)
+      {
+         delete (m_tdFfpiZCStruct);
+         m_tdFfpiZCStruct = nullptr;
+      }
+   }
+
+private:
+   tdFfpiZCtype *m_tdFfpiZCStruct;
+   std::weak_ptr<drama::Task> _theTask;
+
+private:
+   void ActionThread(const drama::sds::Id &) override;
+};
+
 //  ------------------------------------------------------------------------------------------------
 
 //                                  T a s k  D e f i n i t i o n
@@ -574,6 +595,7 @@ public:
                     double ro, double hw, double jhwp, double jhwm, double jl, double clearance,
                     int *inside, int *outside);
 
+   drama::Path &tdFGetCameraPath() { return I_pCameraPath; };
 
 private:
    //  Set up the homing configuration for a specified amplifier.
@@ -681,6 +703,7 @@ private:
    CSearchAction I_CSearchActionObj;
    CCentroidAction I_CCentroidActionObj;
    CImageAction I_CImageActionObj;
+   CZeroCamAction I_CZeroCamActionObj;
 
    //  Interface to the CanAccess layer.
    CanAccess I_CanAccess;
@@ -704,6 +727,7 @@ private:
    // the pointer structure to store the parameters of fpi task added by lliu 01/05/2024
    tdFfpiTaskType *I_tdFfpiMainStruct;
    drama::ParSys I_TdFCanTaskParSys;
+   drama::Path I_pCameraPath;
 
 public:
    drama::Parameter<double> dzero;
@@ -1529,6 +1553,7 @@ private:
 //  rest to the DRAMA infrastructure.
 
 TdFCanTask::TdFCanTask(const std::string &taskName) : drama::Task(taskName),
+                                                      I_InitialiseActionObj(TaskPtr()),
                                                       I_GInitActionObj(TaskPtr()),
                                                       I_GMoveAxisActionObj(TaskPtr()),
                                                       I_GHomeActionObj(TaskPtr()),
@@ -1565,6 +1590,7 @@ TdFCanTask::TdFCanTask(const std::string &taskName) : drama::Task(taskName),
                                                       I_CSearchActionObj(TaskPtr()),
                                                       I_CCentroidActionObj(TaskPtr()),
                                                       I_CImageActionObj(TaskPtr()),
+                                                      I_CZeroCamActionObj(TaskPtr()),
 
                                                       tdfTaskStr(TaskPtr(), "ENQ_DEV_DESCR", "2dF Focal Plane Imager Gantry Task"),
                                                       tdfSimSearchRunStr(TaskPtr(), "SIM_SEARCH_RAN", "No"),
@@ -1605,7 +1631,8 @@ TdFCanTask::TdFCanTask(const std::string &taskName) : drama::Task(taskName),
                                                       I_ZAmp(NULL),
                                                       I_ThetaAmp(NULL),
                                                       I_JawAmp(NULL),
-                                                      I_tdFfpiMainStruct(nullptr)
+                                                      I_tdFfpiMainStruct(nullptr),
+                                                      I_pCameraPath(TaskPtr(), "VimbaFPI", "", "/instsoft/vimbacam/vimbacam")
 {
    //  cml is a global defined by the CML library. Logging everything is a very good idea,
    //  even for a production system, and it's essential during development. Note that the
@@ -1677,6 +1704,7 @@ TdFCanTask::TdFCanTask(const std::string &taskName) : drama::Task(taskName),
    Add("C_SEARCH", drama::MessageHandlerPtr(&I_CSearchActionObj, drama::nodel()));
    Add("C_CENTROID", drama::MessageHandlerPtr(&I_CCentroidActionObj, drama::nodel()));
    Add("C_IMAGE", drama::MessageHandlerPtr(&I_CImageActionObj, drama::nodel()));
+   Add("C_ZEROCAM", drama::MessageHandlerPtr(&I_CZeroCamActionObj, drama::nodel()));
 
    Add("EXIT", &drama::SimpleExitAction);
 
@@ -4008,7 +4036,7 @@ bool TdFCanTask::MoveAxes(const std::vector<AxisDemand> &AxisDemands, bool MoveO
 
 // lliu added initialisation of fpiMainStruct on 02/05/2024. When the initialisation fails, drama will
 // exit
-drama::Request InitialiseAction::MessageReceived()
+void InitialiseAction::ActionThread(const drama::sds::Id &)
 {
 
    UnblockSIGUSR2();
@@ -4024,13 +4052,13 @@ drama::Request InitialiseAction::MessageReceived()
    if (details != nullptr && details->Initialised == YES)
    {
       MessageUser("INITIALISE: TdFCanTask is already initialised.");
-      return drama::RequestCode::End;
+      return;
    }
 
    if (!(ThisTask->InitialisefpiMainStruct()))
    {
       DEBUG("Fail to allocate memory to fpiMainStruct\n");
-      return drama::RequestCode::End;
+      return;
    }
    else
    {
@@ -4056,7 +4084,7 @@ drama::Request InitialiseAction::MessageReceived()
       {
 
          DEBUG("Parameter ZEROCAM_CENWAIT length mismatch");
-         return drama::RequestCode::End;
+         return;
       }
       length = 0;
       // SdsFreeId(id, &status);
@@ -4069,7 +4097,7 @@ drama::Request InitialiseAction::MessageReceived()
       if (length != sizeof(*(details->pars.plt1CenterFidOffsetX)))
       {
          DEBUG("Parameter PLT1_CFID_OFF_X length mismatch");
-         return drama::RequestCode::End;
+         return;
       }
       length = 0;
       // SdsFreeId(id, &status);
@@ -4082,7 +4110,7 @@ drama::Request InitialiseAction::MessageReceived()
       if (length != sizeof(*(details->pars.plt1CenterFidOffsetY)))
       {
          DEBUG("Parameter PLT1_CFID_OFF_Y length mismatch");
-         return drama::RequestCode::End;
+         return;
       }
       length = 0;
       // SdsFreeId(id, &status);
@@ -4094,7 +4122,7 @@ drama::Request InitialiseAction::MessageReceived()
       if (defRead == false)
       {
          details->inUse = NO;
-         return drama::RequestCode::End;
+         return;
       }
 
       details->ipsMode = 0;
@@ -4105,6 +4133,9 @@ drama::Request InitialiseAction::MessageReceived()
       details->Initialised = YES;
       details->inUse = NO;
    }
+
+   ThisTask->tdFGetCameraPath().GetPath(this);
+   ThisTask->tdFGetCameraPath().Obey(this, "INITIALISE");
 
    if (!(ThisTask->SetupAmps()))
    {
@@ -4118,8 +4149,6 @@ drama::Request InitialiseAction::MessageReceived()
    }
    // We never re-enable the blocking of SIGUSR2 - it causes too many problems.
    // BlockSIGUSR2();
-
-   return drama::RequestCode::End;
 }
 
 //  ------------------------------------------------------------------------------------------------
@@ -4948,6 +4977,10 @@ void GEXITActionNT::ActionThread(const drama::sds::Id &)
       DEBUG("DisableAmps fails\n");
       MessageUser("G_EXIT: " + ThisTask->GetError());
    }
+
+   ThisTask->tdFGetCameraPath().Get(this);
+   ThisTask->tdFGetCameraPath().Obey(this, "EXIT");
+   DEBUG("EXIT camera OK\n");
    return;
 }
 
@@ -5882,7 +5915,7 @@ void CSearchAction::ActionThread(const drama::sds::Id &Arg)
 
    m_tdFfpiSFStruct->searchStartX = searchStartX;
    m_tdFfpiSFStruct->searchStartY = searchStartY;
-   
+
    tdFfpiCENtype *cenWin = new tdFfpiCENtype();
    int i = 1, j = 1, k = 0;                                    /* Used to determine next search point  */
    short atSearchXY = NO,                                      /* Flag - above fibre-end location      */
@@ -6033,7 +6066,7 @@ bool CSearchAction::CheckRepeatCentroid(tdFfpiTaskType *details, short *const ce
 
             MessageUser("CheckRepeatCentroid: First three images on thsi object give different results - will do 10");
             MessageUser("CheckRepeatCentroid: Deltas %ld,%ld - %ld,%ld", labs(m_tdFfpiSFStruct->resultsX[0] - m_tdFfpiSFStruct->resultsX[1]),
-                        labs(m_tdFfpiSFStruct->resultsY[0] - m_tdFfpiSFStruct->resultsY[1]), labs(m_tdFfpiSFStruct->resultsX[0] - m_tdFfpiSFStruct->resultsX[2]), 
+                        labs(m_tdFfpiSFStruct->resultsY[0] - m_tdFfpiSFStruct->resultsY[1]), labs(m_tdFfpiSFStruct->resultsX[0] - m_tdFfpiSFStruct->resultsX[2]),
                         labs(m_tdFfpiSFStruct->resultsY[0] - m_tdFfpiSFStruct->resultsY[2]));
          }
       }
@@ -6055,8 +6088,8 @@ bool CSearchAction::CheckRepeatCentroid(tdFfpiTaskType *details, short *const ce
 }
 
 void CSearchAction::CheckCent_ObjectNotFound(long *const searchX, long *const searchY, short *const atSearchXY, short *const centroided,
-                                 int *const i, int *const j, int *const k, short *const checkedCentroid,
-                                 short *const centroidRepeated, short *const repeatChecked)
+                                             int *const i, int *const j, int *const k, short *const checkedCentroid,
+                                             short *const centroidRepeated, short *const repeatChecked)
 {
    long int dist;
    int pi = *i; /* Save values on entry of i,j and k */
@@ -6336,14 +6369,14 @@ void CCentroidAction::ActionThread(const drama::sds::Id &Arg)
       DramaTHROW(TDFCANTASK__NO_ARGUMENTS, "C_CENTROID: No input argument is provided.");
    }
    details->inUse = YES;
-   drama::ParSys parSysId(ThisTask->TaskPtr());
+
    drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
    drama::gitarg::String ImageArg(this, Arg, "Image", 1, "FREE", NoFlags);
    string strImage = "FREE";
    if (ImageArg != "FREE" && ImageArg != "free")
    {
       details->inUse = NO;
-      DramaTHROW(TDFCANTASK__INV_INPUT_ARGUMENT,"C_CENTROID: TdFCanTask can only take \"FREE\" Image type.");
+      DramaTHROW(TDFCANTASK__INV_INPUT_ARGUMENT, "C_CENTROID: TdFCanTask can only take \"FREE\" Image type.");
 
       // return;
    }
@@ -6351,7 +6384,7 @@ void CCentroidAction::ActionThread(const drama::sds::Id &Arg)
    if (WindowArg != "FULL" && WindowArg != "NORM" && WindowArg != "SEARCH")
    {
       details->inUse = NO;
-      DramaTHROW(TDFCANTASK__INV_INPUT_ARGUMENT,"C_CENTROID: TdFCanTask can only take \"FULL\", \"NORM\", \"SEARCH\" Window type.");
+      DramaTHROW(TDFCANTASK__INV_INPUT_ARGUMENT, "C_CENTROID: TdFCanTask can only take \"FULL\", \"NORM\", \"SEARCH\" Window type.");
       // return;
    }
 
@@ -6378,18 +6411,18 @@ void CCentroidAction::ActionThread(const drama::sds::Id &Arg)
       cenData->window.Xdim = details->searchWin.xSpan;
       cenData->window.Ydim = details->searchWin.ySpan;
       cenData->window.Xoffset = doubleToLong(details->searchWin.xCen -
-                                            details->searchWin.xSpan / 2.0);
+                                             details->searchWin.xSpan / 2.0);
       cenData->window.Yoffset = doubleToLong(details->searchWin.yCen -
-                                            details->searchWin.ySpan / 2.0);
+                                             details->searchWin.ySpan / 2.0);
    }
    else
    {
       cenData->window.Xdim = details->normWin.xSpan;
       cenData->window.Ydim = details->normWin.ySpan;
       cenData->window.Xoffset = doubleToLong(details->normWin.xCen -
-                                            details->normWin.xSpan / 2.0);
+                                             details->normWin.xSpan / 2.0);
       cenData->window.Yoffset = doubleToLong(details->normWin.yCen -
-                                            details->normWin.ySpan / 2.0);
+                                             details->normWin.ySpan / 2.0);
    }
 
    if (cenData->window.Xoffset < 0)
@@ -6410,8 +6443,8 @@ void CCentroidAction::ActionThread(const drama::sds::Id &Arg)
                cenData->window.MaxX, cenData->window.MaxY,
                cenData->window.Xoffset, cenData->window.Yoffset,
                cenData->window.Xdim, cenData->window.Ydim);
-   drama::Path pCameraPath(ThisTask->TaskPtr(), "VimbaFPI", "", "/instsoft/vimbacam/vimbacam");
-   pCameraPath.GetPath(this);
+
+   ThisTask->tdFGetCameraPath().GetPath(this);
    drama::sds::Id messageArg(drama::sds::Id::CreateArgStruct());
    drama::sds::IdPtr returnedArg;
    std::string strWindowType;
@@ -6430,7 +6463,7 @@ void CCentroidAction::ActionThread(const drama::sds::Id &Arg)
    messageArg.Put("SHUTTER_OPEN", (int)cenData->img->shutter);
    messageArg.Put("UPDATE", cenData->img->updateTime);
 
-   pCameraPath.Obey(this, "CENTRECT", messageArg, &returnedArg);
+   ThisTask->tdFGetCameraPath().Obey(this, "CENTRECT", messageArg, &returnedArg);
    if (*returnedArg)
    {
       double xCent, yCent, xFull, yFull, dFWHM;
@@ -6474,7 +6507,6 @@ void CImageAction::ActionThread(const drama::sds::Id &Arg)
       strWindow = WindowArg;
    }
    details->inUse = YES;
-   drama::ParSys parSysId(ThisTask->TaskPtr());
 
    tdFfpiCENtype *cenData = new tdFfpiCENtype();
    sprintf(cenData->saveName, "%s_%ld", "Image", (long int)time(0));
@@ -6489,24 +6521,126 @@ void CImageAction::ActionThread(const drama::sds::Id &Arg)
    }
 
    MessageUser("C_IMAGE: - grabbing image");
-   drama::Path pCameraPath(ThisTask->TaskPtr(), "VimbaFPI", "", "/instsoft/vimbacam/vimbacam");
-   pCameraPath.GetPath(this);
+
+   ThisTask->tdFGetCameraPath().GetPath(this);
    drama::sds::Id messageArg(drama::sds::Id::CreateArgStruct());
    drama::sds::IdPtr returnedArg;
 
    messageArg.Put("EXPOSURE_TIME", cenData->img->exposureTime);
    messageArg.Put("SHUTTER_OPEN", (int)cenData->img->shutter);
    messageArg.Put("UPDATE", cenData->img->updateTime);
-   pCameraPath.Obey(this, "IMAGE", messageArg, &returnedArg);
+   ThisTask->tdFGetCameraPath().Obey(this, "IMAGE", messageArg, &returnedArg);
    if (returnedArg == nullptr)
    {
       details->inUse = NO;
       DramaTHROW(TDFCANTASK__NO_IMAGE, "C_IMAGE: No image is taken, please check the camera.");
    }
-   returnedArg->List();
+   // drama::sds::Id DataArray= returnedArg->Find("DATA_ARRAY");
+   // DataArray.List();
    details->inUse = NO;
    MessageUser("C_IMAGE: - Action complete.");
 }
+
+void CZeroCamAction::ActionThread(const drama::sds::Id &)
+{
+   auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   ThisTask->ClearError();
+   tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
+   if (details == nullptr)
+   {
+      DramaTHROW(TDFCANTASK__NOTINIT, "C_ZEROCAM: the structure pointer is null, please initialise the task!");
+   }
+   if (details->inUse)
+   {
+      DramaTHROW(TDFCANTASK__IN_USE, "C_ZEROCAM: TdFCanTask is running other actions.");
+   }
+   details->inUse = YES;
+   m_tdFfpiZCStruct = new tdFfpiZCtype();
+   drama::ParSys parSysId(ThisTask->TaskPtr());
+
+   GCamWindowType cenWin;
+   double grid[MAX_POINTS][2], measured[MAX_POINTS][2], settleTime;
+   long int cenX, cenY;
+   bool atNextPoint, centroided, doneGrid, settled;
+   short centroided;
+
+   if (m_tdFfpiZCStruct->reset == YES)
+   {
+      long int i, j, k, nextX, nextY;
+      details->imagePos.enable = 1;
+      details->imagePos.displayText = (dataZC->check & _DEBUG);
+      details->imagePos.useDpr = details->dprFeedback;
+
+      ThisTask->tdFfpiUpdatePos(YES, details->dprFeedback, YES);
+      cenX = details->ideal.x;
+      cenY = details->ideal.y;
+      parSysId.Get("SETTLE_TIME", &settleTime);
+      centroided = doneGrid = NO;
+      atNextPoint = NO;
+
+      if ((*details->pars.zeroCamCenWait) > 0)
+         settled = NO;
+      else
+         settled = YES;
+
+      k = nextX = nextY = 0;
+      i = j = 1;
+      for (curPoint = 0; curPoint < MAX_POINTS; curPoint++)
+      {
+         if (j > i)
+         {
+            if (k == 0)
+            {
+               j = 1;
+               k = 1;
+            }
+            else
+            {
+               i++;
+               j = 1;
+               k = 0;
+            }
+         }
+         (k == 0) ? (nextY += (i % 2) ? GRID_SIZE : -GRID_SIZE) : (nextX += (i % 2) ? GRID_SIZE : -GRID_SIZE);
+         j++;
+         grid[curPoint][_XI] = (double)nextX;
+         grid[curPoint][_YI] = (double)nextY;
+      }
+      curPoint = 0;
+
+      cenWin.MaxX = cenWin.Xdim = details->freeImg.xMax;
+      cenWin.MaxY = cenWin.Ydim = details->freeImg.yMax;
+      cenWin.PixelSize = details->freeImg.PixelSize;
+      cenWin.Xoffset = cenWin.Yoffset = 0;
+      m_tdFfpiZCStruct->reset = NO;
+   }
+
+   while (!settled || !centroided || !doneGrid)
+   {
+      if (!settled)
+      {
+         settled = YES;
+         std::this_thread::sleep_for(std::chrono::seconds(int(*details->pars.zeroCamCenWait)))
+         long int Xpos, Ypos;
+         parSysId.Get("X", &Xpos);
+         parSysId.Get("Y", &Ypos);
+         MessageUser("C_ZEROCAM: waiting %g seconds for gantry to settle",
+                (*details->pars.zeroCamCenWait));
+         MessageUser("C_ZEROCAM: Position after move was %ld, %ld", Xpos, Ypos);
+      }
+      else if(!centroided)
+      {
+
+      }
+      else if(!doneGrid)
+      {
+         
+      }
+   }
+   details->inUse = NO;
+   MessageUser("C_ZEROCAM: - Action complete.");
+}
+
 //  ------------------------------------------------------------------------------------------------
 
 //                                    M a i n  P r o g r a m
