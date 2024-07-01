@@ -131,6 +131,9 @@
 #define R9 0.1570796327
 #define SF_IMAGES 10
 
+#define MAX_POINTS 25
+#define GRID_SIZE 100
+
 #ifndef SAFE
 #define SAFE 2
 #endif
@@ -284,6 +287,57 @@ public:
         reset = centroidOK = YES;
     }
 } tdFfpiZCtype;
+
+typedef struct tdFfpiSHtype
+{
+public:
+    long int expX;
+    long int expY;
+    long int measuredX;
+    long int measuredY;
+    short reset;
+    short found;
+
+public:
+    tdFfpiSHtype()
+    {
+        expX = expY = 0;
+        measuredX = measuredY = 0;
+        reset = found = YES;
+    }
+} tdFfpiSHtype;
+
+typedef struct tdFfpiStype
+{
+public:
+    double temp;
+    long int x[NUM_FIDUCIALS];
+    long int y[NUM_FIDUCIALS];
+    long int fidNum[NUM_FIDUCIALS]; /* fiducial number */
+    long int dx;
+    long int dy;
+    int xEnc;
+    int yEnc;
+    short found;
+    short numMarks;
+    short area;
+    short reset;
+
+public:
+    tdFfpiStype()
+    {
+        short i;
+        temp = 0;
+        for (i = 0; i < NUM_FIDUCIALS; i++)
+            x[i] = y[i] = fidNum[i] = 0;
+        dx = dy = 0;
+        xEnc = yEnc = 0;
+        found = YES;
+        numMarks = 0;
+        area = _ALL;
+        reset = YES;
+    }
+} tdFfpiStype;
 
 typedef struct TdfFlexType
 {

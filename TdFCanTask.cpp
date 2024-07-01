@@ -548,6 +548,75 @@ private:
    void ActionThread(const drama::sds::Id &) override;
 };
 
+class CShiftCoAction : public drama::thread::TAction
+{
+public:
+   CShiftCoAction(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask), _theTask(theTask) {}
+   ~CShiftCoAction()
+   {
+      if (m_tdFfpiSHStruct)
+      {
+         delete (m_tdFfpiSHStruct);
+         m_tdFfpiSHStruct = nullptr;
+      }
+   }
+
+private:
+   tdFfpiSHtype *m_tdFfpiSHStruct;
+   std::weak_ptr<drama::Task> _theTask;
+
+private:
+   void ActionThread(const drama::sds::Id &) override;
+};
+
+class CSurveyAction : public drama::thread::TAction
+{
+public:
+   CSurveyAction(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask), _theTask(theTask) {}
+   ~CSurveyAction()
+   {
+      if (m_tdFfpiSStruct)
+      {
+         delete (m_tdFfpiSStruct);
+         m_tdFfpiSStruct = nullptr;
+      }
+   }
+
+private:
+   tdFfpiStype *m_tdFfpiSStruct;
+   std::weak_ptr<drama::Task> _theTask;
+   const int MAX_FAILURES = 4;
+   const int MIN_MARKS = 4;
+   const double RMS_WARNING=20.0;
+
+private:
+   void ActionThread(const drama::sds::Id &) override;
+   bool FidNotFound(double *const expectedX, double *const expectedY,
+                    const short curFid, short *const atFid, short *const recordedFid);
+   void SearchForFid(const long offsetX, const long offsetY, const short curFid, short *const atFid);
+   void RecordFid(double *const expectedX, double *const expectedY, double *const measuredX,
+                  double *const measuredY, long *const offsetX, long *const offsetY,
+                  short *const curFid, short *const atFid, short *const recordedFid);
+   void ActionComplete(tdFfpiTaskType *details, const double *const expectedX, const double *const expectedY,
+                       const double *const measuredX, const double *const measuredY,
+                       const double ha, const double dec, const short fitType, const double plateTheta,
+                       drama::sds::Id *paramId);
+   void SetCoeffs(tdFfpiTaskType *details, const double *const expectedX, const double *const expectedY,
+                  const double *const measuredX, const double *const measuredY,
+                  const short fitType, double *const coeffs, const double plateTheta, drama::sds::Id *paramId);
+   bool OffsetAndDisplayResults(tdFfpiTaskType *details, const double platetheta, const short fitType, const short centerFid, double measuredArray[][2], double fiducialArray[][2],
+                                double *const coeffs, drama::sds::Id *paramId);
+   void tdFfpiSurveyCheckCoeffs(const double *current, const double *newcoeffs,
+                                int plate, const double plateTheta, drama::sds::Id *paramId);
+   void DisplayResultsBasic(const int newmodel, double fiducialArray[][2],
+                            double cal[][2], const double xrms, const double yrms, const double rrms, drama::sds::Id *paramId);
+   void DisplayResultsInEncoderUnits(tdFfpiTaskType *details, const double plateTheta,
+                                     const int newmodel, const double *const coeffs, double measuredArray[][2]);
+   void ConstructReturnValue(tdFfpiTaskType *details, const double *const expectedX, const double *const expectedY, const double *const measuredX,
+                                         const double *const measuredY, const double *const coeffs, const double ha,
+                                         const double dec, drama::sds::Id *paramId);
+};
+
 //  ------------------------------------------------------------------------------------------------
 
 //                                  T a s k  D e f i n i t i o n
@@ -594,6 +663,14 @@ public:
    int tdFforbidden(double x, double y, double theta, double rq, double ri,
                     double ro, double hw, double jhwp, double jhwm, double jl, double clearance,
                     int *inside, int *outside);
+   // lliu added on 26-06-2024 to check if the position of an image before and after centorid
+   void tdFfpiPreExp();
+   void tdFfpiPostExp();
+
+   void tdFfpiConvertFromFP(long int xFp, long int yFp, double plateTheta, short level,
+                            double *xCon, double *yCon);
+   void tdFfpiConvertFromEnc(int xEnc, int yEnc, double plateTheta,
+                             short level, double *xCon, double *yCon);
 
    drama::Path &tdFGetCameraPath() { return I_pCameraPath; };
 
@@ -613,8 +690,6 @@ private:
    // Read the flex file
    bool tdFfpiReadFlexFile(drama::sds::Id &defId);
 
-   void tdFfpiConvertFromEnc(int xEnc, int yEnc, double plateTheta,
-                             short level, double *xCon, double *yCon);
    void tdFfpiFlexure(long int x, long int y,
                       double ha, double dec, TdfFlexType *pars, long int *dx, long int *dy);
    void tdFstateBitSet(unsigned char bit);
@@ -622,7 +697,7 @@ private:
 
    // lliu added on 17-05-2024 to check the target poisiton
    void tdFfpiPositionCheck(int Index, CML::uunit &Position);
-
+   void tdFfpiEncPos(short useDpr, short displayText, tdFencPos *position);
    // --------------------------------------------------------------------------
    // Gantry movement related actions
    // --------------------------------------------------------------------------
@@ -700,10 +775,17 @@ private:
    // --------------------------------------------------------------------------
    // Camera related actions
    // --------------------------------------------------------------------------
-   CSearchAction I_CSearchActionObj;
+
    CCentroidAction I_CCentroidActionObj;
    CImageAction I_CImageActionObj;
    CZeroCamAction I_CZeroCamActionObj;
+
+   // --------------------------------------------------------------------------
+   // Calibration related actions
+   // --------------------------------------------------------------------------
+   CSearchAction I_CSearchActionObj;
+   CShiftCoAction I_CShiftCoActionObj;
+   CSurveyAction I_CSurveyActionObj;
 
    //  Interface to the CanAccess layer.
    CanAccess I_CanAccess;
@@ -1212,6 +1294,120 @@ static bool WhichAxes(const std::string &Axes, bool &X, bool &Y, bool &Z, bool &
    return Valid;
 }
 
+void TdFCanTask::tdFfpiEncPos(short useDpr, short displayText, tdFencPos *position)
+{
+   if (useDpr)
+   {
+      if (displayText)
+         DEBUG("Assuming current encoder position is previous target position.\n");
+      position->x = I_tdFfpiMainStruct->atEnc.x;
+      position->y = I_tdFfpiMainStruct->atEnc.y;
+   }
+}
+
+void TdFCanTask::tdFfpiPreExp()
+{
+   tdFimagePos *details = &I_tdFfpiMainStruct->imagePos;
+   if (details->enable)
+      tdFfpiEncPos(YES, YES, &details->enc);
+   else
+      DEBUG("tdFfpiPreExp cannot be implemented because details->enable is set to NO.\n");
+}
+
+void TdFCanTask::tdFfpiPostExp()
+{
+   tdFimagePos *details = &I_tdFfpiMainStruct->imagePos;
+   if (details->enable)
+   {
+      tdFencPos now;
+      double atFpX, atFpY, plateTheta;
+      tdFfpiEncPos(YES, YES, &now);
+      details->enc.x = (now.x + details->enc.x) / 2;
+      details->enc.y = (now.y + details->enc.y) / 2;
+      I_TdFCanTaskParSys.Get("PLATE_THETA", &plateTheta);
+      tdFfpiConvertFromEnc(details->enc.x, details->enc.y, plateTheta, _FULL,
+                           &atFpX, &atFpY);
+      details->p.x = doubleToLong(atFpX);
+      details->p.y = doubleToLong(atFpY);
+      DEBUG("Average gantry position during image is x:%ld, y:%ld\n",
+            details->p.x, details->p.y);
+   }
+}
+
+void TdFCanTask::tdFfpiConvertFromFP(long int xFp, long int yFp,
+                                     double plateTheta, short level, double *xCon, double *yCon)
+{
+   double x_fp, y_fp, x_enc, y_enc, ha, dec;
+   long int dx = 0, dy = 0;
+
+   I_TdFCanTaskParSys.Get("HA", &ha);
+   I_TdFCanTaskParSys.Get("DEC", &dec);
+
+   x_fp = (double)(xFp * cos(plateTheta) - yFp * sin(plateTheta));
+   y_fp = (double)(yFp * cos(plateTheta) + xFp * sin(plateTheta));
+
+   if ((level == _ALL) || (level == _COEFFS))
+   {
+      *xCon = x_fp;
+      *yCon = y_fp;
+      return;
+   }
+   /*
+    * Adjust for offset of plate one center fiducial from plate 2 center fiducial.
+    */
+   if (I_tdFfpiMainStruct->currentPlate == 1)
+   {
+      if (I_tdFfpiMainStruct->plateOneDontRemove)
+      {
+         /*
+        fprintf(stderr,
+                "FPI:FromFP:Converting for plate 1, but offset removal disabled\n");
+         */
+         ;
+      }
+      else
+      {
+         double t_x = x_fp;
+         double t_y = y_fp;
+         x_fp = t_x - (double)(*(I_tdFfpiMainStruct->pars.plt1CenterFidOffsetX));
+         y_fp = t_y - (double)(*(I_tdFfpiMainStruct->pars.plt1CenterFidOffsetY));
+         /*
+         fprintf(stderr,
+                 "FPI:FromFP:Plate 1 position changed by %d, %d from %.1f, %.1f to %.1f, %.1f\n",
+                 -1*(*(I_tdFfpiMainStruct->pars.plt1CenterFidOffsetX)),
+                 -1*(*(details->pars.plt1CenterFidOffsetY)),
+                 t_x, t_y, x_fp, y_fp);
+         */
+      }
+   }
+
+   slaXy2xy(x_fp, y_fp,                         /* Field plate coordinates */
+            I_tdFfpiMainStruct->convert.coeffs, /* Transformation matrix   */
+            &x_enc, &y_enc);                    /* Encoder coordinates     */
+
+   if (level == _TEMP)
+   {
+      *xCon = x_enc;
+      *yCon = y_enc;
+      return;
+   }
+
+   if (level == _FLEX)
+   {
+      *xCon = x_enc;
+      *yCon = y_enc;
+      return;
+   }
+
+   /*
+    *  Compensate for system deflections.
+    */
+   tdFfpiFlexure((long int)x_enc, (long int)y_enc, ha, dec,
+                 &I_tdFfpiMainStruct->convert.flex, &dx, &dy);
+   *xCon = x_enc - (double)dx;
+   *yCon = y_enc - (double)dy;
+}
+
 int TdFCanTask::tdFforbidden(double x, double y, double theta, double rq, double ri,
                              double ro, double hw, double jhwp, double jhwm, double jl, double clearance,
                              int *inside, int *outside)
@@ -1591,6 +1787,8 @@ TdFCanTask::TdFCanTask(const std::string &taskName) : drama::Task(taskName),
                                                       I_CCentroidActionObj(TaskPtr()),
                                                       I_CImageActionObj(TaskPtr()),
                                                       I_CZeroCamActionObj(TaskPtr()),
+                                                      I_CShiftCoActionObj(TaskPtr()),
+                                                      I_CSurveyActionObj(TaskPtr()),
 
                                                       tdfTaskStr(TaskPtr(), "ENQ_DEV_DESCR", "2dF Focal Plane Imager Gantry Task"),
                                                       tdfSimSearchRunStr(TaskPtr(), "SIM_SEARCH_RAN", "No"),
@@ -1705,6 +1903,8 @@ TdFCanTask::TdFCanTask(const std::string &taskName) : drama::Task(taskName),
    Add("C_CENTROID", drama::MessageHandlerPtr(&I_CCentroidActionObj, drama::nodel()));
    Add("C_IMAGE", drama::MessageHandlerPtr(&I_CImageActionObj, drama::nodel()));
    Add("C_ZEROCAM", drama::MessageHandlerPtr(&I_CZeroCamActionObj, drama::nodel()));
+   Add("C_SHIFT_COEFFS", drama::MessageHandlerPtr(&I_CShiftCoActionObj, drama::nodel()));
+   Add("C_SURVEY", drama::MessageHandlerPtr(&I_CSurveyActionObj, drama::nodel()));
 
    Add("EXIT", &drama::SimpleExitAction);
 
@@ -3234,9 +3434,13 @@ bool TdFCanTask::HomeAxes(bool HomeX, bool HomeY, bool HomeZ, bool HomeTheta, bo
       {
          HomeFlags[X1_AMP] = true;
          HomeFlags[X2_AMP] = true;
+         I_tdFfpiMainStruct->toEnc.x = 0;
       }
       if (HomeY)
+      {
          HomeFlags[Y_AMP] = true;
+         I_tdFfpiMainStruct->toEnc.x = 0;
+      }
 
       //  Set all the amps in the linkage to a pre-programmed halt mode, specifying that a
       //  halted axis will be 'floppy'.
@@ -3831,7 +4035,14 @@ bool TdFCanTask::MoveAxes(const std::vector<AxisDemand> &AxisDemands, bool MoveO
          Targets[Index] = TargetPosition;
          TargetPoint[Index] = TargetPosition;
          DEBUG("Target for axis %d is %f\n", Index, TargetPosition);
-
+         if (Index == 0 || Index == 1)
+         {
+            I_tdFfpiMainStruct->toEnc.x = doubleToLong(TargetPosition);
+         }
+         else if (Index == 2)
+         {
+            I_tdFfpiMainStruct->toEnc.y = doubleToLong(TargetPosition);
+         }
          MoveFlags[Index] = Found;
       }
       TargetPoint.setDim(MAX_TDF_AMPS);
@@ -4136,6 +4347,7 @@ void InitialiseAction::ActionThread(const drama::sds::Id &)
 
    ThisTask->tdFGetCameraPath().GetPath(this);
    ThisTask->tdFGetCameraPath().Obey(this, "INITIALISE");
+   details->cameraInit = YES;
 
    if (!(ThisTask->SetupAmps()))
    {
@@ -4724,6 +4936,7 @@ void GHomeActionNT::ActionThread(const drama::sds::Id &Arg)
       else
       {
          details->inUse = YES;
+
          if (!(ThisTask->HomeAxes(X, Y, Z, Theta, Jaw)))
          {
             MessageUser("G_HOME_NT: " + ThisTask->GetError());
@@ -4978,7 +5191,7 @@ void GEXITActionNT::ActionThread(const drama::sds::Id &)
       MessageUser("G_EXIT: " + ThisTask->GetError());
    }
 
-   ThisTask->tdFGetCameraPath().Get(this);
+   ThisTask->tdFGetCameraPath().GetPath(this);
    ThisTask->tdFGetCameraPath().Obey(this, "EXIT");
    DEBUG("EXIT camera OK\n");
    return;
@@ -6011,11 +6224,33 @@ void CSearchAction::ActionThread(const drama::sds::Id &Arg)
          }
       }
    }
+
+   drama::sds::Id newArg;
+
    if (flag == true)
+   {
       ActionComplete(details, searchX, searchY, foundIt);
 
+      newArg = drama::sds::Id::CreateArgStruct();
+      double expXenc, expYenc, atXenc, atYenc;
+      ThisTask->tdFfpiConvertFromFP(m_tdFfpiSFStruct->searchStartX, m_tdFfpiSFStruct->searchStartY,
+                                    platetheta, _FULL, &expXenc, &expYenc);
+      ThisTask->tdFfpiConvertFromFP(searchX, searchY, platetheta, _FULL,
+                                    &atXenc, &atYenc);
+      newArg.Put("FOUND", foundIt);
+      newArg.Put("MEASUREDX", searchX);
+      newArg.Put("MEASUREDY", searchY);
+      newArg.Put("EncoderX", atXenc);
+      newArg.Put("EncoderY", atYenc);
+      newArg.Put("STARTX", m_tdFfpiSFStruct->searchStartX);
+      newArg.Put("STARTY", m_tdFfpiSFStruct->searchStartY);
+      newArg.Put("XErr", m_tdFfpiSFStruct->xErr);
+      newArg.Put("YErr", m_tdFfpiSFStruct->yErr);
+      newArg.Put("XEncoderErr", doubleToLong(atXenc - expXenc));
+      newArg.Put("YEncoderErr", doubleToLong(atYenc - expYenc));
+   }
+   SetReturnArg(&newArg);
    details->inUse = NO;
-
    MessageUser("C_SEARCH: action completed.\n");
 }
 
@@ -6438,6 +6673,8 @@ void CCentroidAction::ActionThread(const drama::sds::Id &Arg)
    {
       std::this_thread::sleep_for(std::chrono::seconds(int(cenData->settleTime)));
    }
+
+   ThisTask->tdFfpiPreExp();
    MessageUser("C_CENTROID: - grabbing image");
    MessageUser("C_CENTROID:  Window size -> Max %ld %ld off %ld %ld, dim %ld %ld",
                cenData->window.MaxX, cenData->window.MaxY,
@@ -6476,6 +6713,7 @@ void CCentroidAction::ActionThread(const drama::sds::Id &Arg)
                   xCent, yCent, xFull, yFull, dFWHM);
    }
    details->inUse = NO;
+   ThisTask->tdFfpiPostExp();
    MessageUser("C_CENTROID: - Action complete.");
 }
 
@@ -6498,7 +6736,7 @@ void CImageAction::ActionThread(const drama::sds::Id &Arg)
       // return;
    }
    string strImage, strWindow;
-   if (Arg) // throw out if there is no argument quickly
+   if (Arg)
    {
       drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
       drama::gitarg::String ImageArg(this, Arg, "Image", 1, "FREE", NoFlags);
@@ -6554,7 +6792,7 @@ void CZeroCamAction::ActionThread(const drama::sds::Id &)
    {
       DramaTHROW(TDFCANTASK__IN_USE, "C_ZEROCAM: TdFCanTask is running other actions.");
    }
-   details->inUse = YES;
+
    m_tdFfpiZCStruct = new tdFfpiZCtype();
    drama::ParSys parSysId(ThisTask->TaskPtr());
 
@@ -6562,13 +6800,19 @@ void CZeroCamAction::ActionThread(const drama::sds::Id &)
    double grid[MAX_POINTS][2], measured[MAX_POINTS][2], settleTime;
    long int cenX, cenY;
    bool atNextPoint, centroided, doneGrid, settled;
-   short centroided;
+   short curPoint;
+
+   std::vector<std::string> fitErrors = {"illegal itype",
+                                         "insufficent data", "singular solution"};
+#define FITERR_ILL_ITYPE 0
+#define FITERR_INSUFF_DATA 1
+#define FITERR_SINGULAR 2
 
    if (m_tdFfpiZCStruct->reset == YES)
    {
       long int i, j, k, nextX, nextY;
       details->imagePos.enable = 1;
-      details->imagePos.displayText = (dataZC->check & _DEBUG);
+      details->imagePos.displayText = YES;
       details->imagePos.useDpr = details->dprFeedback;
 
       ThisTask->tdFfpiUpdatePos(YES, details->dprFeedback, YES);
@@ -6615,30 +6859,1101 @@ void CZeroCamAction::ActionThread(const drama::sds::Id &)
       m_tdFfpiZCStruct->reset = NO;
    }
 
+   bool flag = true;
    while (!settled || !centroided || !doneGrid)
    {
       if (!settled)
       {
          settled = YES;
-         std::this_thread::sleep_for(std::chrono::seconds(int(*details->pars.zeroCamCenWait)))
+         std::this_thread::sleep_for(std::chrono::seconds(int(*details->pars.zeroCamCenWait)));
          long int Xpos, Ypos;
          parSysId.Get("X", &Xpos);
          parSysId.Get("Y", &Ypos);
          MessageUser("C_ZEROCAM: waiting %g seconds for gantry to settle",
-                (*details->pars.zeroCamCenWait));
+                     (*details->pars.zeroCamCenWait));
          MessageUser("C_ZEROCAM: Position after move was %ld, %ld", Xpos, Ypos);
       }
-      else if(!centroided)
+      else if (!centroided)
       {
+         centroided = YES;
+         if (cenWin.Xoffset < 0)
+            cenWin.Xoffset = 0;
+         if (cenWin.Yoffset < 0)
+            cenWin.Yoffset = 0;
+         if (cenWin.Xdim + cenWin.Xoffset > cenWin.MaxX)
+            cenWin.Xdim = cenWin.MaxX - cenWin.Xoffset;
+         if (cenWin.Ydim + cenWin.Yoffset > cenWin.MaxY)
+            cenWin.Ydim = cenWin.MaxY - cenWin.Yoffset;
 
+         if (settleTime > 0.0)
+         {
+            std::this_thread::sleep_for(std::chrono::seconds(int(settleTime)));
+         }
+         ThisTask->tdFfpiPreExp();
+         MessageUser("C_ZEROCAM: - grabbing image");
+         MessageUser("C_ZEROCAM:  Window size -> Max %ld %ld off %ld %ld, dim %ld %ld",
+                     cenWin.MaxX, cenWin.MaxY, cenWin.Xoffset, cenWin.Yoffset,
+                     cenWin.Xdim, cenWin.Ydim);
+
+         ThisTask->tdFGetCameraPath().GetPath(this);
+         drama::sds::Id messageArg(drama::sds::Id::CreateArgStruct());
+         drama::sds::IdPtr returnedArg;
+         std::string strWindowType;
+         strWindowType = to_string(cenWin.Xoffset) + ":" + to_string(cenWin.Yoffset) + ":" + to_string(cenWin.Xoffset + cenWin.Xdim - 1) + ":" + to_string(cenWin.Yoffset + cenWin.Ydim - 1);
+         messageArg.Put("CENTROID", strWindowType);
+         messageArg.Put("BIAS", details->freeImg.bias);
+         messageArg.Put("EXPOSURE_TIME", details->freeImg.exposureTime);
+         messageArg.Put("SHUTTER_OPEN", (int)details->freeImg.shutter);
+         messageArg.Put("UPDATE", details->freeImg.updateTime);
+
+         ThisTask->tdFGetCameraPath().Obey(this, "CENTRECT", messageArg, &returnedArg);
+         if (*returnedArg)
+         {
+            double xCent, yCent, xFull, yFull, dFWHM;
+            returnedArg->Get("XVALUE", &xCent);
+            returnedArg->Get("YVALUE", &yCent);
+            returnedArg->Get("XFULL", &xFull);
+            returnedArg->Get("YFULL", &yFull);
+            returnedArg->Get("FWHM", &dFWHM);
+            MessageUser("C_ZEROCAM: centroid result \nError:  %lf %lf \nWinodw Size: %lf %lf\nFull Width Half Max: %lf",
+                        xCent, yCent, xFull, yFull, dFWHM);
+            m_tdFfpiZCStruct->centroidOK = dFWHM ? YES : NO;
+            m_tdFfpiZCStruct->xFull = xFull;
+            m_tdFfpiZCStruct->yFull = yFull;
+         }
+         ThisTask->tdFfpiPostExp();
       }
-      else if(!doneGrid)
+      else if (!doneGrid)
       {
-         
+         if (!atNextPoint)
+         {
+            atNextPoint = YES;
+            centroided = NO;
+            long int XCoor = cenX + doubleToLong(grid[curPoint][_XI]);
+            long int YCoor = cenY + doubleToLong(grid[curPoint][_YI]);
+            MessageUser("C_ZEROCAM: About to move to next grid point (%ld,%ld)", XCoor, YCoor);
+            drama::Path thisTaskPath(_theTask);
+            thisTaskPath.GetPath(this);
+            drama::sds::Id messageArg(drama::sds::Id::CreateArgStruct());
+            std::string strAxis, strCoordinates;
+            strAxis = "X,Y";
+            strCoordinates = to_string(XCoor) + "," + to_string(YCoor);
+            messageArg.Put("AXES", strAxis);
+            messageArg.Put("POSITIONS", strCoordinates);
+            thisTaskPath.Obey(this, "G_MOVE_NT", messageArg);
+
+            if ((*details->pars.zeroCamCenWait) > 0)
+               settled = NO;
+         }
+         else
+         {
+            if (m_tdFfpiZCStruct->centroidOK != YES)
+            {
+               flag = false;
+               break;
+            }
+            else
+            {
+               measured[curPoint][_XI] = m_tdFfpiZCStruct->xFull;
+               measured[curPoint][_YI] = m_tdFfpiZCStruct->yFull;
+               MessageUser("C_ZEROCAM: Position during centroid was %ld, %ld", details->imagePos.p.x, details->imagePos.p.y);
+               grid[curPoint][_XI] = details->imagePos.p.x - cenX;
+               grid[curPoint][_YI] = details->imagePos.p.y - cenY;
+            }
+            if (curPoint < MAX_POINTS - 1)
+            {
+               curPoint++;
+               atNextPoint = NO;
+            }
+            else
+            {
+               double coeffs[6];
+               int i, j = 0;
+               curPoint = 0;
+               slaFitxy(6, MAX_POINTS, grid, measured, coeffs, &j);
+               if (j != 0)
+               {
+                  char *err;
+                  char scratch[40];
+                  if (j == -1)
+                     err = (char *)fitErrors[FITERR_ILL_ITYPE].c_str();
+                  else if (j == -2)
+                     err = (char *)fitErrors[FITERR_INSUFF_DATA].c_str();
+                  else if (j == -3)
+                     err = (char *)fitErrors[FITERR_SINGULAR].c_str();
+                  else
+                  {
+                     sprintf(scratch, "Unexpected fit error %d", j);
+                     err = scratch;
+                  }
+
+                  MessageUser("C_ZEROCAM: error message %s\n", err);
+                  MessageUser("    Array contents -\n");
+                  MessageUser("      (pixels)           (microns)\n");
+                  for (j = 0; j < MAX_POINTS; j++)
+                     MessageUser("      %7.3f,%7.3f    %7.3f,%7.3f\n",
+                                 measured[j][_XI], measured[j][_YI],
+                                 grid[j][_XI], grid[j][_YI]);
+
+                  flag = false;
+                  break;
+               }
+
+               MessageUser("Actual (micron) and Measured (pixel) arrays are:\n");
+               for (i = 0; i < MAX_POINTS; i++)
+                  MessageUser("    %4ld,%4ld    %8.4f,%8.4f\n",
+                              doubleToLong(grid[i][_XI]), doubleToLong(grid[i][_YI]),
+                              measured[i][_XI], measured[i][_YI]);
+
+               /*
+                *  Record new transformation matrices.
+                */
+               for (i = 0; i < 6; i++)
+                  details->freeImg.camCoeffs[i] = coeffs[i];
+               slaInvf(details->freeImg.camCoeffs,
+                       details->freeImg.invCoeffs, &j);
+               if (j != 0)
+               {
+                  for (i = 0; i < 6; i++)
+                     details->freeImg.invCoeffs[i] = details->freeImg.camCoeffs[i];
+               }
+               if (1)
+               {
+                  int i;
+                  MessageUser("====================================================\n");
+                  MessageUser("  expected             calculated           error\n");
+                  MessageUser("====================================================\n");
+                  for (i = 0; i < MAX_POINTS; i++)
+                  {
+                     double calX, calY;
+                     slaXy2xy(measured[i][_XI], measured[i][_YI], coeffs, &calX, &calY);
+                     MessageUser("%8.1f,%8.1f   %8.1f,%8.1f  %6.1f,%6.1f\n",
+                                 grid[i][_XI], grid[i][_YI], calX, calY,
+                                 grid[i][_XI] - calX, grid[i][_YI] - calY);
+                  }
+                  MessageUser("====================================================\n");
+                  MessageUser("New camera coeffs array is:\n");
+                  MessageUser("    %8.4f  %8.4f  %8.4f\n", coeffs[0], coeffs[1], coeffs[2]);
+                  MessageUser("    %8.4f  %8.4f  %8.4f\n", coeffs[3], coeffs[4], coeffs[5]);
+               }
+               doneGrid = YES;
+            }
+         }
       }
    }
-   details->inUse = NO;
+   drama::sds::Id newArg;
+   if (flag)
+   {
+      newArg = drama::sds::Id::CreateArgStruct();
+      std::vector<unsigned long> dims;
+      dims.push_back(6);
+      drama::sds::Id coeffs(newArg.CreateChildArray("coeffs", SDS_DOUBLE, dims));
+
+      unsigned long i;
+      unsigned long count;
+
+      drama::sds::ArrayWriteHelper<double> array;
+      coeffs.ArrayAccess(&array);
+
+      count = array.Size();
+      for (i = 0; i < count; ++i)
+      {
+         array[i] = details->freeImg.camCoeffs[i];
+      }
+   }
+   SetReturnArg(&newArg);
    MessageUser("C_ZEROCAM: - Action complete.");
+}
+
+void CShiftCoAction::ActionThread(const drama::sds::Id &Arg)
+{
+   auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   ThisTask->ClearError();
+   tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
+   if (details == nullptr)
+   {
+      DramaTHROW(TDFCANTASK__NOTINIT, "C_SHIFT_COEFF: the structure pointer is null, please initialise the task!");
+   }
+   if (details->inUse)
+   {
+      DramaTHROW(TDFCANTASK__IN_USE, "C_SHIFT_COEFF: TdFCanTask is running other actions.");
+   }
+
+   m_tdFfpiSHStruct = new tdFfpiSHtype();
+   drama::ParSys parSysId(ThisTask->TaskPtr());
+   if (!Arg)
+   {
+      DramaTHROW(TDFCANTASK__NO_ARGUMENTS, "C_SHIFT_COEFF: No input argument is provided.");
+   }
+   int expX, expY;
+   drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
+   drama::gitarg::Int<XMIN, XMAX> XFArg(this, Arg, "expX", 1, 0, NoFlags);
+   expX = XFArg;
+   m_tdFfpiSHStruct->expX = expX;
+   drama::gitarg::Int<YMIN, YMAX> YFArg(this, Arg, "expY", 2, 0, NoFlags);
+   expY = YFArg;
+
+   short doneSearch;
+   if (m_tdFfpiSHStruct->reset == YES)
+   {
+      doneSearch = NO;
+      m_tdFfpiSHStruct->reset = NO;
+   }
+
+   if (!doneSearch)
+   {
+      doneSearch = YES;
+      drama::Path thisTaskPath(_theTask);
+      thisTaskPath.GetPath(this);
+      drama::sds::Id messageArg(drama::sds::Id::CreateArgStruct());
+      messageArg.Put("XF", expX);
+      messageArg.Put("YF", expY);
+      drama::sds::IdPtr returnedArg;
+      thisTaskPath.Obey(this, "C_SEARCH", messageArg, &returnedArg);
+      if (returnedArg)
+      {
+         returnedArg->Get("FOUND", &m_tdFfpiSHStruct->found);
+         returnedArg->Get("MEASUREDX", &m_tdFfpiSHStruct->measuredX);
+         returnedArg->Get("MEASUREDY", &m_tdFfpiSHStruct->measuredY);
+      }
+   }
+   else
+   {
+      double expXenc, expYenc, atXenc, atYenc,
+          plateTheta, dx, dy;
+
+      parSysId.Get("PLATE_THETA", &plateTheta);
+      ThisTask->tdFfpiConvertFromFP(m_tdFfpiSHStruct->expX, m_tdFfpiSHStruct->expY,
+                                    plateTheta, _FULL,
+                                    &expXenc, &expYenc);
+      ThisTask->tdFfpiConvertFromFP(m_tdFfpiSHStruct->measuredX, m_tdFfpiSHStruct->measuredY,
+                                    plateTheta, _FULL,
+                                    &atXenc, &atYenc);
+      dx = atXenc - expXenc;
+      dy = atYenc - expYenc;
+
+      if (m_tdFfpiSHStruct->found == NO)
+      {
+         MessageUser("C_SHIFT_COEFF: Search for image at %ld,%ld failed.\n", expX, expY);
+         return;
+      }
+      else
+      {
+         int j;
+
+         details->convert.coeffs[0] += dx;
+         details->convert.coeffs[3] += dy;
+         slaInvf(details->convert.coeffs, details->convert.invCoeffs, &j);
+         if (j != 0)
+         {
+            int i;
+            for (i = 0; i < 6; i++)
+               details->convert.invCoeffs[i] = details->convert.coeffs[i];
+         }
+      }
+      MessageUser("C_SHIFT_COEFF: Measured shift = %.1f,%.1f", dx, dy);
+      MessageUser("C_SHIFT_COEFF: New COEFFS array is %f,%f,%f,%f,%f,%f",
+                  details->convert.coeffs[0], details->convert.coeffs[1],
+                  details->convert.coeffs[2], details->convert.coeffs[3],
+                  details->convert.coeffs[4], details->convert.coeffs[5]);
+
+      drama::sds::Id newArg = drama::sds::Id::CreateArgStruct();
+      std::vector<unsigned long> dims;
+      dims.push_back(6);
+      drama::sds::Id coeffs(newArg.CreateChildArray("coeffs", SDS_DOUBLE, dims));
+
+      unsigned long i;
+      unsigned long count;
+
+      drama::sds::ArrayWriteHelper<double> array;
+      coeffs.ArrayAccess(&array);
+
+      count = array.Size();
+      for (i = 0; i < count; ++i)
+      {
+         array[i] = details->convert.coeffs[i];
+      }
+
+      SetReturnArg(&newArg);
+   }
+   MessageUser("C_SHIFT_COEFF: - Action complete.");
+}
+
+bool CSurveyAction::FidNotFound(double *const expectedX, double *const expectedY,
+                                const short curFid, short *const atFid, short *const recordedFid)
+{
+   DEBUG("C_SURVEY: Search for fiducial index %d, at %ld,%ld failed", curFid,
+         m_tdFfpiSStruct->x[curFid], m_tdFfpiSStruct->y[curFid]);
+
+   --m_tdFfpiSStruct->numMarks;
+   if ((m_tdFfpiSStruct->numMarks) < MIN_MARKS)
+   {
+      DEBUG("C_SURVEY: Insufficent marks found to do a survey, have %d, need %d\n",
+            m_tdFfpiSStruct->numMarks, MIN_MARKS);
+      return false;
+   }
+
+   drama::ParSys parSysId(_theTask);
+   if (curFid == m_tdFfpiSStruct->numMarks)
+   {
+      *recordedFid = YES;
+      parSysId.Put("SURVEY_PROG", 100.0);
+      return true;
+   }
+   for (int i = curFid; i < m_tdFfpiSStruct->numMarks; ++i) /// why is no larger than numMarks here?
+   {
+      m_tdFfpiSStruct->x[i] = m_tdFfpiSStruct->x[i + 1];
+      m_tdFfpiSStruct->y[i] = m_tdFfpiSStruct->y[i + 1];
+      expectedX[i] = expectedX[i + 1];
+      expectedY[i] = expectedY[i + 1];
+   }
+
+   parSysId.Put("SURVEY_PROG",
+                100.0 * (curFid + 1.0) / (double)m_tdFfpiSStruct->numMarks);
+   *atFid = NO;
+   return true;
+}
+
+void CSurveyAction::RecordFid(double *const expectedX, double *const expectedY, double *const measuredX,
+                              double *const measuredY, long *const offsetX, long *const offsetY,
+                              short *const curFid, short *const atFid, short *const recordedFid)
+{
+   double plateTheta;
+   drama::ParSys parSysId(_theTask);
+   parSysId.Get("PLATE_THETA", &plateTheta);
+
+   auto thisTask = _theTask.lock()->TaskPtrAs<TdFCanTask>();
+   thisTask->tdFfpiConvertFromFP(m_tdFfpiSStruct->x[*curFid], m_tdFfpiSStruct->y[*curFid],
+                                 plateTheta, m_tdFfpiSStruct->area,
+                                 &expectedX[*curFid], &expectedY[*curFid]);
+
+   thisTask->tdFfpiConvertFromEnc(m_tdFfpiSStruct->xEnc, m_tdFfpiSStruct->yEnc,
+                                  plateTheta, m_tdFfpiSStruct->area,
+                                  &measuredX[*curFid], &measuredY[*curFid]);
+
+   if (m_tdFfpiSStruct->area == _COEFFS)
+   {
+      double xErr, yErr, absErr;
+      double expEncX, expEncY;
+      thisTask->tdFfpiConvertFromFP(m_tdFfpiSStruct->x[*curFid], m_tdFfpiSStruct->y[*curFid],
+                                    plateTheta, _FULL,
+                                    &expEncX, &expEncY);
+
+      xErr = expEncX - m_tdFfpiSStruct->xEnc;
+      yErr = expEncY - m_tdFfpiSStruct->yEnc;
+      absErr = sqrt(SQRD(xErr) + SQRD(yErr));
+      DEBUG("C_SURVEY: Fiducial index %d found %.1f (x:%.1f, y:%.1f) microns from the expected position\n", *curFid, absErr, xErr, yErr);
+   }
+
+   *offsetX += m_tdFfpiSStruct->dx;
+   *offsetY += m_tdFfpiSStruct->dy;
+
+   if (*curFid == m_tdFfpiSStruct->numMarks - 1)
+   {
+      *recordedFid = YES;
+      parSysId.Put("SURVEY_PROG", 100.0);
+   }
+   else
+   {
+      parSysId.Put("SURVEY_PROG",
+                   100.0 * (*curFid + 1.0) / (double)m_tdFfpiSStruct->numMarks);
+      *atFid = NO;
+      (*curFid)++;
+   }
+}
+
+void CSurveyAction::SearchForFid(const long offsetX, const long offsetY,
+                                 const short curFid, short *const atFid)
+{
+   *atFid = YES;
+   drama::Path thisTaskPath(_theTask);
+   thisTaskPath.GetPath(this);
+   drama::sds::Id messageArg(drama::sds::Id::CreateArgStruct());
+   long int startX, startY;
+   startX = m_tdFfpiSStruct->x[curFid] + offsetX;
+   startY = m_tdFfpiSStruct->y[curFid] + offsetY;
+   messageArg.Put("XF", startX);
+   messageArg.Put("YF", startY);
+   drama::sds::IdPtr returnedArg;
+
+   DEBUG("C_SURVEY: Will search for fiducial index %d at %7ld, %7ld - search at %7ld, %7ld\n",
+         curFid, m_tdFfpiSStruct->x[curFid], m_tdFfpiSStruct->y[curFid], startX, startY);
+   thisTaskPath.Obey(this, "C_SEARCH", messageArg, &returnedArg);
+   if (returnedArg)
+   {
+      returnedArg->Get("FOUND", &m_tdFfpiSStruct->found);
+      if (m_tdFfpiSStruct->found == NO)
+      {
+         m_tdFfpiSStruct->xEnc = m_tdFfpiSStruct->yEnc = 0;
+      }
+      else
+      {
+         returnedArg->Get("EncoderX", &m_tdFfpiSStruct->xEnc);
+         returnedArg->Get("EncoderY", &m_tdFfpiSStruct->yEnc);
+         returnedArg->Get("XEncoderErr", &m_tdFfpiSStruct->dx);
+         returnedArg->Get("YEncoderErr", &m_tdFfpiSStruct->dy);
+      }
+   }
+}
+
+void CSurveyAction::DisplayResultsBasic(const int newmodel, double fiducialArray[][2],
+                                        double cal[][2], const double xrms, const double yrms, const double rrms, drama::sds::Id *paramId)
+{
+   int counter;
+
+   double xErr[NUM_FIDUCIALS];
+   double yErr[NUM_FIDUCIALS];
+   double xExpected[NUM_FIDUCIALS];
+   double yExpected[NUM_FIDUCIALS];
+   double xCalculated[NUM_FIDUCIALS];
+   double yCalculated[NUM_FIDUCIALS];
+
+   for (counter = 0; counter < m_tdFfpiSStruct->numMarks; counter++)
+   {
+      xErr[counter] = fiducialArray[counter][_XI] - cal[counter][_XI];
+      yErr[counter] = fiducialArray[counter][_YI] - cal[counter][_YI];
+      xExpected[counter] = fiducialArray[counter][_XI];
+      yExpected[counter] = fiducialArray[counter][_YI];
+      xCalculated[counter] = cal[counter][_XI];
+      yCalculated[counter] = cal[counter][_YI];
+   }
+
+   if (paramId)
+   {
+      drama::sds::Id id = paramId->Copy();
+      const char *calNameX = 0;
+      const char *calNameY = 0;
+      if (newmodel == 10)
+      {
+         calNameX = "New1stPassErrX";
+         calNameY = "New1stPassErrY";
+         id.Put("New1stPassRMSX", xrms);
+         id.Put("New1stPassRMSY", yrms);
+         id.Put("New1stPassRMS", rrms);
+      }
+      else if (newmodel)
+      {
+         calNameX = "NewErrX";
+         calNameY = "NewErrY";
+         id.Put("NewRMSX", xrms);
+         id.Put("NewRMSY", yrms);
+         id.Put("NewRMS", rrms);
+      }
+      else
+      {
+         calNameX = "OldErrX";
+         calNameY = "OldErrY";
+         id.Put("OldRMSX", xrms);
+         id.Put("OldRMSY", yrms);
+         id.Put("OldRMS", rrms);
+      }
+      std::vector<unsigned long> dims;
+      dims.push_back(m_tdFfpiSStruct->numMarks);
+      drama::sds::Id xErrId(id.CreateChildArray(calNameX, SDS_DOUBLE, dims));
+      drama::sds::ArrayWriteHelper<double> xarray;
+      xErrId.ArrayAccess(&xarray);
+      for (counter = 0; counter < (int)xarray.Size(); ++counter)
+      {
+         xarray[counter] = xErr[counter];
+      }
+
+      drama::sds::Id yErrId(id.CreateChildArray(calNameY, SDS_DOUBLE, dims));
+      drama::sds::ArrayWriteHelper<double> yarray;
+      yErrId.ArrayAccess(&yarray);
+      for (counter = 0; counter < (int)yarray.Size(); ++counter)
+      {
+         yarray[counter] = yErr[counter];
+      }
+
+      paramId->ShallowCopy(&id, true);
+   }
+
+   DEBUG("========================================================\n");
+   if (newmodel == 10)
+   {
+      DEBUG("C_SURVEY: Field Plate units - new model first pass\n");
+   }
+   else
+   {
+      DEBUG("C_SURVEY: Field Plate units - %s\n", newmodel ? "new model" : "old model");
+   }
+   DEBUG("#################\n");
+   DEBUG("  Error between specified fiducial position and what we\n");
+   DEBUG("  get by converting the encoder position we found it at\n");
+   DEBUG("  back to field plate units using the %s\n", newmodel ? "new model" : "old model");
+   DEBUG("expected             calculated                 error (x/y/t)\n");
+   DEBUG("===================================================================\n");
+   for (counter = 0; counter < m_tdFfpiSStruct->numMarks; counter++)
+   {
+      DEBUG("%9.1f,%9.1f   %9.1f,%9.1f  %6.1f,%6.1f %6.2f\n",
+            fiducialArray[counter][_XI],
+            fiducialArray[counter][_YI],
+            cal[counter][_XI],
+            cal[counter][_YI],
+            xErr[counter], yErr[counter],
+            sqrt(xErr[counter] * xErr[counter] +
+                 yErr[counter] * yErr[counter]));
+   }
+   DEBUG("RMS                                            %6.1f,%6.1f %6.2f\n", xrms, yrms, rrms);
+   DEBUG("===================================================================\n");
+}
+
+void CSurveyAction::tdFfpiSurveyCheckCoeffs(const double *current, const double *newcoeffs,
+                                            int plate, const double plateTheta, drama::sds::Id *paramId)
+{
+   double cXz;     /* Current coefficients - X zero point */
+   double cYz;     /* Current coefficients - Y zero point */
+   double cXs;     /* Current coefficients - X Scale */
+   double cYs;     /* Current coefficients - X Scale */
+   double cPerp;   /* Current coefficients -  nonperpendicularity (radians) */
+   double cOrient; /* Current coefficients - orientation (radians) */
+
+   double nXz;     /* New coefficients - X zero point */
+   double nYz;     /* New coefficients - Y zero point */
+   double nXs;     /* New coefficients - X Scale */
+   double nYs;     /* New coefficients - X Scale */
+   double nPerp;   /* New coefficients -  nonperpendicularity (radians) */
+   double nOrient; /* New coefficients - orientation (radians) */
+
+   slaDcmpf((double *)current, &cXz, &cYz, &cXs, &cYs, &cPerp, &cOrient);
+   slaDcmpf((double *)newcoeffs, &nXz, &nYz, &nXs, &nYs, &nPerp, &nOrient);
+
+   DEBUG("C_SURVEY: Old Coefficents array = %.1f, %f, %f, %.1f, %f, %f\n",
+         current[0], current[1], current[2], current[3], current[4], current[5]);
+   DEBUG("C_SURVEY: New Coefficents array = %.1f, %f, %f, %.1f, %f, %f\n",
+         newcoeffs[0], newcoeffs[1], newcoeffs[2],
+         newcoeffs[3], newcoeffs[4], newcoeffs[5]);
+   DEBUG("C_SURVEY: Decomposition follows\n");
+   DEBUG("Which        X-Zero      Y-Zero      X-Scale    Y-Scale  Orientation Non-perp \n");
+   DEBUG("Current      %8.1f %8.1f %10.8f %10.8f %8.4f %8.4f\n",
+         cXz, cYz, cXs, cYs, cOrient * 180.0 / PI, cPerp * 180.0 / PI);
+   DEBUG("New          %8.1f %8.1f %10.8f %10.8f %8.4f %8.4f\n",
+         nXz, nYz, nXs, nYs, nOrient * 180.0 / PI, nPerp * 180.0 / PI);
+   DEBUG("Change       %8.1f %8.1f %10.8f %10.8f %8.6f %8.6f\n",
+         nXz - cXz,
+         nYz - cYz,
+         fabs(nXs / cXs) - 1.0,
+         fabs(nYs / cYs) - 1.0,
+         (nOrient - cOrient) * 180.0 / PI,
+         (nPerp - cPerp) * 180.0 / PI);
+   DEBUG("Rotation: Applied=%8.4f, Apparent = %8.4f (milli-degrees), Plate %d\n",
+         (plateTheta / PI * 180.0 * 1000.0),
+         ((plateTheta + nOrient) / PI * 180.0 * 1000.0),
+         plate);
+
+   if (paramId)
+   {
+      int counter;
+      std::vector<unsigned long> dims;
+      dims.push_back(6);
+
+      drama::sds::Id newId = paramId->Copy();
+      drama::sds::Id newParamId(newId.CreateChildItem("checkdata", SDS_STRUCT));
+      drama::sds::Id oldCoeffs(newParamId.CreateChildArray("oldCoeffs", SDS_DOUBLE, dims));
+      drama::sds::ArrayWriteHelper<double> oldCoeffarray;
+      oldCoeffs.ArrayAccess(&oldCoeffarray);
+      for (counter = 0; counter < (int)oldCoeffarray.Size(); ++counter)
+      {
+         oldCoeffarray[counter] = current[counter];
+      }
+      drama::sds::Id newCoeffs(newParamId.CreateChildArray("newCoeffs", SDS_DOUBLE, dims));
+      drama::sds::ArrayWriteHelper<double> newCoeffarray;
+      newCoeffs.ArrayAccess(&newCoeffarray);
+      for (counter = 0; counter < (int)newCoeffarray.Size(); ++counter)
+      {
+         newCoeffarray[counter] = newcoeffs[counter];
+      }
+
+      drama::sds::Id idOldDecomp(newParamId.CreateChildItem("oldDecomp", SDS_STRUCT));
+      idOldDecomp.Put("X-Zero", cXz);
+      idOldDecomp.Put("Y-Zero", cYz);
+      idOldDecomp.Put("X-Scale", cXs);
+      idOldDecomp.Put("Y-Scale", cYs);
+      idOldDecomp.Put("Orientation", cOrient * 180.0 / PI);
+      idOldDecomp.Put("Non-perp", cPerp * 180.0 / PI);
+
+      drama::sds::Id idNewDecomp(newParamId.CreateChildItem("newDecomp", SDS_STRUCT));
+      idNewDecomp.Put("X-Zero", nXz);
+      idNewDecomp.Put("Y-Zero", nYz);
+      idNewDecomp.Put("X-Scale", nXs);
+      idNewDecomp.Put("Y-Scale", nYs);
+      idNewDecomp.Put("Orientation", nOrient * 180.0 / PI);
+      idNewDecomp.Put("Non-perp", nPerp * 180.0 / PI);
+
+      drama::sds::Id idChange(newParamId.CreateChildItem("change", SDS_STRUCT));
+      idChange.Put("X-Zero", nXz - cXz);
+      idChange.Put("Y-Zero", nYz - cYz);
+      idChange.Put("X-Scale", fabs(nXs / cXs) - 1.0);
+      idChange.Put("Y-Scale", fabs(nYs / cYs) - 1.0);
+      idChange.Put("Orientation", (nOrient - cOrient) * 180.0 / PI);
+      idChange.Put("Non-perp", (nPerp - cPerp) * 180.0 / PI);
+
+      newParamId.Put("PlateTheta", plateTheta);
+      newParamId.Put("RotApplied", (plateTheta / PI * 180.0 * 1000.0));
+      newParamId.Put("RotApparent", (plateTheta + nOrient) / PI * 180.0 * 1000.0);
+      paramId->ShallowCopy(&newId, true);
+   }
+}
+
+bool CSurveyAction::OffsetAndDisplayResults(tdFfpiTaskType *details, const double platetheta, const short fitType, const short centerFid, double measuredArray[][2], double fiducialArray[][2],
+                                            double *const coeffs, drama::sds::Id *paramId)
+{
+   double xrms;
+   double yrms;
+   double rrms;
+   double xrms2;
+   double yrms2;
+   double rrms2;
+   double diffCoeffs[6];
+   double origNewCoeffs[6];
+   double calculatedNewModel[NUM_FIDUCIALS][2]; /* Positions calculated with new model */
+   double calculatedNewModelNoOffset[NUM_FIDUCIALS][2];
+   double calculatedOrigModel[NUM_FIDUCIALS][2]; /* Positions calculated with original model */
+   int j;
+   int adjustedCenter = 0;
+
+   for (j = 0; j < 6; ++j)
+      origNewCoeffs[j] = coeffs[j];
+
+   slaFitxy(fitType, m_tdFfpiSStruct->numMarks, fiducialArray, measuredArray, diffCoeffs, &j);
+   slaPxy(m_tdFfpiSStruct->numMarks, fiducialArray, measuredArray, details->convert.invCoeffs, calculatedOrigModel, &xrms2, &yrms2, &rrms2);
+
+   slaPxy(m_tdFfpiSStruct->numMarks, fiducialArray, measuredArray, diffCoeffs, calculatedNewModel, &xrms, &yrms, &rrms);
+   slaPxy(m_tdFfpiSStruct->numMarks, fiducialArray, measuredArray, diffCoeffs, calculatedNewModelNoOffset, &xrms, &yrms, &rrms);
+
+   if ((centerFid >= 0) && (centerFid < m_tdFfpiSStruct->numMarks))
+   {
+      double xCen = calculatedNewModel[centerFid][_XI];
+      double yCen = calculatedNewModel[centerFid][_YI];
+      if ((fabs(xCen) > 0.1) || (fabs(yCen) > 0.1))
+      {
+         double x, y;
+         double xErr, yErr;
+         adjustedCenter = 1;
+
+         DEBUG("C_SURVEY: Adjusting offset by %.1f %.1f to center the center fiducial (index %d)\n",
+               xCen, yCen, centerFid);
+         DEBUG("C_SURVEY: Original RMS error is %6.1f,%6.1f %6.2f\n", xrms, yrms, rrms);
+
+         slaXy2xy(0, 0, coeffs, &x, &y);
+         xErr = x - measuredArray[centerFid][_XI];
+         yErr = y - measuredArray[centerFid][_YI];
+         DEBUG("C_SURVEY: Without adjusted coeffs, 0,0 -> %6.1f, %6.1f (error %3.1f, %3.1f)\n", x, y, xErr, yErr);
+
+         diffCoeffs[0] -= xCen;
+         diffCoeffs[3] -= yCen;
+         slaInvf(diffCoeffs, coeffs, &j);
+
+         slaXy2xy(0, 0, coeffs, &x, &y);
+         xErr = x - measuredArray[centerFid][_XI];
+         yErr = y - measuredArray[centerFid][_YI];
+         DEBUG("C_SURVEY: With zero adjusted coeffs, 0,0 -> %6.1f, %6.1f (error %3.1f, %3.1f)\n", x, y, xErr, yErr);
+
+         /*
+          *  Recalculate the new positions with the adjusted offset.
+          */
+         slaPxy(m_tdFfpiSStruct->numMarks, fiducialArray, measuredArray,
+                diffCoeffs, calculatedNewModel, &xrms, &yrms, &rrms);
+      }
+      else
+      {
+         DEBUG("C_SURVEY: Center fiducial (index %d) is centered - no adjustment needed.\n", centerFid);
+      }
+   }
+   else
+   {
+      DEBUG("C_SURVEY: Don't have center fiducial so can't ensure offset is correct.\n");
+   }
+
+   DEBUG("C_SURVEY: Survey did a %d component fit.\n", fitType);
+
+   DisplayResultsBasic(0, fiducialArray, calculatedOrigModel,
+                       xrms2, yrms2, rrms2, paramId);
+   if (adjustedCenter)
+      DisplayResultsBasic(10, fiducialArray, calculatedNewModelNoOffset,
+                          xrms, yrms, rrms, paramId);
+
+   DisplayResultsBasic(1, fiducialArray, calculatedNewModel,
+                       xrms, yrms, rrms, paramId);
+
+   DisplayResultsInEncoderUnits(details, platetheta, 0,
+                                details->convert.coeffs,
+                                measuredArray);
+   if (adjustedCenter)
+      DisplayResultsInEncoderUnits(details, platetheta,
+                                   10, origNewCoeffs,
+                                   measuredArray);
+   DisplayResultsInEncoderUnits(details, platetheta, 1, coeffs,
+                                measuredArray);
+
+   tdFfpiSurveyCheckCoeffs(details->convert.coeffs, coeffs,
+                           details->currentPlate, platetheta, paramId);
+
+   DEBUG("C_SURVEY: With old model:XRMS = %5.2f, YRMS = %5.2f, TOTAL RMS = %5.2f\n",
+         xrms2, yrms2, rrms2);
+   DEBUG("With new model:XRMS = %5.2f, YRMS = %5.2f, TOTAL RMS = %5.2f\n",
+         xrms, yrms, rrms);
+
+
+   if (rrms > RMS_WARNING)
+   {
+      DEBUG("C_SURVEY: Warning - the SURVEY RMS of %6.1f microns seems too large\n", rrms);
+      return false;
+   }
+   return true;
+}
+
+void CSurveyAction::DisplayResultsInEncoderUnits(tdFfpiTaskType *details, const double plateTheta,
+                                                 const int newmodel, const double *const coeffs, double measuredArray[][2])
+{
+   int counter;
+   double savedCoeffs[6];
+   int j;
+   auto thisTask = _theTask.lock()->TaskPtrAs<TdFCanTask>();
+   for (j = 0; j < 6; j++)
+   {
+      savedCoeffs[j] = details->convert.coeffs[j];
+      details->convert.coeffs[j] = coeffs[j];
+   }
+
+   if (newmodel == 10)
+      DEBUG("C_SURVEY: Encoder units - original new model\n");
+   else
+      DEBUG("C_SURVEY: Encoder units - %s\n", newmodel ? "new model" : "old model");
+   DEBUG("#########################\n");
+   DEBUG("    The encoder positions the fiducials were expected and found at.\n");
+   DEBUG("expected             found                  error (x/y/t)\n");
+   DEBUG("===================================================================\n");
+   for (counter = 0; counter < m_tdFfpiSStruct->numMarks; counter++)
+   {
+      double encExpX, encExpY;
+      double xErr, yErr;
+      /* Convert original positions to the encoder value we
+         would have searched at */
+      thisTask->tdFfpiConvertFromFP(m_tdFfpiSStruct->x[counter], m_tdFfpiSStruct->y[counter],
+                                    plateTheta, _FULL, &encExpX, &encExpY);
+
+      xErr = encExpX - measuredArray[counter][_XI];
+      yErr = encExpY - measuredArray[counter][_YI];
+
+      DEBUG("%9.1f,%9.1f   %9.1f,%9.1f  %6.1f,%6.1f %6.2f\n",
+            encExpX, encExpY,
+            measuredArray[counter][_XI],
+            measuredArray[counter][_YI],
+            xErr, yErr, sqrt(xErr * xErr + yErr * yErr));
+   }
+   DEBUG("==============================================================\n");
+   /*
+    * Revert the coefficents.
+    */
+   for (j = 0; j < 6; j++)
+   {
+      details->convert.coeffs[j] = savedCoeffs[j];
+   }
+}
+
+void CSurveyAction::SetCoeffs(tdFfpiTaskType *details, const double *const expectedX, const double *const expectedY,
+                              const double *const measuredX, const double *const measuredY,
+                              const short fitType, double *const coeffs, const double plateTheta, drama::sds::Id *paramId)
+{
+   short centerFid = -1; /* Index of center fiducial */
+   double expectedArray[m_tdFfpiSStruct->numMarks][2];
+   double measuredArray[m_tdFfpiSStruct->numMarks][2];
+   double fiducialArray[m_tdFfpiSStruct->numMarks][2];
+
+   DEBUG("C_SURVEY: Updating gantry field-plate/encoder transformation matrix...\n");
+   int j;
+   for (j = 0; j < m_tdFfpiSStruct->numMarks; j++)
+   {
+      expectedArray[j][_XI] = expectedX[j];
+      expectedArray[j][_YI] = expectedY[j];
+      measuredArray[j][_XI] = measuredX[j];
+      measuredArray[j][_YI] = measuredY[j];
+
+      fiducialArray[j][_XI] = m_tdFfpiSStruct->x[j];
+      fiducialArray[j][_YI] = m_tdFfpiSStruct->y[j];
+
+      if ((labs(m_tdFfpiSStruct->x[j]) < 5000) && (labs(m_tdFfpiSStruct->y[j]) < 5000))
+         centerFid = j;
+   }
+
+   slaFitxy(fitType,                   /* Type of model to use (see slaLib docs) */
+            m_tdFfpiSStruct->numMarks, /* Number of marks surveyed             */
+            measuredArray,             /* Array of measured values             */
+            expectedArray,             /* Array of expected values             */
+            coeffs,                    /* New coeffs array                     */
+            &j);                       /* Modified status                      */
+
+   if (j != 0)
+   {
+      DEBUG("C_SURVEY: Error calculating coeffs array.\n");
+      return;
+   }
+
+   DEBUG("C_SURVEY: First pass array = %.1f, %.6f, %.6f, %.1f, %.6f, %.6f\n",
+         coeffs[0], coeffs[1], coeffs[2], coeffs[3], coeffs[4], coeffs[5]);
+
+   if (m_tdFfpiSStruct->area == _COEFFS)
+      *paramId = (drama::sds::Id::CreateArgStruct("COEFFS"));
+
+   bool checkFlag = OffsetAndDisplayResults(details, plateTheta, fitType, centerFid,
+                                            measuredArray, fiducialArray, coeffs, paramId);
+   if (checkFlag == false)
+   {
+      return;
+   }
+
+   for (j = 0; j < 6; j++)
+      details->convert.coeffs[j] = coeffs[j];
+
+   slaInvf(details->convert.coeffs, details->convert.invCoeffs, &j);
+   if (j != 0)
+   {
+      int i;
+      for (i = 0; i < 6; i++)
+         details->convert.invCoeffs[i] = details->convert.coeffs[i];
+   }
+
+   DEBUG("C_SURVEY: Actual New array = %.1f, %.6f, %.6f, %.1f, %.6f, %.6f\n",
+         coeffs[0], coeffs[1], coeffs[2], coeffs[3], coeffs[4], coeffs[5]);
+   DEBUG("C_SURVEY: Diff array = %.1f, %.6f, %.6f, %.1f, %.6f, %.6f\n",
+         details->convert.invCoeffs[0],
+         details->convert.invCoeffs[1],
+         details->convert.invCoeffs[2],
+         details->convert.invCoeffs[3],
+         details->convert.invCoeffs[4],
+         details->convert.invCoeffs[5]);
+}
+void CSurveyAction::ConstructReturnValue(tdFfpiTaskType *details, const double *const expectedX, const double *const expectedY, const double *const measuredX,
+                                         const double *const measuredY, const double *const coeffs, const double ha,
+                                         const double dec, drama::sds::Id *paramId)
+{
+   time_t now;
+   std::vector<unsigned long> dims;
+   dims.push_back(m_tdFfpiSStruct->numMarks);
+   time(&now);
+
+   drama::sds::Id id = paramId->Copy();
+   if (m_tdFfpiSStruct->area == _ALL)
+      id = (drama::sds::Id::CreateArgStruct("ALL"));
+   else if (m_tdFfpiSStruct->area == _TEMP)
+      id = (drama::sds::Id::CreateArgStruct("TEMP"));
+   else if (m_tdFfpiSStruct->area == _FLEX)
+      id = (drama::sds::Id::CreateArgStruct("FLEX"));
+   else if (!paramId) /* _COEFFS */
+      id = (drama::sds::Id::CreateArgStruct("COEFFS"));
+
+   id.Put("fitTime", (INT32)(now));
+   id.Put("plate", details->currentPlate);
+   id.Put("instrument", "2dF");
+   id.Put("gantry", "FPI");
+
+   id.Put("numMarks", m_tdFfpiSStruct->numMarks);
+
+   drama::sds::Id tmpId = id.CreateChildArray("expectedX", SDS_DOUBLE, dims);
+   drama::sds::ArrayWriteHelper<double> arrayHelper;
+   tmpId.ArrayAccess(&arrayHelper);
+
+   for (int index = 0; index < (int)arrayHelper.Size(); index++)
+   {
+      arrayHelper[index] = expectedX[index];
+   }
+
+   tmpId = id.CreateChildArray("expectedY", SDS_DOUBLE, dims);
+   tmpId.ArrayAccess(&arrayHelper);
+   for (int index = 0; index < (int)arrayHelper.Size(); index++)
+   {
+      arrayHelper[index] = expectedY[index];
+   }
+
+   tmpId = id.CreateChildArray("measuredX", SDS_DOUBLE, dims);
+   tmpId.ArrayAccess(&arrayHelper);
+   for (int index = 0; index < (int)arrayHelper.Size(); index++)
+   {
+      arrayHelper[index] = measuredX[index];
+   }
+
+   tmpId = id.CreateChildArray("measuredY", SDS_DOUBLE, dims);
+   tmpId.ArrayAccess(&arrayHelper);
+   for (int index = 0; index < (int)arrayHelper.Size(); index++)
+   {
+      arrayHelper[index] = measuredY[index];
+   }
+
+   dims[0] = 6;
+   tmpId = id.CreateChildArray("coeffs", SDS_DOUBLE, dims);
+   tmpId.ArrayAccess(&arrayHelper);
+   for (int index = 0; index < (int)arrayHelper.Size(); index++)
+   {
+      arrayHelper[index] = coeffs[index];
+   }
+
+   id.Put("ha", ha);
+   id.Put("dec", dec);
+   id.Put("temp", m_tdFfpiSStruct->temp); /* Just dummy at moment */
+   paramId->ShallowCopy(&id, true);
+}
+
+void CSurveyAction::ActionComplete(tdFfpiTaskType *details, const double *const expectedX, const double *const expectedY,
+                                   const double *const measuredX, const double *const measuredY,
+                                   const double ha, const double dec, const short fitType, const double plateTheta,
+                                   drama::sds::Id *paramId)
+{
+   double coeffs[6];
+   SetCoeffs(details, expectedX, expectedY, measuredX, measuredY, fitType, coeffs, plateTheta, paramId);
+
+   ConstructReturnValue(details, expectedX, expectedY, measuredX, measuredY, coeffs, ha, dec, paramId);
+}
+
+void CSurveyAction::ActionThread(const drama::sds::Id &Arg)
+{
+   auto ThisTask(GetTask()->TaskPtrAs<TdFCanTask>());
+   ThisTask->ClearError();
+   tdFfpiTaskType *details = ThisTask->tdFfpiGetMainStruct();
+   if (details == nullptr)
+   {
+      DramaTHROW(TDFCANTASK__NOTINIT, "C_SURVEY: the structure pointer is null, please initialise the task!");
+   }
+   if (details->inUse)
+   {
+      DramaTHROW(TDFCANTASK__IN_USE, "C_SURVEY: TdFCanTask is running other actions.");
+   }
+   if (!Arg)
+   {
+      DramaTHROW(TDFCANTASK__NO_ARGUMENTS, "C_SURVEY: No input argument is provided.");
+   }
+   m_tdFfpiSStruct = new tdFfpiStype();
+   drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
+   drama::gitarg::String AreaArg(this, Arg, "area", 1, "", NoFlags);
+   std::string strArea = AreaArg;
+   if (strArea != "ALL" && strArea != "COEFFS" && strArea != "TEMP" && strArea != "FLEX")
+   {
+      DramaTHROW(TDFCANTASK__INV_INPUT_ARGUMENT, "C_SURVEY: TdFCanTask can only take \"ALL\", \"COEFFS\", \"TEMP\",\"FLEX\" type.");
+   }
+   if (strArea == "ALL")
+      m_tdFfpiSStruct->area = _ALL;
+   else if (strArea == "FLEX")
+      m_tdFfpiSStruct->area = _FLEX;
+   else if (strArea == "TEMP")
+      m_tdFfpiSStruct->area = _TEMP;
+   else
+      m_tdFfpiSStruct->area = _COEFFS;
+
+   drama::gitarg::Int<3, NUM_FIDUCIALS> NumArg(this, Arg, "numMarks", 2, 3, NoFlags);
+   int iNum = NumArg;
+   m_tdFfpiSStruct->numMarks = iNum;
+
+   drama::gitarg::Id XArg(this, Arg, "x", 3, "", NoFlags);
+   std::vector<unsigned long> checkDims;
+   XArg.GetDims(&checkDims);
+   if (checkDims.size() != 1 && iNum != (int)checkDims[0])
+   {
+      DramaTHROW_S(TDFCANTASK__INV_INPUT_ARGUMENT, "C_SURVEY: the input of X coordinates is invalid. The number of fidual is %d and the number of X coordinates is %d.\n", iNum, (int)(checkDims[0]));
+   }
+   drama::sds::ArrayReadHelper<long int> xArray;
+   XArg.ArrayAccess(&xArray, &checkDims);
+   for (int i = 0; i < iNum; i++)
+   {
+      m_tdFfpiSStruct->x[i] = xArray[i];
+      DEBUG("%ld ", m_tdFfpiSStruct->x[i]);
+   }
+   DEBUG("\n");
+
+   drama::gitarg::Id YArg(this, Arg, "y", 4, "", NoFlags);
+   YArg.GetDims(&checkDims);
+   if (checkDims.size() != 1 && iNum != checkDims[0])
+   {
+      DramaTHROW_S(TDFCANTASK__INV_INPUT_ARGUMENT, "C_SURVEY: the input of Y coordinates is invalid. The number of fidual is %d and the number of Y coordinates is %d.\n", iNum, (int)(checkDims[0]));
+   }
+   drama::sds::ArrayReadHelper<long int> yArray;
+   YArg.ArrayAccess(&yArray, &checkDims);
+   for (int i = 0; i < iNum; i++)
+   {
+      m_tdFfpiSStruct->y[i] = yArray[i];
+      DEBUG("%ld ", m_tdFfpiSStruct->y[i]);
+   }
+   DEBUG("\n");
+
+   drama::gitarg::Real<-30, 40> TempArg(this, Arg, "temp", 5, 0.0, NoFlags);
+   double temp = TempArg;
+   m_tdFfpiSStruct->temp = temp;
+
+   double expectedX[NUM_FIDUCIALS], expectedY[NUM_FIDUCIALS];
+   double measuredX[NUM_FIDUCIALS], measuredY[NUM_FIDUCIALS];
+   long int offsetX, offsetY;
+
+   short curFid, atFid, recordedFid, fitType;
+   int nFailures;
+   drama::ParSys parSysId(ThisTask->TaskPtr());
+
+   double ha, dec;
+   double plateTheta;
+
+   if (m_tdFfpiSStruct->reset == YES)
+   {
+      if (m_tdFfpiSStruct->area != _COEFFS)
+      {
+         DramaTHROW(TDFCANTASK__INV_INPUT_ARGUMENT, "C_SURVEY: The survey code currently only supports the COEFFS flag");
+      }
+      MessageUser("C_SURVEY: Starting FPI Survey of %d marks", m_tdFfpiSStruct->numMarks);
+      fitType = 6;
+      nFailures = 0;
+      curFid = 0;
+      atFid = recordedFid = NO;
+      offsetX = offsetY = 0;
+      parSysId.Get("HA", &ha);
+      parSysId.Get("DEC", &dec);
+      parSysId.Get("PLATE_THETA", &plateTheta);
+      parSysId.Put("SURVEY_PROG", 0.0);
+      m_tdFfpiSStruct->reset = NO;
+   }
+   bool flag = true;
+
+   while (!atFid && !recordedFid)
+   {
+      if (!atFid)
+      {
+         SearchForFid(offsetX, offsetY, curFid, &atFid);
+      }
+      else if (!recordedFid)
+      {
+         if (m_tdFfpiSStruct->found != YES)
+         {
+            if (nFailures < MAX_FAILURES)
+            {
+               bool checkFound = FidNotFound(expectedX, expectedY, curFid, &atFid, &recordedFid);
+               if (!checkFound)
+               {
+                  flag = false;
+                  break;
+               }
+            }
+            else
+            {
+               flag = false;
+               MessageUser("C_SURVEY: Search for fiducials index %d, at %ld,%ld failed\n",
+                           curFid, m_tdFfpiSStruct->x[curFid], m_tdFfpiSStruct->y[curFid]);
+               MessageUser("C_SURVEY: Too many failures to find fiducials (%d), aborting survey\n",
+                           nFailures);
+               break;
+            }
+         }
+         else
+         {
+            /* found ok */
+            RecordFid(expectedX, expectedY, measuredX, measuredY, &offsetX, &offsetY, &curFid, &atFid, &recordedFid);
+         }
+      }
+   }
+   drama::sds::Id newArg;
+   if (flag)
+   {
+      // newArg = drama::sds::Id::CreateArgStruct();
+
+      ActionComplete(details, expectedX, expectedY, measuredX, measuredY, ha, dec, fitType, plateTheta, &newArg);
+   }
+   SetReturnArg(&newArg);
+   MessageUser("C_SURVEY: - Action complete.");
 }
 
 //  ------------------------------------------------------------------------------------------------
