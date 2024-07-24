@@ -67,7 +67,7 @@ SIM_CAN_OPEN_DIR = ../SimCanOpen
 XWING_DIR = ../XWing
 TCS_UTIL_DIR = ../TcsUtil
 */
-INCLUDES =  -I. DramaIncl IDir(DRAMA2_DIR) $(CAN_INCLUDES) $(GCAM_INCL) $(GCAM2_INCL) $(SLA_INCL) -I$(VIMBASDK_DIR)
+INCLUDES =  -I. DramaIncl IDir(DRAMA2_DIR) $(CAN_INCLUDES) IDir(GCAM_DIR) IDir(GCAM2_DIR) $(SLA_INCL) -I$(VIMBASDK_DIR)
 
 
 /*
@@ -97,7 +97,7 @@ LOCAL_LDFLAGS=-lrt
 
 
 #EndConfig
-LIBS=LinkLib(TdFCanTask) LinkLibDir(DRAMA2_LIB,drama2) $(CAN_LIBRARIES) -L$(VIMBASDK_LIBS) $(GCAM2_LIB) $(GCAM_LIB)  $(SLA_LIB) $(FITS_LIB) -lboost_filesystem
+LIBS=LinkLib(TdFCanTask) LinkLibDir(DRAMA2_LIB,drama2) $(CAN_LIBRARIES) -L$(VIMBASDK_LIBS) LinkLibDir(GCAM2_LIB,gcam2) LinkLibDir(GCAM_LIB,gcam)  $(SLA_LIB) $(FITS_LIB) -lboost_filesystem
 
 NormalCRules()			/* Include normal c rules	*/
 

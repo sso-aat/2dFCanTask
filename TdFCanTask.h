@@ -16,6 +16,7 @@
 #include <math.h>
 #include "fitsio.h"
 #include "dul.h"
+#include <exception>
 
 // to check if a directory exists
 #include <boost/filesystem.hpp>
@@ -97,10 +98,10 @@
 #define FPI_XY_FR_MAX 1000000 /* FPI XY axes maximum feedrate value (?)        */
 #define PLATE_FR_MIN 1        /* Plate rotators minimum feedrate value (?)     */
 #define PLATE_FR_MAX 3000000  /* Plate rotators maximum feedrate value (?)     */
-#define XMIN -1000            /* X-axis minimum value (microns)                */
-#define XMAX 145000           /* X-axis maximum value (microns)                */
-#define YMIN -1000            /* Y-axis minimum value (microns)                */
-#define YMAX 145000           /* Y-axis maximum value (microns)                */
+#define XMIN -108396            /* X-axis minimum value (microns)                */
+#define XMAX 110000           /* X-axis maximum value (microns)                */
+#define YMIN -110963            /* Y-axis minimum value (microns)                */
+#define YMAX 123059           /* Y-axis maximum value (microns)                */
 #define ZMIN 0                /* Z-axis minimum value (microns)                */
 #define ZMAX 60000            /* Z-axis maximum value (microns)                */
 
@@ -132,7 +133,9 @@
 #define SF_IMAGES 10
 
 #define MAX_POINTS 25
-#define GRID_SIZE 100
+#define GRID_SIZE 10
+
+#define GLOBAL_BUFFER_SPACE 21000000
 
 #ifndef SAFE
 #define SAFE 2
@@ -229,7 +232,7 @@ public:
     {
         if (img)
         {
-            delete (img);
+            // delete (img);
             img = nullptr;
         }
     }
@@ -267,6 +270,10 @@ public:
         statCheck = 0;
         reset = YES;
     }
+    ~tdFfpiSFtype()
+    {
+
+    }
 } tdFfpiSFtype;
 
 typedef struct tdFfpiZCtype
@@ -285,6 +292,10 @@ public:
         kickHandler = 0;
         xFull = yFull = 0;
         reset = centroidOK = YES;
+    }
+    ~tdFfpiZCtype()
+    {
+
     }
 } tdFfpiZCtype;
 
@@ -305,13 +316,17 @@ public:
         measuredX = measuredY = 0;
         reset = found = YES;
     }
+    ~tdFfpiSHtype()
+    {
+
+    }
 } tdFfpiSHtype;
 
 typedef struct tdFfpiStype
 {
 public:
     double temp;
-    long int x[NUM_FIDUCIALS];
+    long int x[NUM_FIDUCIALS]; 
     long int y[NUM_FIDUCIALS];
     long int fidNum[NUM_FIDUCIALS]; /* fiducial number */
     long int dx;
@@ -336,6 +351,10 @@ public:
         numMarks = 0;
         area = _ALL;
         reset = YES;
+    }
+    ~tdFfpiStype()
+    {
+        
     }
 } tdFfpiStype;
 

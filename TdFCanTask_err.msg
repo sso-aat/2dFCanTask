@@ -15,7 +15,9 @@
 .FACILITY TDFCANTASK,1092/PREFIX=TDFCANTASK__
 .SEVERITY ERROR
 .BASE 2
+CAMERA "CAMERA raised an error"
 MALLOCERR "Malloc error"
+NO_GANTRY_MOVEMENT "The gantry failed to move to the target position"
 NOTINIT "The task has not been initialised"
 NO_ARGUMENTS "No arguments are provided"
 NO_ENV_VAR "The environment variable used to find the parameter files is not defined"
@@ -33,4 +35,5 @@ PARKED "Gantry is parked"
 READ_ERROR "Check the SDS file, some fields are missing"
 SIMULATION "Action not possible as we are in simulation mode"
 SLALIB "Error returned by slalib function"
+SEARCH "Error occured during search action"
 .END
