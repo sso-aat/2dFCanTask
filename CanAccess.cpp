@@ -203,7 +203,7 @@ bool CanAccess::Initialise(const std::string& FileName) {
          //  SimCanInterface it uses is its low-level interface to the actual hardware.
          
          if (Iter->IPAddress != "") {
-            AnagateInterface = new AnaGateCAN(Iter->IPAddress.c_str());
+            AnagateInterface = new AnaGateCAN(Iter->IPAddress.c_str(), Iter->PortNumber);
             CanOpenInterface = new CanOpen;
             const Error *Err = CanOpenInterface->Open(*AnagateInterface);
             if (Err) {
@@ -477,9 +477,10 @@ bool CanAccess::GetCanDetails (
                         Details.IniFileName = ExpandedName;
                      }
                      Details.IPAddress = Tokens[3];
-                     Details.SimName = Tokens[4];
-                     if (Tokens.size() > 5) {
-                        Details.SimServer = Tokens[5];
+                     Details.PortNumber = stoi(Tokens[4]);
+                     Details.SimName = Tokens[5];
+                     if (Tokens.size() > 6) {
+                        Details.SimServer = Tokens[6];
                      }
                      DetailsList.push_back(Details);
                   } else if (TcsUtil::MatchCaseBlind(Tokens[0],"SimulateAll")) {

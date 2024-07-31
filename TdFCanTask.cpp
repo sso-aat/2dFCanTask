@@ -7485,7 +7485,7 @@ void CShiftCoAction::ActionThread(const drama::sds::Id &Arg)
 
       SetReturnArg(&newArg);
    }
-   MessageUser("C_SHIFT_COEFF: - Action complete.");
+   MessageUser("C_SHIFT_COEFFS: - Action complete.");
 }
 
 bool CSurveyAction::FidNotFound(double *const expectedX, double *const expectedY,
@@ -8199,7 +8199,7 @@ void CSurveyAction::ActionThread(const drama::sds::Id &Arg)
    std::vector<std::string> XCoordinates = SplitString(XStr);
    if (iNum != (int)XCoordinates.size())
    {
-      DramaTHROW_S(TDFCANTASK__INV_INPUT_ARGUMENT, "C_SURVEY: the input of X coordinates is invalid. The number of fidual is %d and the number of Y coordinates is %d.\n", iNum, (int)(XCoordinates.size()));
+      DramaTHROW_S(TDFCANTASK__INV_INPUT_ARGUMENT, "C_SURVEY: the input of X coordinates is invalid. The number of fidual is %d and the number of X coordinates is %d.\n", iNum, (int)(XCoordinates.size()));
    }
    for (int index = 0; index < iNum; index++)
    {

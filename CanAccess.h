@@ -83,6 +83,7 @@
 struct CanAccessBusDetails {
    std::string Name;            // The CANBus name, eg "CAN0"
    std::string IPAddress;       // The IP address, if for an internet bus. Otherwise, empty string.
+   int PortNumber;
    std::string SimName;         // The name of the simulated CAN bus, often the same as Name.
    std::string SimServer;       // The simulator server, if multiple buses being used. Else empty.
    std::string IniFileName;     // The name of the .ini file with the bus configuration.
