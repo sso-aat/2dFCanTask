@@ -19,12 +19,6 @@ static const std::string CONFIGURATION_FILE = "$TDFCTASK_DIR/TdFGripperTask.conf
 extern const char *const TdFGripperTaskVersion;
 extern const char *const TdFGripperTaskDate;
 
-typedef struct
-{
-    AmpId AxisId;    //  The axis in question.
-    double Position; //  The demanded position.
-    double Velocity; //  The demanded velocity. 0 => not specified.
-} AxisDemand;
 
 class InitialiseAction : public drama::thread::TAction
 {
