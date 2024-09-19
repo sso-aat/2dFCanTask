@@ -16,9 +16,17 @@
 #include "TcsUtil.h"
 #include <vector>
 #include <unistd.h>
+#include <fstream>
+#include <iostream>
+#include <sstream>
+#include <stdlib.h>
+
 // to check if a directory exists
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
+
+#include "TdFGripperTask_err.h"
+#include "TdFGripperTask_err_msgt.h"
 
 #ifdef USE_CAN_ANAGATE
 #include <can_anagate.h>
@@ -31,11 +39,11 @@
 enum AmpId
 {
     X1_AMP = 0,
-    X2_AMP,
-    Y_AMP,
-    Z_AMP,
-    JAW_AMP,
-    THETA_AMP
+    X2_AMP = 1,
+    Y_AMP = 2,
+    Z_AMP = 3,
+    JAW_AMP = 4,
+    THETA_AMP = 5
 };
 
 typedef struct
@@ -157,24 +165,49 @@ typedef struct
 #define TDFPT_PARAM_DIR "/home/lliu/Project_Codes/buildanagate/Parameters/"
 #endif
 
-const double distP17 = 100.0;    /* Maximum absolute conversion expected */
-const double distP18 = 250000.0; /* Plate scale used in Will's model */
-const double distP1 = -72.02;    /* dX = X^2 */
-const double distP2 = 71.71;     /* dX = Y^2 */
-const double distP3 = -12.85;    /* dX = X^3 */
-const double distP4 = 15.98;     /* dX = Y^3 */
-const double distP5 = 45.11;     /* dX = X^4 */
-const double distP6 = -26.50;    /* dX = Y^4 */
-const double distP7 = 0.34;      /* dX = 1  */
-const double distP8 = 0.00;      /* dX = 0  */
-const double distP9 = -19.33;    /* dY = X^2 */
-const double distP10 = -8.72;    /* dY = Y^2 */
-const double distP11 = -9.81;    /* dY = X^3 */
-const double distP12 = -4.73;    /* dY = Y^3 */
-const double distP13 = 27.93;    /* dY = X^4 */
-const double distP14 = -35.04;   /* dY = Y^4 */
-const double distP15 = 2.43;     /* dY = sin(angle)    */
-const double distP16 = 0.00;     /* dY = cosine(angle) */
+/*
+ *  Note: all dimensions in microns unless stated.
+ */
+#define BUTTON_FVP 9100 /* Fibre virtual pivot                   */
+#define BUTTON_PHW 600  /* Prism half width                      */
+#define BUTTON_PLE -600 /* Prism leading edge                    */
+#define BUTTON_BHW 1000 /* Button half width                     */
+#define BUTTON_BLE 1100 /* Button leading edge                   */
+#define BUTTON_BTE 5100 /* Button trailing edge                  */
+#define BUTTON_THW 300  /* Tail half width                       */
+
+#define FIBRE_DIA 225       /* Diameter of fibre optics              */
+#define EXTENSION 283000    /* Maximum allowed extension             */
+#define EXT_SQRD 8.0089e10  /* Maximum extension, squared            */
+#define FIBRE_CLEAR 400     /* Minimum allowed button/fibre clear.   */
+#define BUTTON_CLEAR 400    /* Minimum allowed button/button clear.  */
+#define MAX_CLEARANCE 5000  /* Maximum allowed but or fib clearances */
+#define MAX_PIV_ANGLE 0.250 /* +/- max allowed piv/fib angle (rads)  */
+#define MAX_BUT_ANGLE 0.189 /* +/- max allowed but/fib angle (rads)  */
+
+#define HANDLE_WIDTH 500 /* Width of the button handle (microns)  */
+
+#define PIVOT_PROBE_DIST 10000 /* The distance between the pivot pos &..*/
+                               /* the prism when the button is parked   */
+
+double distP17 = 100.0;    /* Maximum absolute conversion expected */
+double distP18 = 250000.0; /* Plate scale used in Will's model */
+double distP1 = -72.02;    /* dX = X^2 */
+double distP2 = 71.71;     /* dX = Y^2 */
+double distP3 = -12.85;    /* dX = X^3 */
+double distP4 = 15.98;     /* dX = Y^3 */
+double distP5 = 45.11;     /* dX = X^4 */
+double distP6 = -26.50;    /* dX = Y^4 */
+double distP7 = 0.34;      /* dX = 1  */
+double distP8 = 0.00;      /* dX = 0  */
+double distP9 = -19.33;    /* dY = X^2 */
+double distP10 = -8.72;    /* dY = Y^2 */
+double distP11 = -9.81;    /* dY = X^3 */
+double distP12 = -4.73;    /* dY = Y^3 */
+double distP13 = 27.93;    /* dY = X^4 */
+double distP14 = -35.04;   /* dY = Y^4 */
+double distP15 = 2.43;     /* dY = sin(angle)    */
+double distP16 = 0.00;     /* dY = cosine(angle) */
 
 /*
  * Indicates a standard deviation of a offset is invalid. (MOVE_FIBRE and
@@ -191,6 +224,7 @@ const double distP16 = 0.00;     /* dY = cosine(angle) */
 #define OUTSIDE_RADIUS 347300 /* Radius of smallest circule which is 	*/
 /* outside the retractor ring		*/
 #define HALF_GUIDE_EXPAN 2250 /* The amount added between the four quadrants*/
+#define BACKILLAL
 /* to account for the guide fibres	*/
 
 /*
@@ -206,16 +240,14 @@ const double distP16 = 0.00;     /* dY = cosine(angle) */
 #define SQRD(x) ((x) * (x))           /* Return the square of a number              */
 #define ABS(x) ((x) < 0 ? -(x) : (x)) /* Return the absolute value of a number      */
 
-#define FPI_XY_FR_MIN 1       /* FPI XY axes minimum feedrate value (?)        */
-#define FPI_XY_FR_MAX 1000000 /* FPI XY axes maximum feedrate value (?)        */
-#define PLATE_FR_MIN 1        /* Plate rotators minimum feedrate value (?)     */
-#define PLATE_FR_MAX 3000000  /* Plate rotators maximum feedrate value (?)     */
-#define XMIN -108396          /* X-axis minimum value (microns)                */
-#define XMAX 110000           /* X-axis maximum value (microns)                */
-#define YMIN -110963          /* Y-axis minimum value (microns)                */
-#define YMAX 123059           /* Y-axis maximum value (microns)                */
-#define ZMIN 0                /* Z-axis minimum value (microns)                */
-#define ZMAX 60000            /* Z-axis maximum value (microns)                */
+#define PLATE_FR_MIN 1       /* Plate rotators minimum feedrate value (?)     */
+#define PLATE_FR_MAX 3000000 /* Plate rotators maximum feedrate value (?)     */
+#define XMIN -108396         /* X-axis minimum value (microns)                */
+#define XMAX 110000          /* X-axis maximum value (microns)                */
+#define YMIN -110963         /* Y-axis minimum value (microns)                */
+#define YMAX 123059          /* Y-axis maximum value (microns)                */
+#define ZMIN 0               /* Z-axis minimum value (microns)                */
+#define ZMAX 60000           /* Z-axis maximum value (microns)                */
 
 #define QUADRANT_RADIUS 277000
 #define INSIDE_RADIUS 270430
@@ -226,10 +258,10 @@ const double distP16 = 0.00;     /* dY = cosine(angle) */
 #define JAW_HWM 8300    /* Jaw half with -ve theta */
 #define JAW_LENGTH 5250 /* Jaw length		*/
 
-#define TDFFPI_MSG_BUFFER 20000 /* Size of message buffer for TDFFPI          */
+#define TDFGRIPPER_MSG_BUFFER 20000 /* Size of message buffer for TDFFPI          */
 
-#define FPI_CLEAR_X 253513
-#define FPI_CLEAR_Y -240488
+#define GRIPPER_CLEAR_X 253513
+#define GRIPPER_CLEAR_Y -240488
 
 #define TAN4P5 0.07870171
 #define SIN9 0.156434465
@@ -238,6 +270,10 @@ const double distP16 = 0.00;     /* dY = cosine(angle) */
 #define COS4P5 0.9969173337
 #define CLEARANCE 500.0
 #define PI 3.1415926535
+#define D2PI (2 * PI)
+#define MILLION 1000000.0
+#define D2PI_MRADS (D2PI * MILLION)
+#define DPI_MRADS (PI * MILLION)
 #define TWOPI 6.283185308
 #define PION2 1.570796327
 #define R4P5 0.07853981634
@@ -246,6 +282,7 @@ const double distP16 = 0.00;     /* dY = cosine(angle) */
 
 #define MAX_POINTS 25
 #define GRID_SIZE 10
+#define FREE_GRID_SIZE 20
 
 #define GLOBAL_BUFFER_SPACE 21000000
 
@@ -272,22 +309,27 @@ const double distP16 = 0.00;     /* dY = cosine(angle) */
 #define TUMMIN -45         /* Tumbler-axis minimum (degrees)                */
 #define TUMMAX 225         /* Tumbler-axis maximum (degrees)                */
 
-#define GRIP_PARKED (GRIP_A_X | GRIP_A_Y | GRIP_A_Z) /* Axes required to ... */
-#define GRIP_X_PARK -260000                          /* Gripper X axis park position (microns)        */
-#define GRIP_Y_PARK -260000                          /* Gripper Y axis park position (microns)        */
-#define GRIP_Z_PARK 50000                            /* Gripper Z axis park position (microns)        */
-#define GRIP_JAW_PARK 0                              /* Gripper JAW axis park position (microns)      */
-#define GRIP_THETA_PARK 0                            /* Gripper THETA axis park position (microns)    */
+#define GRIPPER_PARKED (GRIP_A_X | GRIP_A_Y | GRIP_A_Z) /* Axes required to ... */
+#define GRIPPER_X_PARK -260000                          /* Gripper X axis park position (microns)        */
+#define GRIPPER_Y_PARK -260000                          /* Gripper Y axis park position (microns)        */
+#define GRIPPER_Z_PARK 50000                            /* Gripper Z axis park position (microns)        */
+#define GRIPPER_JAW_PARK 0                              /* Gripper JAW axis park position (microns)      */
+#define GRIPPER_THETA_PARK 0                            /* Gripper THETA axis park position (microns)    */
 
-#define GRIP_XY_FR_MIN 1       /* GRIP XY axes minimum feedrate value (?)       */
-#define GRIP_XY_FR_MAX 1000000 /* GRIP XY axes maximum feedrate value (?)       */
-#define GRIP_Z_FR_MIN 1        /* GRIP Z axis minimum feedrate value (?)        */
-#define GRIP_Z_FR_MAX 200000   /* GRIP Z axis maximum feedrate value (?)        */
-#define THETA_FR_MIN 1         /* GRIP theta axis minimum feedrate value (?)    */
-#define THETA_FR_MAX 9000000   /* GRIP theta axis maximum feedrate value (?)    */
-#define JAW_FR_MIN 1           /* GRIP jaw axis minimum feedrate value (?)      */
-#define JAW_FR_MAX 200000      /* GRIP jaw axis maximum feedrate value (?)      */
+#define GRIPPER_XY_FR_MIN 1       /* GRIP XY axes minimum feedrate value (?)       */
+#define GRIPPER_XY_FR_MAX 1000000 /* GRIP XY axes maximum feedrate value (?)       */
+#define GRIPPER_Z_FR_MIN 1        /* GRIP Z axis minimum feedrate value (?)        */
+#define GRIPPER_Z_FR_MAX 200000   /* GRIP Z axis maximum feedrate value (?)        */
+#define THETA_FR_MIN 1            /* GRIP theta axis minimum feedrate value (?)    */
+#define THETA_FR_MAX 9000000      /* GRIP theta axis maximum feedrate value (?)    */
+#define JAW_FR_MIN 1              /* GRIP jaw axis minimum feedrate value (?)      */
+#define JAW_FR_MAX 200000         /* GRIP jaw axis maximum feedrate value (?)      */
 
+#define THETA_TOL 0.05
+
+#define NSMASK_INTERLOCK_PLATE_0 1
+#define NSMASK_INTERLOCK_PLATE_1 2
+#define NSMASK_INTERLOCK_BOTH 3
 /*
  *  Structure definitions required for the main tdFgrip task structure.
  */
@@ -686,7 +728,12 @@ public:
         Initialised = NO;
         cameraInit = NO;
         dprFeedback = YES;
-        inUse = NO;
+        inUse = YES;
+        backIllumOn = NO;
+        illumPlate = -1;  /* negative means not set */
+        configPlate = -1; /* negative means not set */
+        plateOneDontRemove = 0;
+        distMap.loaded = NO;
     }
     ~tdFgripTaskType() {}
 } tdFgripTaskType;

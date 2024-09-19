@@ -2902,24 +2902,23 @@ void TdFCanTask::tdFfpiFlexure(long int x, long int y,
 void TdFCanTask::tdFstateBitSet(unsigned char bit)
 {
    unsigned short oldval, newval = 0;
-   oldval = ushortZero;
+   I_TdFCanTaskParSys.Get("TASK_STATE", &oldval);
    newval = oldval | bit;
 
    /* Only update the parameter (triggering monitors) if value has changed*/
    if (newval != oldval)
-      ushortZero = newval;
+      I_TdFCanTaskParSys.Put("TASK_STATE", newval);
 }
 
 void TdFCanTask::tdFstateBitClear(unsigned char bit)
 {
    unsigned short oldval, newval = 0;
-   oldval = ushortZero;
-
+   I_TdFCanTaskParSys.Get("TASK_STATE", &oldval);
    newval = oldval & (~bit);
 
    /* Only update the parameter (triggering monitors) if value has changed*/
    if (newval != oldval)
-      ushortZero = newval;
+      I_TdFCanTaskParSys.Put("TASK_STATE", newval);
 }
 
 void TdFCanTask::tdFfpiConvertFromEnc(int xEnc, int yEnc, double plateTheta,
@@ -3484,7 +3483,7 @@ bool TdFCanTask::HomeAxes(bool HomeX, bool HomeY, bool HomeZ, bool HomeTheta, bo
       if (HomeY)
       {
          HomeFlags[Y_AMP] = true;
-         I_tdFfpiMainStruct->toEnc.x = 0;
+         I_tdFfpiMainStruct->toEnc.y = 0;
       }
 
       //  Set all the amps in the linkage to a pre-programmed halt mode, specifying that a
@@ -3986,7 +3985,7 @@ void TdFCanTask::tdFfpiPositionCheck(int Index, CML::uunit &Position)
       {
          Position = XMIN;
       }
-      else if (Position > XMAX)
+      if (Position > XMAX)
          Position = XMAX;
       break;
    }
@@ -3996,7 +3995,7 @@ void TdFCanTask::tdFfpiPositionCheck(int Index, CML::uunit &Position)
       {
          Position = YMIN;
       }
-      else if (Position > YMAX)
+      if (Position > YMAX)
          Position = YMAX;
       break;
    }
@@ -4006,7 +4005,7 @@ void TdFCanTask::tdFfpiPositionCheck(int Index, CML::uunit &Position)
       {
          Position = ZMIN;
       }
-      else if (Position > ZMAX)
+      if (Position > ZMAX)
          Position = ZMAX;
       break;
    }
@@ -6812,15 +6811,12 @@ void CCentroidAction::ActionThread(const drama::sds::Id &Arg)
    {
       details->inUse = NO;
       DramaTHROW(TDFCANTASK__INV_INPUT_ARGUMENT, "C_CENTROID: TdFCanTask can only take \"FREE\" Image type.");
-
-      // return;
    }
    drama::gitarg::String WindowArg(this, Arg, "Window", 2, "FULL", NoFlags);
    if (WindowArg != "FULL" && WindowArg != "NORM" && WindowArg != "SEARCH")
    {
       details->inUse = NO;
       DramaTHROW(TDFCANTASK__INV_INPUT_ARGUMENT, "C_CENTROID: TdFCanTask can only take \"FULL\", \"NORM\", \"SEARCH\" Window type.");
-      // return;
    }
 
    string strWindow = WindowArg;

@@ -4,9 +4,10 @@
  * @version:
  * @Date: 2024-08-24 15:59:31
  * @LastEditors: lliu
- * @LastEditTime: 2024-08-28 20:54:21
+ * @LastEditTime: 2024-09-19 13:34:08
  */
 #include "TdFGripperTask.h"
+
 #include <memory>
 
 static const std::string G_AmpNames[MAX_TDF_AMPS] = {
@@ -18,7 +19,6 @@ static const std::string CONFIGURATION_FILE = "$TDFCTASK_DIR/TdFGripperTask.conf
 
 extern const char *const TdFGripperTaskVersion;
 extern const char *const TdFGripperTaskDate;
-
 
 class InitialiseAction : public drama::thread::TAction
 {
@@ -43,11 +43,14 @@ private:
 class GMoveAxisActionNT : public drama::thread::TAction
 {
 public:
-    GMoveAxisActionNT(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask) {}
+    GMoveAxisActionNT(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask), _theTask(theTask) {}
     ~GMoveAxisActionNT() {}
 
 private:
     void ActionThread(const drama::sds::Id &) override;
+
+private:
+    std::weak_ptr<drama::Task> _theTask;
 };
 
 class GParkGantryActionNT : public drama::thread::TAction
@@ -203,6 +206,17 @@ private:
     void ActionThread(const drama::sds::Id &) override;
 };
 
+// P_SetZMapActionNT is a thread version of SET_ZMAP action, it sets the parameters of the zmap
+class PSetZMapActionNT : public drama::thread::TAction
+{
+public:
+    PSetZMapActionNT(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask) {}
+    ~PSetZMapActionNT() {}
+
+private:
+    void ActionThread(const drama::sds::Id &) override;
+};
+
 // P_UpdateFlexActionNT is a thread version of UPDATE_FLEX action, it rereads the flex file
 class PUpdateFlexActionNT : public drama::thread::TAction
 {
@@ -280,6 +294,17 @@ private:
     void ActionThread(const drama::sds::Id &) override;
 };
 
+// P_ReportZMapActionNT is a thread version of REPORT_ZMAP action, it reports the parameters of the zmap
+class PReportZMapActionNT : public drama::thread::TAction
+{
+public:
+    PReportZMapActionNT(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask) {}
+    ~PReportZMapActionNT() {}
+
+private:
+    void ActionThread(const drama::sds::Id &) override;
+};
+
 // P_SaveDefsActionNT is a thread version of SaveDef action, it saves Def into the tdfgripperDef.sds
 class PSaveDefsActionNT : public drama::thread::TAction
 {
@@ -304,34 +329,35 @@ private:
     std::shared_ptr<tdFgrip_SFtype> m_tdFgripperSFStruct;
     std::weak_ptr<drama::Task> _theTask;
     std::shared_ptr<tdFgripperTaskType> details = nullptr;
+    drama::ParSys parSysId;
 
 private:
     void ActionThread(const drama::sds::Id &) override;
 
-    bool MoveToSearchPosition(const long searchX, const long searchY, short *const atSearchXY,
-                              short *const searchStarted);
-    bool PerformCentroid(const shared_ptr<tdFgrip_CENtype> &cenWin, const double settletime, short *const centroided);
-
+    bool MoveToSearchPosition(const long searchX, const long searchY, const double theta, short *const atSearchXY,
+                              short *const searchStarted, const short attempts);
+    bool PerformCentroid(const shared_ptr<tdFgrip_CENtype> cenWin, const double settletime, short *const centroided);
     bool CheckCentroid(short *const attempts, long *const searchX, long *const searchY, short *const atSearchXY,
                        short *const centroided, short *const foundIt, int *const i, int *const j, int *const k, short *const checkedCentroid,
                        short *const centroidRepeated, short *const repeatChecked);
 
-    void CheckCent_ObjectHasNotYetBeenSeen(long *const searchX, long *const searchY, short *const atSearchXY, short *const centroided,
-                                           short *const attempts, short *const foundIt, int *const i, int *const j, int *const k,
+    void CheckCent_ObjectHasNotYetBeenSeen(long *const searchX, long *const searchY, short *const atSearchXY,
+                                           short *const centroided, short *const attempts, short *const foundIt, int *const i, int *const j, int *const k,
                                            short *const checkedCentroid, short *const centroidRepeated, short *const repeatChecked);
 
     void CheckCent_ObjectNotFound(long *const searchX, long *const searchY, short *const atSearchXY, short *const centroided,
                                   int *const i, int *const j, int *const k, short *const checkedCentroid,
                                   short *const centroidRepeated, short *const repeatChecked);
 
-    void CheckCent_ObjectFound(long *const searchX, long *const searchY, short *const atSearchXY,
-                               short *const centroided, short *const attempts, short *const foundIt, short *const checkedCentroid);
+    void CheckCentroid(short *const attempts, long *const searchX, long *const searchY, short *const atSearchXY,
+                       short *const centroided, short *const foundIt, int *const i, int *const j, int *const k, short *const checkedCentroid,
+                       short *const centroidRepeated, short *const repeatChecked);
 
     bool CheckRepeatCentroid(short *const centroidRepeated, short *const repeatChecked);
 
     bool ActionComplete_CalculateMean(long *const searchX, long *const searchY);
-    void ActionComplete_FoundItCheck(long *const searchX, long *const searchY, short *const foundIt);
-    void ActionComplete(long searchX, long searchY, short &foundIt);
+    void ActionComplete_FoundItCheck(const short isSurvey, long *const searchX, long *const searchY, short *const foundIt);
+    void ActionComplete(long searchX, long searchY, short &foundIt, short isSurvey, const double plateTheta);
 };
 
 class CCentroidAction : public drama::thread::TAction
@@ -367,9 +393,55 @@ public:
 private:
     std::shared_ptr<tdFgrip_ZCtype> m_tdFgripperZCStruct;
     std::weak_ptr<drama::Task> _theTask;
+    drama::ParSys parSysId;
+    std::shared_ptr<tdFgripperTaskType> details;
+    std::vector<std::string> fitErrors = {"illegal itype",
+                                          "insufficent data", "singular solution"};
+#define FITERR_ILL_ITYPE 0
+#define FITERR_INSUFF_DATA 1
+#define FITERR_SINGULAR 2
+#define MAX_POINTS 25
+#define INIT_POINTS 5
 
 private:
     void ActionThread(const drama::sds::Id &) override;
+    void Reset(GCamWindowType *const cenWin, double initGrid[INIT_POINTS][2],
+               double grid[MAX_POINTS][2], double *const settleTime, double *const curTheta, double *const plateTheta, double *const okErrorSqrd,
+               long int *const curZ, long int *const freeHeight, long int *const cenX, long int *const cenY,
+               short *const counter, short *const focus, short *const numAttempts, short *const maxAttempts,
+               short *const centroided, short *const initialCalDone, short *const fibreAtCentre,
+               short *const lifted, short *const doneGrid, short *const atNextPoint, short *const settled);
+    void DoCentroid(const GCamWindowType *const cenWin, const short focus, const double settleTime, short *const centroided);
+    bool DoInitialCalibration(const long int cenX, const long int cenY, const long int curZ,
+                              const double curTheta, const double plateTheta, double initCoeffs[6], double initGrid[INIT_POINTS][2], double initCen[INIT_POINTS][2],
+                              short *const counter, short *const settled, short *const centroided, short *const initialCalDone);
+    void InitialCalibrationNextPoint(const long int cenX, const long int cenY, const long int curZ,
+                                     const double curTheta, const double plateTheta, double initGrid[INIT_POINTS][2], short *const counter, short *const settled);
+    bool SaveLastCentroid(const long int cenX, const long int cenY, double initGrid[INIT_POINTS][2],
+                          double initCen[INIT_POINTS][2], short *const counter);
+    bool CentreFibre(const long int curZ, const double curTheta, const double plateTheta, const double okErrorSqrd, const short maxAttempts,
+                     double initCoeffs[6], long int *const cenX, long int *const cenY, short *const numAttempts,
+                     short *const fibreAtCentre, short *const counter, short *const settled, short *const centroided);
+    void RaiseGripper(const long int freeHeight, long int *const curZ, const double curTheta, const double plateTheta, short *const lifted);
+    bool DoCalibration(const long int cenX, const long int cenY,
+                       const long int curZ, const double curTheta, const double plateTheta, double grid[MAX_POINTS][2],
+                       double cen[MAX_POINTS][2], short *const counter, short *const settled, short *const centroided,
+                       short *const doneGrid, short *const atNextPoint, short *const lifted, short *const focus);
+    void DoNextPoint(const long int cenX, const long int cenY, const long int curZ, const double curTheta, const double plateTheta,
+                     double grid[MAX_POINTS][2], const short counter, short *const settled,
+                     short *const centroided, short *const atNextPoint);
+    bool RecordLastPoint(const long int cenX, const long int cenY, const short counter,
+                         const short focus, double grid[MAX_POINTS][2], double cen[MAX_POINTS][2]);
+    void GridComplete(double grid[MAX_POINTS][2], double cen[MAX_POINTS][2], short *const counter,
+                      short *const centroided, short *const doneGrid, short *const atNextPoint, short *const lifted, short *const focus);
+    void ProcessFreeCalibration(short *const doneGrid, double coeffs[6]);
+    void ProcessGraspCalibration(short *const counter, short *const centroided, short *const atNextPoint,
+                                 short *const lifted, short *const focus, double coeffs[6]);
+    void ChangeGridState(double grid[MAX_POINTS][2]);
+    void DisplayNewFit(const int points, double grid[][2], double cen[][2], double coeffs[6]);
+    void CheckCoeffs(const double *current, const double *newcoeffs);
+    bool DoFitAndValidate(const std::string mesString, const int fitType, const int points,
+                          const double origCoeffs[6], double gantryOffset[][2], double centroidResult[][2], double newCoeffs[6]);
 };
 
 class CShiftCoAction : public drama::thread::TAction
@@ -400,6 +472,8 @@ private:
     std::shared_ptr<tdFgrip_Stype> m_tdFgripperSStruct;
     std::weak_ptr<drama::Task> _theTask;
     std::shared_ptr<dFgripperTaskType> details = nullptr;
+    drama::ParSys parSysId;
+
     const int MAX_FAILURES = 4;
     const int MIN_MARKS = 4;
     const double RMS_WARNING = 20.0;
@@ -408,7 +482,9 @@ private:
     void ActionThread(const drama::sds::Id &) override;
     bool FidNotFound(double *const expectedX, double *const expectedY,
                      const short curFid, short *const atFid, short *const recordedFid);
-    bool SearchForFid(const long offsetX, const long offsetY, const short curFid, short *const atFid);
+    bool SearchForFid(const long offsetX, const long offsetY, const long stepSize,
+                      const long maxError, const long tolerance, const short attempts,
+                      const short curFid, short *const atFid);
     void RecordFid(double *const expectedX, double *const expectedY, double *const measuredX,
                    double *const measuredY, long *const offsetX, long *const offsetY,
                    short *const curFid, short *const atFid, short *const recordedFid);
@@ -430,6 +506,24 @@ private:
     void ConstructReturnValue(const double *const expectedX, const double *const expectedY, const double *const measuredX,
                               const double *const measuredY, const double *const coeffs, const double ha,
                               const double dec, drama::sds::Id *paramId);
+};
+
+class GMeasureZHeightAction : public drama::thread::TAction
+{
+public:
+    GMeasureZHeightAction(std::weak_ptr<drama::Task> theTask) : drama::thread::TAction(theTask), _theTask(theTask) {}
+    ~GMeasureZHeightAction()
+    {
+    }
+
+private:
+    std::shared_ptr<tdFgrip_MEAS_Ztype> m_tdFgripperMEASStruct;
+    std::weak_ptr<drama::Task> _theTask;
+    std::shared_ptr<dFgripperTaskType> details = nullptr;
+    drama::ParSys parSysId;
+
+private:
+    void ActionThread(const drama::sds::Id &) override;
 };
 
 class TdFGripperTask : public drama::Task
@@ -474,7 +568,8 @@ public:
     // lliu added on 26-06-2024 to check if the position of an image before and after centorid
     void tdFgripperPreExp();
     void tdFgripperPostExp();
-
+    void tdFgripperGetActZ(long int &z);
+    bool tdFgripperCheckXYZTmove(long int tarX, long int tarY, long int tarZ, double tarT, short displayText);
     void tdFgripperConvertFromFP(int displayText, long int xFp, long int yFp, long int zFp, double tFp,
                                  long int jFp, double plateTheta, short level, double *xCon,
                                  double *yCon, double *zCon, double *tCon, double *jCon);
@@ -482,7 +577,11 @@ public:
                                   int jEnc, double plateTheta, short level, double *xCon,
                                   double *yCon, double *zCon, double *tCon, double *jCon);
 
-    drama::Path &tdFGetCameraPath() { return I_pCameraPath; };
+    drama::Path &tdFGetCameraPath() { return I_pCameraPath; }
+    bool tdFgripperCheckCross(long int tarX, long int tarY, long int tarZ, double tarT, int carrying);
+    bool tdFgripperCheckIntMove(long int tarX, long int tarY, long int tarZ,
+                                double tarT, long int carryZ, long int crossRetractZ, long int *intX, long int *intY);
+    bool tdFgripperNSMaskCheck(long int target);
 
 private:
     //  Set up the homing configuration for a specified amplifier.
@@ -500,6 +599,8 @@ private:
     // Read the flex file
     bool tdFgripperReadFlexFile(drama::sds::Id &defId);
 
+    bool tdFgripperReadDistMapFile(std::string &fName);
+    int tdFgripperGetMapIndex(const double x, const double y);
     void tdFgripperFlexure(long int x, long int y,
                            double ha, double dec, TdfFlexType *pars, long int *dx, long int *dy);
     double GetZAdjustment(const int debug, const double x, const double y, tdFzmap *const zmap);
@@ -507,10 +608,14 @@ private:
 
     void tdFstateBitSet(unsigned char bit);
     void tdFstateBitClear(unsigned char bit);
-
+    int tdFgripBackIllum(int on, int display);
+    bool IntEqual(long int target, long int cur, const char *parameter);
     // lliu added on 17-05-2024 to check the target poisiton
     void tdFgripperPositionCheck(int Index, CML::uunit &Position);
     void tdFgripperEncPos(short useDpr, short displayText, tdFencPos *position);
+    void tdFposNSMaskCheck(const char *parameters[], int *safe);
+    long int tdFgripperThetaDiffMicroRads(const long int t1, const long int t2);
+    std::vector<AxisDemand> SetUpEncodePositions(double Encx = 0.0, double Ency = 0.0, double Encz = 0.0, double Enct = 0.0);
     // --------------------------------------------------------------------------
     // Gantry movement related actions
     // --------------------------------------------------------------------------
@@ -561,6 +666,7 @@ private:
     PUpdateFlexActionNT I_PUpdateFlexActionNTObj;
     // The new action handler for Update action
     PUpdateActionNT I_PUpdateActionNTObj;
+    PSetZMapActionNT I_PSetZMapActionNTObj;
 
     // --------------------------------------------------------------------------
     // Parameter reporting related actions
@@ -577,6 +683,7 @@ private:
     PReportWindowActionNT I_PReportWindowActionNTObj;
     // The new action handler for Parameter Saving action
     PSaveDefsActionNT I_PSaveDefsActionNTObj;
+    PReportZMapActionNT I_PReportZMapActionNTObj;
 
     // --------------------------------------------------------------------------
     // Camera related actions
@@ -592,6 +699,11 @@ private:
     CSearchAction I_CSearchActionObj;
     CShiftCoAction I_CShiftCoActionObj;
     CSurveyAction I_CSurveyActionObj;
+
+    // --------------------------------------------------------------------------
+    // Fibre Movement related actions
+    // --------------------------------------------------------------------------
+    GMeasureZHeightAction I_GMeasureZHeightActionObj;
 
     //  Interface to the CanAccess layer.
     CanAccess I_CanAccess;
@@ -615,44 +727,6 @@ private:
     std::shared_ptr<tdFgripperTaskType> I_tdFgripperMainStruct = nullptr;
     drama::ParSys I_TdFGripperTaskParSys;
     drama::Path I_pCameraPath;
-
-public:
-    drama::Parameter<double> dzero;
-    drama::Parameter<double> dzeroHA;
-    drama::Parameter<double> dzeroDEC;
-    drama::Parameter<double> plateTheta;
-    drama::Parameter<double> settleTime;
-    drama::Parameter<double> zerocamCenWait; /* Wait for gantry to settle before oing centroid in zerocam operation. */
-
-    drama::Parameter<INT32> xPark;
-    drama::Parameter<INT32> yPark;
-    drama::Parameter<INT32> xCopleyPark;
-    drama::Parameter<INT32> yCopleyPark;
-    drama::Parameter<INT32> xyVel;
-    drama::Parameter<INT32> xaccuracy;
-    drama::Parameter<INT32> yaccuracy;
-    drama::Parameter<INT32> stepSize;
-    drama::Parameter<INT32> maxError;
-    drama::Parameter<INT32> posTol;
-    drama::Parameter<INT32> timeoutFac;
-    drama::Parameter<INT32> fibInImgThres;
-    drama::Parameter<INT32> copleyCodeVer; /* <---- PMAC code version number */
-    drama::Parameter<INT32> overlayPlaneEnabled;
-
-    drama::Parameter<short> attempts;
-    drama::Parameter<short> shortZeroX;
-    drama::Parameter<short> shortZeroY;
-
-    drama::Parameter<unsigned short> ushortZero;
-    drama::Parameter<unsigned short> ushortZeroCentroid;
-
-    drama::Parameter<std::string> tdfTaskStr;
-    drama::Parameter<std::string> tdfSimSearchRunStr;
-    drama::Parameter<std::string> tdfVersionStr;
-    drama::Parameter<std::string> tdfVersionDate;
-    drama::Parameter<std::string> tdfCanMode;
-    drama::Parameter<std::string> tdfCanParked;
-    drama::Parameter<std::string> tdfGantryLamp;
 };
 
 std::vector<std::string> SplitString(const std::string &ArgString)
@@ -730,6 +804,22 @@ bool GetDouble(const std::string &ValueString, double &Value)
         OK = false;
     }
     return OK;
+}
+
+long int dRangeMicroRad(long int angle)
+{
+    long int r;
+    /*
+     * Get the value in the range +/- 2PI microradians
+     */
+    r = dmod((double)(angle), D2PI_MRADS);
+    /*
+     * If the result is rather then PI microradians or less then -PI microradians, then
+     * add/subtrace 2PI microradians, as needed.
+     */
+    if (fabs(r) > DPI_MRADS)
+        r = r - dsign(D2PI_MRADS, angle);
+    return r;
 }
 
 long int doubleToLong(double doubleNum)
@@ -1486,6 +1576,52 @@ int TdFGripperTask::tdFforbidden(double x, double y, double theta, double rq, do
     return (1);
 }
 
+std::vector<AxisDemand> TdFGripperTask::SetUpEncodePositions(double Encx, double Ency, double Encz, double Enct)
+{
+    std::vector<AxisDemand> AxisDemands;
+
+    for (int i = 0; i < MAX_TDF_AMPS; i++)
+    {
+        AxisDemand axis;
+        switch (i)
+        {
+        case 0:
+        case 1:
+        {
+            axis.AxisId = (AmpId)i;
+            axis.Position = Encx;
+            axis.Velocity = 1.0;
+            AxisDemands.emplace_back(axis);
+            break;
+        }
+        case 2:
+        {
+            axis.AxisId = (AmpId)i;
+            axis.Position = Ency;
+            axis.Velocity = 1.0;
+            AxisDemands.emplace_back(axis);
+        }
+        case 3:
+        {
+            axis.AxisId = (AmpId)i;
+            axis.Position = Encz;
+            axis.Velocity = 1.0;
+            AxisDemands.emplace_back(axis);
+        }
+        case 5:
+        {
+            axis.AxisId = (AmpId)i;
+            axis.Position = Enct;
+            axis.Velocity = 1.0;
+            AxisDemands.emplace_back(axis);
+        }
+        default:
+            break;
+        }
+    }
+    return AxisDemands;
+}
+
 const CML::Error *WaitLinkedHome(
     CML::Linkage *TheLinkage, CML::int32 timeout, CML::uunit Targets[] = NULL)
 {
@@ -1650,39 +1786,7 @@ TdFGripperTask::TdFGripperTask(const std::string &taskName) : drama::Task(taskNa
                                                               I_CShiftCoActionObj(TaskPtr()),
                                                               I_CSurveyActionObj(TaskPtr()),
 
-                                                              tdfTaskStr(TaskPtr(), "ENQ_DEV_DESCR", "2dF Focal Plane Imager Gantry Task"),
-                                                              tdfSimSearchRunStr(TaskPtr(), "SIM_SEARCH_RAN", "No"),
-                                                              tdfVersionStr(TaskPtr(), "ENQ_VER_NUM", ""),
-                                                              tdfVersionDate(TaskPtr(), "ENQ_VER_DATE", ""),
-                                                              tdfCanMode(TaskPtr(), "MODE", "PROTECTED"),
-                                                              tdfCanParked(TaskPtr(), "PARKED", "NO"),
-                                                              tdfGantryLamp(TaskPtr(), "GANTRY_LAMPS", "OFF"),
-                                                              copleyCodeVer(TaskPtr(), "COPLEY_CODE_VER", 1000),
-                                                              dzero(TaskPtr(), "SURVEY_PROG", 0.0),
-                                                              dzeroHA(TaskPtr(), "HA", 0.0),
-                                                              dzeroDEC(TaskPtr(), "DEC", 0.0),
-                                                              xPark(TaskPtr(), "X", 0),
-                                                              yPark(TaskPtr(), "Y", 0),
-                                                              xCopleyPark(TaskPtr(), "XCopley", 0),
-                                                              yCopleyPark(TaskPtr(), "YCopley", 0),
-                                                              plateTheta(TaskPtr(), "PLATE_THETA", 0.0),
-                                                              xyVel(TaskPtr(), "XY_VEL", 150000),
-                                                              xaccuracy(TaskPtr(), "X_ACCURACY", 5),
-                                                              yaccuracy(TaskPtr(), "Y_ACCURACY", 5),
-                                                              posTol(TaskPtr(), "POS_TOL", 5),
-                                                              attempts(TaskPtr(), "POS_ATTEMPTS", 5),
-                                                              fibInImgThres(TaskPtr(), "FIBRE_IN_IMAGE", FIBRE_IN_IMAGE_LIMIT),
-                                                              settleTime(TaskPtr(), "SETTLE_TIME", 1.0),
-                                                              maxError(TaskPtr(), "MAX_ERROR", 5000),
-                                                              stepSize(TaskPtr(), "STEP_SIZE", 1000),
-                                                              timeoutFac(TaskPtr(), "TIMEOUT_FAC", 10),
-                                                              overlayPlaneEnabled(TaskPtr(), "VFG_OP_ENABLE", 1),
-                                                              ushortZero(TaskPtr(), "TASK_STATE", 0),
-                                                              ushortZeroCentroid(TaskPtr(), "DEBUG_CENTROID", 0),
-                                                              zerocamCenWait(TaskPtr(), "ZEROCAM_CENWAIT", 1.0),
-
-                                                              shortZeroX(TaskPtr(), "PLT1_CFID_OFF_X", 0),
-                                                              shortZeroY(TaskPtr(), "PLT1_CFID_OFF_Y", 0),
+                                                              I_GMeasureZHeightActionObj(TaskPtr()),
                                                               I_X1Amp(NULL),
                                                               I_X2Amp(NULL),
                                                               I_YAmp(NULL),
@@ -1697,7 +1801,7 @@ TdFGripperTask::TdFGripperTask(const std::string &taskName) : drama::Task(taskNa
     //  the simulator, and can be compared for diagnostic purposes.
 
     CML::cml.SetDebugLevel(CML::LOG_EVERYTHING);
-
+    MessPutFacility(&MessFac_TDFGRIP);
     //  Set up the various actions. Note that 'INITIALISE' which initialises the task as a
     //  whole, is quite different to 'G_INIT' which initialises the 2dF gantry. (There
     //  will later be an 'F_INIT' which initialises the gripper gantry, and others.)
@@ -1739,6 +1843,8 @@ TdFGripperTask::TdFGripperTask(const std::string &taskName) : drama::Task(taskNa
     Add("P_UPDATE_FLEX", drama::MessageHandlerPtr(&I_PUpdateFlexActionNTObj, drama::nodel()));
     // add new Update action which updates the pose
     Add("P_UPDATE", drama::MessageHandlerPtr(&I_PUpdateActionNTObj, drama::nodel()));
+    // add new Set ZMap action which sets the zmap
+    Add("P_SET_ZMAP", drama::MessageHandlerPtr(&I_PSetZMapActionNTObj, drama::nodel()));
 
     // add new Report action which reports the parameters of gripper task
     Add("P_REPORT", drama::MessageHandlerPtr(&I_PReportActionNTObj, drama::nodel()));
@@ -1750,6 +1856,8 @@ TdFGripperTask::TdFGripperTask(const std::string &taskName) : drama::Task(taskNa
     Add("P_REPORT_IMAGE", drama::MessageHandlerPtr(&I_PReportImageActionNTObj, drama::nodel()));
     // add new Report Window action which reports the window
     Add("P_REPORT_WINDOW", drama::MessageHandlerPtr(&I_PReportWindowActionNTObj, drama::nodel()));
+    // add new Report ZMap action which reports the ZMap
+    Add("P_REPORT_ZMAP", drama::MessageHandlerPtr(&I_PReportZMapActionNTObj, drama::nodel()));
     // add new Save Defs action which saves the parameter into a file
     Add("P_SAVE_DEFS", drama::MessageHandlerPtr(&I_PSaveDefsActionNTObj, drama::nodel()));
 
@@ -1761,13 +1869,152 @@ TdFGripperTask::TdFGripperTask(const std::string &taskName) : drama::Task(taskNa
     Add("C_SHIFT_COEFFS", drama::MessageHandlerPtr(&I_CShiftCoActionObj, drama::nodel()));
     Add("C_SURVEY", drama::MessageHandlerPtr(&I_CSurveyActionObj, drama::nodel()));
 
+    // add specific GRIP task actions
+    Add("G_MEASUREZHEIGHT", drama::MessageHandlerPtr(&I_GMeasureZHeightActionObj, drama::nodel()));
+
     Add("EXIT", &drama::SimpleExitAction);
 
     {
-        I_TdFGripperTaskParSys.Create("PMAC_LIM_X_POS", (INT32)(528000));
-        I_TdFGripperTaskParSys.Create("PMAC_LIM_X_NEG", (INT32)(-16300));
-        I_TdFGripperTaskParSys.Create("PMAC_LIM_Y_POS", (INT32)(537400));
-        I_TdFGripperTaskParSys.Create("PMAC_LIM_Y_NEG", (INT32)(-3400));
+        I_TdFGripperTaskParSys.Create("ENQ_DEV_DESCR", "2dF Gripper Gantry Task");
+        I_TdFGripperTaskParSys.Create("ENQ_VER_NUM", "");
+        I_TdFGripperTaskParSys.Create("ENQ_VER_DATE", "");
+        I_TdFGripperTaskParSys.Create("MODE", "PROTECTED");
+        I_TdFGripperTaskParSys.Create("STAT_IT", 0);
+        I_TdFGripperTaskParSys.Create("SURVEY_PROG", 0.0);
+        I_TdFGripperTaskParSys.Create("X", 0);
+        I_TdFGripperTaskParSys.Create("Y", 0);
+        I_TdFGripperTaskParSys.Create("Z", 0);
+        I_TdFGripperTaskParSys.Create("JAW", 0);
+        I_TdFGripperTaskParSys.Create("THETA", 0.0);
+        I_TdFGripperTaskParSys.Create("PLATE_THETA", 0.0);
+        I_TdFGripperTaskParSys.Create("X_PMAC", 0);
+        I_TdFGripperTaskParSys.Create("Y_PMAC", 0);
+        I_TdFGripperTaskParSys.Create("Z_PMAC", 0);
+        I_TdFGripperTaskParSys.Create("JAW_PMAC", 0);
+        I_TdFGripperTaskParSys.Create("THETA_PMAC", 0);
+        I_TdFGripperTaskParSys.Create("X_PMAC_ERR", 0);
+        I_TdFGripperTaskParSys.Create("Y_PMAC_ERR", 0);
+        I_TdFGripperTaskParSys.Create("Z_PMAC_ERR", 0);
+        I_TdFGripperTaskParSys.Create("JAW_PMAC_ERR", 0);
+        I_TdFGripperTaskParSys.Create("THETA_PMAC_ERR", 0);
+        I_TdFGripperTaskParSys.Create("XY_VEL", 150000);
+        I_TdFGripperTaskParSys.Create("Z_VEL", 10000);
+        I_TdFGripperTaskParSys.Create("JAW_VEL", 10000);
+        I_TdFGripperTaskParSys.Create("THETA_VEL", 6283185);
+        I_TdFGripperTaskParSys.Create("SETTLE_LEVEL", "HI");
+        I_TdFGripperTaskParSys.Create("X_ACCURACY_HI", 1);
+        I_TdFGripperTaskParSys.Create("X_ACCURACY_MED", 1);
+        I_TdFGripperTaskParSys.Create("X_ACCURACY_LOW", 15);
+        I_TdFGripperTaskParSys.Create("Y_ACCURACY_HI", 1);
+        I_TdFGripperTaskParSys.Create("Y_ACCURACY_MED", 1);
+        I_TdFGripperTaskParSys.Create("Y_ACCURACY_LOW", 15);
+        I_TdFGripperTaskParSys.Create("Z_ACCURACY_HI", 15);
+        I_TdFGripperTaskParSys.Create("Z_ACCURACY_MED", 15);
+        I_TdFGripperTaskParSys.Create("Z_ACCURACY_LOW", 15);
+        I_TdFGripperTaskParSys.Create("T_ACCURACY_HI", 15);
+        I_TdFGripperTaskParSys.Create("T_ACCURACY_MED", 15);
+        I_TdFGripperTaskParSys.Create("T_ACCURACY_LOW", 15);
+        I_TdFGripperTaskParSys.Create("J_ACCURACY_HI", 15);
+        I_TdFGripperTaskParSys.Create("J_ACCURACY_MED", 15);
+        I_TdFGripperTaskParSys.Create("J_ACCURACY_LOW", 15);
+        I_TdFGripperTaskParSys.Create("ACCURACY", "<unknown>");
+        I_TdFGripperTaskParSys.Create("PARKED", "NO");
+        I_TdFGripperTaskParSys.Create("CARRYING_BUTTON", "NO");
+        I_TdFGripperTaskParSys.Create("STEP_SIZE", 1000);
+        I_TdFGripperTaskParSys.Create("MAX_ERROR", 5000);
+        I_TdFGripperTaskParSys.Create("HA", 0.0);
+        I_TdFGripperTaskParSys.Create("DEC", 0.0);
+        I_TdFGripperTaskParSys.Create("CENTRE_X_ROT", 0.0);
+        I_TdFGripperTaskParSys.Create("CENTRE_Y_ROT", 0.0);
+        I_TdFGripperTaskParSys.Create("FIBRE_IN_IMAGE", FIBRE_IN_IMAGE_LIMIT);
+        I_TdFGripperTaskParSys.Create("IT_METHOD", "LIFT/DRAG");
+        I_TdFGripperTaskParSys.Create("IT_TOL_PLACE", 10);
+        I_TdFGripperTaskParSys.Create("IT_TOL_PARK", 50);
+        I_TdFGripperTaskParSys.Create("MAX_ITS_PLACE", 4);
+        I_TdFGripperTaskParSys.Create("MAX_ITS_PARK", 1);
+        I_TdFGripperTaskParSys.Create("LIFT_DRAG_TOL", 20);
+        I_TdFGripperTaskParSys.Create("IT_ERROR_DIST", 500);
+        I_TdFGripperTaskParSys.Create("POS_TOL", 5);
+        I_TdFGripperTaskParSys.Create("POS_ATTEMPTS", 5);
+        I_TdFGripperTaskParSys.Create("IT_Z", 2500);
+        I_TdFGripperTaskParSys.Create("CARRY_Z", 30000);
+        I_TdFGripperTaskParSys.Create("BUTTON_Z", 0);
+        I_TdFGripperTaskParSys.Create("PUTDOWN_Z", 50);
+        I_TdFGripperTaskParSys.Create("PARK_Z", 1000);
+        I_TdFGripperTaskParSys.Create("CAMERA_Z", 30000);
+        I_TdFGripperTaskParSys.Create("CAMERA_Z_FID", 20000);
+        I_TdFGripperTaskParSys.Create("CLEAN_Z", 50);
+        I_TdFGripperTaskParSys.Create("JAW_OPEN", 3000);
+        I_TdFGripperTaskParSys.Create("JAW_OPEN_IT", 3000);
+        I_TdFGripperTaskParSys.Create("JAW_OPEN_FULL", 4000);
+        I_TdFGripperTaskParSys.Create("HANDLE_WIDTH", HANDLE_WIDTH);
+        I_TdFGripperTaskParSys.Create("JAW_METHOD_UP", "JAW_SEP");
+        I_TdFGripperTaskParSys.Create("JAW_METHOD_DWN", "JAW_SYN");
+        I_TdFGripperTaskParSys.Create("SETTLE_TIME", 1.0);
+        I_TdFGripperTaskParSys.Create("TIMEOUT_FAC", 10);
+        I_TdFGripperTaskParSys.Create("SEND_ABORT", "FALSE");
+        I_TdFGripperTaskParSys.Create("VFG_OP_ENABLE", 1);
+        I_TdFGripperTaskParSys.Create("CROSS_RETRACT_Z", 25000);
+        I_TdFGripperTaskParSys.Create("JAW_CLOSE", 0);
+        I_TdFGripperTaskParSys.Create("JAW_CLOSE_G", 0);
+
+        I_TdFGripperTaskParSys.Create("BACKILL_ALWAYS", 1);
+        I_TdFGripperTaskParSys.Create("BACKILL_WARMUP", 1.0 / 60);
+        I_TdFGripperTaskParSys.Create("BACKILL_STATE", "UNKNOWN");
+        I_TdFGripperTaskParSys.Create("BACKILL_PLATE", 0);
+        I_TdFGripperTaskParSys.Create("TASK_STATE", 0);
+        I_TdFGripperTaskParSys.Create("ZEROCAM_CENWAIT", 1.0);
+        I_TdFGripperTaskParSys.Create("GANTRY_LAMPS", "OFF");
+        I_TdFGripperTaskParSys.Create("SURVEY_4COMP_FT", 0);
+        I_TdFGripperTaskParSys.Create("PMAC_LIM_X_POS", (INT64)(537000));
+        I_TdFGripperTaskParSys.Create("PMAC_LIM_X_NEG", (INT64)(-16000));
+        I_TdFGripperTaskParSys.Create("PMAC_LIM_Y_POS", (INT64)(537400));
+        I_TdFGripperTaskParSys.Create("PMAC_LIM_Y_NEG", (INT64)(-9700));
+
+        I_TdFGripperTaskParSys.Create("SIM_SEARCH_RAN", "NO");
+        I_TdFGripperTaskParSys.Create("DEBUG_CENTROID", 0);
+        I_TdFGripperTaskParSys.Create("DIST_REM_ENABLE", 1);
+        I_TdFGripperTaskParSys.Create("DIST_P1", distP1);
+        I_TdFGripperTaskParSys.Create("DIST_P2", distP2);
+        I_TdFGripperTaskParSys.Create("DIST_P3", distP3);
+        I_TdFGripperTaskParSys.Create("DIST_P4", distP4);
+        I_TdFGripperTaskParSys.Create("DIST_P5", distP5);
+        I_TdFGripperTaskParSys.Create("DIST_P6", distP6);
+        I_TdFGripperTaskParSys.Create("DIST_P7", distP7);
+        I_TdFGripperTaskParSys.Create("DIST_P8", distP8);
+        I_TdFGripperTaskParSys.Create("DIST_P9", distP9);
+        I_TdFGripperTaskParSys.Create("DIST_P10", distP10);
+        I_TdFGripperTaskParSys.Create("DIST_P11", distP11);
+        I_TdFGripperTaskParSys.Create("DIST_P12", distP12);
+        I_TdFGripperTaskParSys.Create("DIST_P13", distP13);
+        I_TdFGripperTaskParSys.Create("DIST_P14", distP14);
+        I_TdFGripperTaskParSys.Create("DIST_P15", distP15);
+        I_TdFGripperTaskParSys.Create("DIST_P16", distP16);
+        I_TdFGripperTaskParSys.Create("DIST_P17", distP17);
+        I_TdFGripperTaskParSys.Create("DIST_P18", distP18);
+        I_TdFGripperTaskParSys.Create("DIST_MAP_FILE", "2dF_distortion.map");
+
+        I_TdFGripperTaskParSys.Create("PLT1_CFID_OFF_X", 0);
+        I_TdFGripperTaskParSys.Create("PLT1_CFID_OFF_Y", 0);
+        I_TdFGripperTaskParSys.Create("DEBUG_CVT", 0);
+        I_TdFGripperTaskParSys.Create("DEBUG_ITS", 0);
+        I_TdFGripperTaskParSys.Create("NS_MASK", 0);
+        I_TdFGripperTaskParSys.Create("NS_MASK_P0", 0);
+        I_TdFGripperTaskParSys.Create("NS_MASK_P1", 0);
+        I_TdFGripperTaskParSys.Create("NS_MASK_SIM", 0);
+        I_TdFGripperTaskParSys.Create("CUR_FID", 0);
+
+        I_TdFGripperTaskParSys.Create("THETA_SHIFT", 0);
+        I_TdFGripperTaskParSys.Create("JAW_SHIFT", 0);
+        I_TdFGripperTaskParSys.Create("Z_SHIFT", 0);
+        I_TdFGripperTaskParSys.Create("CENTCALCHK_WRN", 30);
+        I_TdFGripperTaskParSys.Create("CENTCALCHK_ERR", 50);
+        I_TdFGripperTaskParSys.Create("CHECKS_DONE", 1);
+        I_TdFGripperTaskParSys.Create("SIM_ITS_MODE", "RANDOM");
+        I_TdFGripperTaskParSys.Create("ITS_IGNRE_FRST", "NO");
+        I_TdFGripperTaskParSys.Create("PICKING", 0);
+        I_TdFGripperTaskParSys.Create("PICKUP_PICKED", 0);
+
         drama::Buffers buffer(2000, 2, 2000000, 1);
         I_pCameraPath.SetBuffers(buffer);
         std::string LoadArg = "-i 10.88.16.199 -n VIMBACAM -p 8bit";
@@ -1850,6 +2097,10 @@ bool TdFGripperTask::tdFgripperDefRead(short loadingFiles, short check)
             defId.List();
         }
     }
+    if (loadingFiles & DEFS_FILE)
+    {
+        tdFgripperReadDistMap();
+    }
     if (loadingFiles & FLEX_FILE)
     {
         fName = pathName + "tdFgripperFlex.sds";
@@ -1877,6 +2128,128 @@ bool TdFGripperTask::tdFgripperDefRead(short loadingFiles, short check)
     return true;
 }
 
+void TdFGripperTask::tdFgripperReadDistMap()
+{
+    if (abs(*I_tdFgripperMainStruct->pars.distRemEnable) >= 10)
+    {
+        I_tdFgripperMainStruct->distMap.loaded = NO;
+        string strParam;
+        I_TdFGripperTaskParSys.Get("DIST_MAP_FILE", &strParam);
+        fName = pathName + strParam;
+        if (strParam.empty() || !boost::filesystem::exists(fName) || !boost::filesystem::is_regular_file(fName))
+        {
+            I_ErrorString += "DIST_MAP_FILE doesn't exist.\n";
+            DramaTHROW(TDFGRIPPERTASK__NO_ENV_VAR, "DIST_MAP_FILE doesn't exist.");
+        }
+
+        bool readRes = tdFgripperReadDistMapFile(fName);
+        if (!readRes)
+        {
+            I_ErrorString += "Failed to read " + strParam + "\n";
+            DEBUG("\nREAD DIST_MAP_FILE failed: %s", I_ErrorString.c_str());
+            DramaTHROW(TDFGRIPPERTASK__READ_ERROR, "Failed to read DIST_MAP_FILE.");
+        }
+        else
+        {
+            DEBUG("Loaded distortion map from \"%s\"\n", fName.c_str());
+        }
+    }
+}
+
+bool TdFGripperTask::tdFgripperReadDistMapFile(std::string &fName)
+{
+    ifstream file(fName);
+    string line;
+    bool flag = true;
+    unsigned int lineNum = 0;
+    unsigned int numEntries = 0;
+    if (!file.is_open())
+    {
+        I_ErrorString += "Failed to open the DIST_MAP_FILE " + fName + "\n";
+        return false;
+    }
+
+    while (getline(file, line))
+    {
+        double xposition;
+        double yposition;
+        double xadjust;
+        double yadjust;
+        int mapIndex;
+        lineNum++;
+        if (line[0] == '#')
+        {
+            continue;
+        }
+        std::istringstream iss(line);
+        if (iss >> xposition >> yposition >> xadjust >> yadjust)
+        {
+            string extra;
+            if (iss >> extra)
+            {
+                flag = false;
+                DEBUG("The line in the file is not correct: %s", line.c_str());
+                I_ErrorString += "The line in the file is not correct: " + line + "\n" break;
+            }
+            else
+            {
+                mapIndex = tdFgripGetMapIndex(xposition, yposition);
+                I_tdFgripperMainStruct->distMap.x[mapIndex] = xadjust;
+                I_tdFgripperMainStruct->distMap.y[mapIndex] = yadjust;
+                ++numEntries;
+            }
+        }
+        else
+        {
+            flag = false;
+            DEBUG("The line in the file is not correct: %s", line.c_str());
+            I_ErrorString += "The line in the file is not correct: " + line + "\n" break;
+        }
+    }
+    file.close();
+    if (numEntries != (GRID_WIDTH * GRID_WIDTH))
+    {
+        flag = false;
+        DEBUG("Distortion map file %s has %d entries rather than the expected %d.\n",
+              fName.c_str(), numEntries, (GRID_WIDTH * GRID_WIDTH));
+        I_ErrorString += "Distortion map file " + fName + " has " + std::toString(numEntries) + " entries rather than the expected " + std::toString(GRID_WIDTH * GRID_WIDTH) + "\n"
+    }
+    if (flag)
+        I_tdFgripperMainStruct->distMap.loaded = YES;
+    return flag;
+}
+
+int TdFGripperTask::tdFgripperGetMapIndex(const double x, const double y)
+{
+    /*
+     *  Work out our index into the map.
+     */
+    int xIndex = (int)(round((x + GRID_CENTRE_OFFSET) / GRID_STEP));
+    int yIndex = (int)(round((y + GRID_CENTRE_OFFSET) / GRID_STEP));
+
+    /*
+     * Range validation checks.
+     */
+    if (xIndex < 1)
+        xIndex = 1;
+    if (xIndex > GRID_WIDTH)
+        xIndex = GRID_WIDTH;
+    if (yIndex < 1)
+        yIndex = 1;
+    if (yIndex > GRID_WIDTH)
+        yIndex = GRID_WIDTH;
+
+    /*
+     * The indicies are 1 based, make them 0 based.
+     */
+    --xIndex;
+    --yIndex;
+    /*
+     * And then this is the actual index into the map
+     */
+    return yIndex * GRID_WIDTH + xIndex;
+}
+
 bool TdFGripperTask::tdFgripperWriteFile(drama::sds::Id &defId)
 {
     std::shared_ptr<tdFgripperTaskType> details = tdFgripperGetMainStruct();
@@ -1885,6 +2258,7 @@ bool TdFGripperTask::tdFgripperWriteFile(drama::sds::Id &defId)
     unsigned long int dimVal = 6;
     long int lIntParam;
     short shortParam;
+    std::string strParam;
     std::vector<unsigned long int> dims;
     dims.push_back(dimVal);
 
@@ -1900,10 +2274,19 @@ bool TdFGripperTask::tdFgripperWriteFile(drama::sds::Id &defId)
 
     drama::sds::ArrayWriteHelper<double> arrayHelper;
     tmp2Id.ArrayAccess(&arrayHelper);
-
     for (int index = 0; index < (int)dimVal; index++)
     {
         arrayHelper[index] = details->freeImg.camCoeffs[index];
+    }
+
+    tmpId = defId.CreateChildItem("graspImage", SDS_STRUCT);
+    tmpId.Put("bias", (short)details->freeImg.bias);
+    tmp2Id = tmpId.CreateChildArray("camCoeffs", SDS_DOUBLE, dims);
+    drama::sds::ArrayWriteHelper<double> arrayHelper;
+    tmp2Id.ArrayAccess(&arrayHelper);
+    for (int index = 0; index < (int)dimVal; index++)
+    {
+        arrayHelper[index] = details->graspImg.camCoeffs[index];
     }
 
     tmpId = defId.CreateChildItem("normWindow", SDS_STRUCT);
@@ -1926,47 +2309,127 @@ bool TdFGripperTask::tdFgripperWriteFile(drama::sds::Id &defId)
     {
         arrayHelperCoeffs[index] = details->convert.coeffs[index];
     }
+    tmpId.Put("zShift", (long int)details->convert.zShift);
+    tmpId.Put("jawShift", (long int)details->convert.jawShift);
+    tmpId.Put("thetaShift", (long int)details->convert.thetaShift);
+    tmpId.Put("zmap_cen", (long int)details->convert.zmap_cen);
+    tmpId.Put("zmap_xm", (long int)details->convert.zmap_xm);
+    tmpId.Put("zmap_xp", (long int)details->convert.zmap_xp);
+    tmpId.Put("zmap_ym", (long int)details->convert.zmap_ym);
+    tmpId.Put("zmap_yp", (long int)details->convert.zmap_yp);
 
     tmpId = defId.CreateChildItem("parameters", SDS_STRUCT);
-    lIntParam = (long int)xyVel;
-    lIntParam = I_TdFGripperTaskParSys.GetInt("XY_VEL");
-    tmpId.Put("XY_VEL", (INT32)lIntParam);
 
-    lIntParam = (long int)stepSize;
+    dParam = I_TdFGripperTaskParSys.GetDouble("CENTRE_X_ROT");
+    tmpId.Put("CENTRE_X_ROT", dParam);
+    dParam = I_TdFGripperTaskParSys.GetDouble("CENTRE_Y_ROT");
+    tmpId.Put("CENTRE_Y_ROT", dParam);
+
+    lIntParam = I_TdFGripperTaskParSys.GetInt("FIBRE_IN_IMAGE");
+    tmpId.Put("FIBRE_IN_IMAGE", lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("XY_VEL");
+    tmpId.Put("XY_VEL", lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("Z_VEL");
+    tmpId.Put("Z_VEL", lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("THETA_VEL");
+    tmpId.Put("THETA_VEL", lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("JAW_VEL");
+    tmpId.Put("JAW_VEL", lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("X_ACCURACY_HI");
+    tmpId.Put("X_ACCURACY_HI", lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("X_ACCURACY_MED");
+    tmpId.Put("X_ACCURACY_MED", lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("X_ACCURACY_LOW");
+    tmpId.Put("X_ACCURACY_LOW", lIntParam);
+
+    lIntParam = I_TdFGripperTaskParSys.GetInt("Y_ACCURACY_HI");
+    tmpId.Put("Y_ACCURACY_HI", lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("Y_ACCURACY_MED");
+    tmpId.Put("Y_ACCURACY_MED", lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("Y_ACCURACY_LOW");
+    tmpId.Put("Y_ACCURACY_LOW", lIntParam);
+
+    lIntParam = I_TdFGripperTaskParSys.GetInt("Z_ACCURACY_HI");
+    tmpId.Put("Z_ACCURACY_HI", lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("Z_ACCURACY_MED");
+    tmpId.Put("Z_ACCURACY_MED", lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("Z_ACCURACY_LOW");
+    tmpId.Put("Z_ACCURACY_LOW", lIntParam);
+
+    lIntParam = I_TdFGripperTaskParSys.GetInt("T_ACCURACY_HI");
+    tmpId.Put("T_ACCURACY_HI", lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("T_ACCURACY_MED");
+    tmpId.Put("T_ACCURACY_MED", lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("T_ACCURACY_LOW");
+    tmpId.Put("T_ACCURACY_LOW", lIntParam);
+
+    lIntParam = I_TdFGripperTaskParSys.GetInt("J_ACCURACY_HI");
+    tmpId.Put("J_ACCURACY_HI", lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("J_ACCURACY_MED");
+    tmpId.Put("J_ACCURACY_MED", lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("J_ACCURACY_LOW");
+    tmpId.Put("J_ACCURACY_LOW", lIntParam);
+
     lIntParam = I_TdFGripperTaskParSys.GetInt("STEP_SIZE");
     tmpId.Put("STEP_SIZE", (INT32)lIntParam);
 
-    lIntParam = (long int)maxError;
     lIntParam = I_TdFGripperTaskParSys.GetInt("MAX_ERROR");
     tmpId.Put("MAX_ERROR", (INT32)lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("IT_METHOD");
+    tmpId.Put("IT_METHOD", (INT32)lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("IT_TOL_PLACE");
+    tmpId.Put("IT_TOL_PLACE", (INT32)lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("IT_TOL_PARK");
+    tmpId.Put("IT_TOL_PARK", (INT32)lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("IT_ERROR_DIST");
+    tmpId.Put("IT_ERROR_DIST", (INT32)lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("MAX_ITS_PLACE");
+    tmpId.Put("MAX_ITS_PLACE", (INT32)lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("MAX_ITS_PARK");
+    tmpId.Put("MAX_ITS_PARK", (INT32)lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("LIFT_DRAG_TOL");
+    tmpId.Put("LIFT_DRAG_TOL", (INT32)lIntParam);
 
-    lIntParam = (long int)posTol;
     lIntParam = I_TdFGripperTaskParSys.GetInt("POS_TOL");
     tmpId.Put("POS_TOL", (INT32)lIntParam);
 
-    shortParam = (short)attempts;
     shortParam = I_TdFGripperTaskParSys.GetInt("POS_ATTEMPTS");
     tmpId.Put("POS_ATTEMPTS", shortParam);
 
-    lIntParam = (long int)fibInImgThres;
-    lIntParam = I_TdFGripperTaskParSys.GetInt("FIBRE_IN_IMAGE");
-    tmpId.Put("FIBRE_IN_IMAGE", (INT32)lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("IT_Z");
+    tmpId.Put("IT_Z", (INT32)lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("CARRY_Z");
+    tmpId.Put("CARRY_Z", (INT32)lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("BUTTON_Z");
+    tmpId.Put("BUTTON_Z", (INT32)lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("PUTDOWN_Z");
+    tmpId.Put("PUTDOWN_Z", (INT32)lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("PARK_Z");
+    tmpId.Put("PARK_Z", (INT32)lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("CLEAN_Z");
+    tmpId.Put("CLEAN_Z", (INT32)lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("CAMERA_Z");
+    tmpId.Put("CAMERA_Z", (INT32)lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("CAMERA_Z_FID");
+    tmpId.Put("CAMERA_Z_FID", (INT32)lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("JAW_OPEN");
+    tmpId.Put("JAW_OPEN", (INT32)lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("JAW_OPEN_IT");
+    tmpId.Put("JAW_OPEN_IT", (INT32)lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("JAW_OPEN_FULL");
+    tmpId.Put("JAW_OPEN_FULL", (INT32)lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("HANDLE_WIDTH");
+    tmpId.Put("HANDLE_WIDTH", (INT32)lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("JAW_METHOD_UP");
+    tmpId.Put("JAW_METHOD_UP", (INT32)lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("JAW_METHOD_DWN");
+    tmpId.Put("JAW_METHOD_DWN", (INT32)lIntParam);
 
-    dParam = (double)settleTime;
     dParam = I_TdFGripperTaskParSys.GetDouble("SETTLE_TIME");
     tmpId.Put("SETTLE_TIME", dParam);
 
-    lIntParam = (long int)timeoutFac;
     lIntParam = I_TdFGripperTaskParSys.GetInt("TIMEOUT_FAC");
     tmpId.Put("TIMEOUT_FAC", (INT32)lIntParam);
-
-    lIntParam = (long int)xaccuracy;
-    lIntParam = I_TdFGripperTaskParSys.GetInt("X_ACCURACY");
-    tmpId.Put("X_ACCURACY", (INT32)lIntParam);
-
-    lIntParam = (long int)yaccuracy;
-    lIntParam = I_TdFGripperTaskParSys.GetInt("Y_ACCURACY");
-    tmpId.Put("Y_ACCURACY", (INT32)lIntParam);
 
     if (details->dprFeedback)
     {
@@ -1977,11 +2440,22 @@ bool TdFGripperTask::tdFgripperWriteFile(drama::sds::Id &defId)
         tmpId.Put("DPR_FEEDBACK", "NO");
     }
 
-    lIntParam = (long int)overlayPlaneEnabled;
-    lIntParam = I_TdFGripperTaskParSys.GetInt("VFG_OP_ENABLE");
-    tmpId.Put("VFG_OP_ENABLE", (INT32)lIntParam);
+    strParam = I_TdFGripperTaskParSys.GetString("SEND_ABORT");
+    tmpId.Put("SEND_ABORT", strParam);
 
-    dParam = (double)zerocamCenWait;
+    lIntParam = I_TdFGripperTaskParSys.GetInt("VFG_OP_ENABLE");
+    tmpId.Put("VFG_OP_ENABLE", lIntParam);
+
+    lIntParam = I_TdFGripperTaskParSys.GetInt("CROSS_RETRACT_Z");
+    tmpId.Put("CROSS_RETRACT_Z", lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("JAW_CLOSE");
+    tmpId.Put("JAW_CLOSE", lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("JAW_CLOSE_G");
+    tmpId.Put("JAW_CLOSE_G", lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("BACKILL_ALWAYS");
+    tmpId.Put("BACKILL_ALWAYS", lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("BACKILL_WARMUP");
+    tmpId.Put("BACKILL_WARMUP", lIntParam);
     dParam = I_TdFGripperTaskParSys.GetDouble("ZEROCAM_CENWAIT");
     tmpId.Put("ZEROCAM_CENWAIT", dParam);
 
@@ -1997,13 +2471,61 @@ bool TdFGripperTask::tdFgripperWriteFile(drama::sds::Id &defId)
     lIntParam = I_TdFGripperTaskParSys.GetInt("PMAC_LIM_Y_NEG");
     tmpId.Put("PMAC_LIM_Y_NEG", (INT32)lIntParam);
 
-    lIntParam = (long int)shortZeroX;
+    lIntParam = I_TdFGripperTaskParSys.GetInt("DIST_REM_ENABLE");
+    tmpId.Put("DIST_REM_ENABLE", lIntParam);
+
+    dParam = I_TdFGripperTaskParSys.GetDouble("DIST_P1");
+    tmpId.Put("DIST_P1", dParam);
+    dParam = I_TdFGripperTaskParSys.GetDouble("DIST_P2");
+    tmpId.Put("DIST_P2", dParam);
+    dParam = I_TdFGripperTaskParSys.GetDouble("DIST_P3");
+    tmpId.Put("DIST_P3", dParam);
+    dParam = I_TdFGripperTaskParSys.GetDouble("DIST_P4");
+    tmpId.Put("DIST_P4", dParam);
+    dParam = I_TdFGripperTaskParSys.GetDouble("DIST_P5");
+    tmpId.Put("DIST_P5", dParam);
+    dParam = I_TdFGripperTaskParSys.GetDouble("DIST_P6");
+    tmpId.Put("DIST_P6", dParam);
+    dParam = I_TdFGripperTaskParSys.GetDouble("DIST_P7");
+    tmpId.Put("DIST_P7", dParam);
+    dParam = I_TdFGripperTaskParSys.GetDouble("DIST_P8");
+    tmpId.Put("DIST_P8", dParam);
+    dParam = I_TdFGripperTaskParSys.GetDouble("DIST_P9");
+    tmpId.Put("DIST_P9", dParam);
+    dParam = I_TdFGripperTaskParSys.GetDouble("DIST_P10");
+    tmpId.Put("DIST_P10", dParam);
+    dParam = I_TdFGripperTaskParSys.GetDouble("DIST_P11");
+    tmpId.Put("DIST_P11", dParam);
+    dParam = I_TdFGripperTaskParSys.GetDouble("DIST_P12");
+    tmpId.Put("DIST_P12", dParam);
+    dParam = I_TdFGripperTaskParSys.GetDouble("DIST_P13");
+    tmpId.Put("DIST_P13", dParam);
+    dParam = I_TdFGripperTaskParSys.GetDouble("DIST_P14");
+    tmpId.Put("DIST_P14", dParam);
+    dParam = I_TdFGripperTaskParSys.GetDouble("DIST_P15");
+    tmpId.Put("DIST_P15", dParam);
+    dParam = I_TdFGripperTaskParSys.GetDouble("DIST_P16");
+    tmpId.Put("DIST_P16", dParam);
+    dParam = I_TdFGripperTaskParSys.GetDouble("DIST_P17");
+    tmpId.Put("DIST_P17", dParam);
+    dParam = I_TdFGripperTaskParSys.GetDouble("DIST_P18");
+    tmpId.Put("DIST_P18", dParam);
+
+    strParam = I_TdFGripperTaskParSys.GetString("DIST_MAP_FILE");
+    tmpId.Put("DIST_MAP_FILE", strParam);
     lIntParam = I_TdFGripperTaskParSys.GetInt("PLT1_CFID_OFF_X");
     tmpId.Put("PLT1_CFID_OFF_X", (short)lIntParam);
 
-    lIntParam = (long int)shortZeroY;
     lIntParam = I_TdFGripperTaskParSys.GetInt("PLT1_CFID_OFF_Y");
     tmpId.Put("PLT1_CFID_OFF_Y", (short)lIntParam);
+
+    lIntParam = I_TdFGripperTaskParSys.GetInt("CENTCALCHK_WRN");
+    tmpId.Put("CENTCALCHK_WRN", lIntParam);
+    lIntParam = I_TdFGripperTaskParSys.GetInt("CENTCALCHK_ERR");
+    tmpId.Put("CENTCALCHK_ERR", lIntParam);
+
+    strParam = I_TdFGripperTaskParSys.GetString("ITS_IGNRE_FRST");
+    tmpId.Put("ITS_IGNRE_FRST", strParam);
 
     tdFgripperSetMainStruct(details);
     return true;
@@ -2031,13 +2553,13 @@ bool TdFGripperTask::tdFgripperReadFile(drama::sds::Id &defId)
     /*
      *  Set camera constant parameters.
      */
-    details->freeImg.shutter = GCAM_OPEN;
-    details->freeImg.updateTime = 0.005;
-    details->freeImg.exposureTime = 0.001667;
-    details->freeImg.camNo = 1;
-    details->freeImg.xMax = CAM_X_SPAN;
-    details->freeImg.yMax = CAM_Y_SPAN;
-    details->freeImg.PixelSize = PIXEL_SIZE;
+    details->freeImg.shutter = details->graspImg.shutter = GCAM_OPEN;
+    details->freeImg.updateTime = details->graspImg.updateTime = 0.005;
+    details->freeImg.exposureTime = details->graspImg.exposureTime = 0.001667;
+    details->freeImg.camNo = details->graspImg.camNo = 1;
+    details->freeImg.xMax = details->graspImg.xMax = CAM_X_SPAN;
+    details->freeImg.yMax = details->graspImg.yMax = CAM_Y_SPAN;
+    details->freeImg.PixelSize = details->graspImg.PixelSize = PIXEL_SIZE;
 
     /*
      *  Read free-focus image details.
@@ -2098,10 +2620,70 @@ bool TdFGripperTask::tdFgripperReadFile(drama::sds::Id &defId)
         DEBUG(" %f ", details->freeImg.invCoeffs[index]);
     }
     DEBUG("\n");
+
+    /*
+     *  Read grasp-focus image details.
+     */
+    tmpId = defId.Find("graspImage");
+    if (tmpId)
+    {
+        tmpId.Get("bias", &sParam);
+        DEBUG("The bias of graspImage is %d\n", (int)sParam);
+        details->graspImg.bias = (int)sParam;
+
+        tmp2Id = tmpId.Find("camCoeffs");
+        if (tmp2Id)
+        {
+            tmp2Id.Get(6 * sizeof(double), details->graspImg.camCoeffs, &actlen, 0);
+            if (actlen != 6 * sizeof(double)) // this is not correct actlen returns bytes values
+            {
+                I_ErrorString += "The field of camCoeffs is invalid.\n";
+                DramaTHROW(TDFGRIPPERTASK__READ_ERROR, "The field of camCoeffs is invalid.");
+            }
+
+            // details->graspImg.camCoeffs[0] = 97.69348;
+            // details->graspImg.camCoeffs[1] = 0.00672548;
+            // details->graspImg.camCoeffs[2] = -0.213328;
+            // details->graspImg.camCoeffs[3] = 169.0098;
+            // details->graspImg.camCoeffs[4] = -0.2252;
+            // details->graspImg.camCoeffs[5] = -0.003135;
+            DEBUG("The GraspImg camCoeffs array is:\n");
+            for (int index = 0; index < 6; index++)
+            {
+                DEBUG(" %f ", details->graspImg.camCoeffs[index]);
+            }
+            DEBUG("\n");
+        }
+        else
+        {
+            I_ErrorString += "Cannot find the field of camCoeffs.\n";
+            DramaTHROW(TDFGRIPPERTASK__READ_ERROR, "Cannot find the field of camCoeffs.");
+        }
+    }
+    else
+    {
+        I_ErrorString += "Cannot find the field of graspImg.\n";
+        DramaTHROW(TDFGRIPPERTASK__READ_ERROR, "Cannot find the field of graspImg.");
+    }
+
+    slaInvf(details->graspImg.camCoeffs, details->graspImg.invCoeffs, &j);
+    if (j != 0)
+    {
+        register int i;
+        for (i = 0; i < 6; i++)
+            details->graspImg.invCoeffs[i] = details->graspImg.camCoeffs[i];
+    }
+
+    DEBUG("The GraspImage invCoeffs array is:\n");
+    for (int index = 0; index < 6; index++)
+    {
+        DEBUG(" %f ", details->graspImg.invCoeffs[index]);
+    }
+    DEBUG("\n");
+
     /*
      *  Read the normal wimdow definitions.
      */
-
     tmpId = defId.Find("normWindow");
     if (tmpId)
     {
@@ -2110,10 +2692,11 @@ bool TdFGripperTask::tdFgripperReadFile(drama::sds::Id &defId)
         DEBUG("xCen from file is %f\n", dParam);
         details->normWin.xCen = dParam;
         // DEBUG("normWin.xCen is %f\n", details->normWin.xCen);
-
+        I_TdFGripperTaskParSys.Put("CENTRE_X_ROT", dParam);
         tmpId.Get("yCen", &dParam);
         DEBUG("yCen from file is %f\n", dParam);
         details->normWin.yCen = dParam;
+        I_TdFGripperTaskParSys.Put("CENTRE_Y_ROT", dParam);
         // DEBUG("normWin.yCen is %f\n", details->normWin.yCen);
 
         tmpId.Get("xSpan", &sParam);
@@ -2153,6 +2736,16 @@ bool TdFGripperTask::tdFgripperReadFile(drama::sds::Id &defId)
     tmpId = defId.Find("conversion");
     if (tmpId)
     {
+        tmpId.Get("zShift", &lIntParam);
+        details->convert.zShift = (int)lIntParam;
+        I_TdFGripperTaskParSys.Put("Z_SHIFT", lIntParam);
+        tmpId.Get("jawShift", &lIntParam);
+        details->convert.jawShift = (int)lIntParam;
+        I_TdFGripperTaskParSys.Put("JAW_SHIFT", lIntParam);
+        tmpId.Get("thetaShift", &lIntParam);
+        details->convert.thetaShift = (int)lIntParam;
+        I_TdFGripperTaskParSys.Put("THETA_SHIFT", lIntParam);
+
         tmp2Id = tmpId.Find("coeffs");
         if (tmp2Id)
         {
@@ -2203,12 +2796,59 @@ bool TdFGripperTask::tdFgripperReadFile(drama::sds::Id &defId)
         DEBUG(" %f ", details->convert.invCoeffs[index]);
     }
     DEBUG("\n");
+
+    /*
+     *  Get zmap parameters.
+     *
+     *   This has changed.  If we don't have the "cen" value, we have the old
+     *   format, and shoud presume cen is 0.  IT will be updated by the
+     *   positioner task anyway.
+     */
+    if (tmpId.Exists("cen");)
+    {
+        details->convert.zmap._cen = tmpId.GetDouble("cen");
+    }
+    else
+    {
+        DEBUG("WARNING: Gripper using old format defaults file");
+        details->convert.zmap._cen = 0;
+    }
+
+    details->convert.zmap._xm = tmpId.GetDouble("xm");
+    details->convert.zmap._xp = tmpId.GetDouble("xp");
+    details->convert.zmap._ym = tmpId.GetDouble("ym");
+    details->convert.zmap._yp = tmpId.GetDouble("yp");
+
     /*
      *  Set default parameter values.
      */
     tmpId = defId.Find("parameters");
     if (tmpId)
     {
+        tmpId.Get("CENTRE_X_ROT", &dParam);
+        if (dParam)
+        {
+            DEBUG("CENTRE_X_ROT from file is %ld\n", dParam);
+            I_TdFGripperTaskParSys.Put("CENTRE_X_ROT", dParam);
+            dParam = 0.0;
+        }
+
+        tmpId.Get("CENTRE_Y_ROT", &dParam);
+        if (dParam)
+        {
+            DEBUG("CENTRE_Y_ROT from file is %ld\n", dParam);
+            I_TdFGripperTaskParSys.Put("CENTRE_Y_ROT", dParam);
+            dParam = 0.0;
+        }
+        tmpId.Get("FIBRE_IN_IMAGE", &lIntParam);
+        if (lIntParam)
+        {
+
+            DEBUG("FIBRE_IN_IMAGE from file is %ld\n", lIntParam);
+            I_TdFGripperTaskParSys.Put("FIBRE_IN_IMAGE", lIntParam);
+            lIntParam = 0;
+        }
+
         tmpId.Get("XY_VEL", &lIntParam);
         if (lIntParam)
         {
@@ -2217,13 +2857,158 @@ bool TdFGripperTask::tdFgripperReadFile(drama::sds::Id &defId)
             I_TdFGripperTaskParSys.Put("XY_VEL", (INT32)lIntParam);
             lIntParam = 0;
         }
+        tmpId.Get("Z_VEL", &lIntParam);
+        if (lIntParam)
+        {
+
+            DEBUG("Z_VEL from file is %ld\n", lIntParam);
+            I_TdFGripperTaskParSys.Put("Z_VEL", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("THETA_VEL", &lIntParam);
+        if (lIntParam)
+        {
+
+            DEBUG("THETA_VEL from file is %ld\n", lIntParam);
+            I_TdFGripperTaskParSys.Put("THETA_VEL", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("JAW_VEL", &lIntParam);
+        if (lIntParam)
+        {
+
+            DEBUG("JAW_VEL from file is %ld\n", lIntParam);
+            I_TdFGripperTaskParSys.Put("JAW_VEL", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("X_ACCURACY_HI", &lIntParam);
+        if (lIntParam)
+        {
+
+            DEBUG("X_ACCURACY_HI from file is %ld\n", lIntParam);
+            I_TdFGripperTaskParSys.Put("X_ACCURACY_HI", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("X_ACCURACY_MED", &lIntParam);
+        if (lIntParam)
+        {
+
+            DEBUG("X_ACCURACY_MED from file is %ld\n", lIntParam);
+            I_TdFGripperTaskParSys.Put("X_ACCURACY_MED", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("X_ACCURACY_LOW", &lIntParam);
+        if (lIntParam)
+        {
+
+            DEBUG("X_ACCURACY_LOW from file is %ld\n", lIntParam);
+            I_TdFGripperTaskParSys.Put("X_ACCURACY_LOW", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("Y_ACCURACY_HI", &lIntParam);
+        if (lIntParam)
+        {
+
+            DEBUG("Y_ACCURACY_HI from file is %ld\n", lIntParam);
+            I_TdFGripperTaskParSys.Put("Y_ACCURACY_HI", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("Y_ACCURACY_MED", &lIntParam);
+        if (lIntParam)
+        {
+
+            DEBUG("Y_ACCURACY_MED from file is %ld\n", lIntParam);
+            I_TdFGripperTaskParSys.Put("Y_ACCURACY_MED", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("Y_ACCURACY_LOW", &lIntParam);
+        if (lIntParam)
+        {
+
+            DEBUG("Y_ACCURACY_LOW from file is %ld\n", lIntParam);
+            I_TdFGripperTaskParSys.Put("Y_ACCURACY_LOW", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("Z_ACCURACY_HI", &lIntParam);
+        if (lIntParam)
+        {
+
+            DEBUG("Z_ACCURACY_HI from file is %ld\n", lIntParam);
+            I_TdFGripperTaskParSys.Put("Z_ACCURACY_HI", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("Z_ACCURACY_MED", &lIntParam);
+        if (lIntParam)
+        {
+
+            DEBUG("Z_ACCURACY_MED from file is %ld\n", lIntParam);
+            I_TdFGripperTaskParSys.Put("Z_ACCURACY_MED", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("Z_ACCURACY_LOW", &lIntParam);
+        if (lIntParam)
+        {
+
+            DEBUG("Z_ACCURACY_LOW from file is %ld\n", lIntParam);
+            I_TdFGripperTaskParSys.Put("Z_ACCURACY_LOW", lIntParam);
+            lIntParam = 0;
+        }
+
+        tmpId.Get("T_ACCURACY_HI", &lIntParam);
+        if (lIntParam)
+        {
+
+            DEBUG("T_ACCURACY_HI from file is %ld\n", lIntParam);
+            I_TdFGripperTaskParSys.Put("T_ACCURACY_HI", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("T_ACCURACY_MED", &lIntParam);
+        if (lIntParam)
+        {
+
+            DEBUG("T_ACCURACY_MED from file is %ld\n", lIntParam);
+            I_TdFGripperTaskParSys.Put("T_ACCURACY_MED", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("T_ACCURACY_LOW", &lIntParam);
+        if (lIntParam)
+        {
+
+            DEBUG("T_ACCURACY_LOW from file is %ld\n", lIntParam);
+            I_TdFGripperTaskParSys.Put("T_ACCURACY_LOW", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("J_ACCURACY_HI", &lIntParam);
+        if (lIntParam)
+        {
+
+            DEBUG("J_ACCURACY_HI from file is %ld\n", lIntParam);
+            I_TdFGripperTaskParSys.Put("J_ACCURACY_HI", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("J_ACCURACY_MED", &lIntParam);
+        if (lIntParam)
+        {
+
+            DEBUG("J_ACCURACY_MED from file is %ld\n", lIntParam);
+            I_TdFGripperTaskParSys.Put("J_ACCURACY_MED", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("J_ACCURACY_LOW", &lIntParam);
+        if (lIntParam)
+        {
+
+            DEBUG("J_ACCURACY_LOW from file is %ld\n", lIntParam);
+            I_TdFGripperTaskParSys.Put("J_ACCURACY_LOW", lIntParam);
+            lIntParam = 0;
+        }
 
         tmpId.Get("STEP_SIZE", &lIntParam);
         if (lIntParam)
         {
 
             DEBUG("STEP_SIZE from file is %ld\n", lIntParam);
-            I_TdFGripperTaskParSys.Put("STEP_SIZE", (INT32)lIntParam);
+            I_TdFGripperTaskParSys.Put("STEP_SIZE", lIntParam);
             lIntParam = 0;
         }
 
@@ -2231,6 +3016,49 @@ bool TdFGripperTask::tdFgripperReadFile(drama::sds::Id &defId)
         if (lIntParam)
         {
             I_TdFGripperTaskParSys.Put("MAX_ERROR", (INT32)lIntParam);
+            lIntParam = 0;
+        }
+
+        tmpId.Get("IT_METHOD", &strParam);
+        if (strParam.empty() == false)
+        {
+            I_TdFGripperTaskParSys.Put("IT_METHOD", strParam);
+            strParam = "";
+        }
+        tmpId.Get("IT_TOL_PLACE", &lIntParam);
+        if (lIntParam)
+        {
+            I_TdFGripperTaskParSys.Put("IT_TOL_PLACE", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("IT_TOL_PARK", &lIntParam);
+        if (lIntParam)
+        {
+            I_TdFGripperTaskParSys.Put("IT_TOL_PARK", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("IT_ERROR_DIST", &lIntParam);
+        if (lIntParam)
+        {
+            I_TdFGripperTaskParSys.Put("IT_ERROR_DIST", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("MAX_ITS_PLACE", &sParam);
+        if (sParam)
+        {
+            I_TdFGripperTaskParSys.Put("MAX_ITS_PLACE", sParam);
+            sParam = 0;
+        }
+        tmpId.Get("MAX_ITS_PARK", &sParam);
+        if (sParam)
+        {
+            I_TdFGripperTaskParSys.Put("MAX_ITS_PARK", sParam);
+            sParam = 0;
+        }
+        tmpId.Get("LIFT_DRAG_TOL", &lIntParam);
+        if (lIntParam)
+        {
+            I_TdFGripperTaskParSys.Put("LIFT_DRAG_TOL", (INT32)lIntParam);
             lIntParam = 0;
         }
 
@@ -2245,88 +3073,205 @@ bool TdFGripperTask::tdFgripperReadFile(drama::sds::Id &defId)
         if (sParam)
         {
             I_TdFGripperTaskParSys.Put("POS_ATTEMPTS", (short)sParam);
-            // DEBUG("attempts is %hd\n", attempts);
+            // DEBUG("POS_ATTEMPTS is %hd\n", attempts);
             sParam = 0;
         }
 
-        tmpId.Get("FIBRE_IN_IMAGE", &lIntParam);
+        tmpId.Get("IT_Z", &lIntParam);
         if (lIntParam)
         {
 
-            I_TdFGripperTaskParSys.Put("FIBRE_IN_IMAGE", (INT32)lIntParam);
-            // DEBUG("fibInImgThres is %d\n", fibInImgThres);
+            I_TdFGripperTaskParSys.Put("IT_Z", lIntParam);
+            // DEBUG("IT_Z is %d\n", fibInImgThres);
             lIntParam = 0;
+        }
+        tmpId.Get("CARRY_Z", &lIntParam);
+        if (lIntParam)
+        {
+            I_TdFGripperTaskParSys.Put("CARRY_Z", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("BUTTON_Z", &lIntParam);
+        if (lIntParam)
+        {
+            I_TdFGripperTaskParSys.Put("BUTTON_Z", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("PUTDOWN_Z", &lIntParam);
+        if (lIntParam)
+        {
+            I_TdFGripperTaskParSys.Put("PUTDOWN_Z", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("PARK_Z", &lIntParam);
+        if (lIntParam)
+        {
+            I_TdFGripperTaskParSys.Put("PARK_Z", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("CLEAN_Z", &lIntParam);
+        if (lIntParam)
+        {
+            I_TdFGripperTaskParSys.Put("CLEAN_Z", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("CAMERA_Z", &lIntParam);
+        if (lIntParam)
+        {
+            I_TdFGripperTaskParSys.Put("CAMERA_Z", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("CAMERA_Z_FID", &lIntParam);
+        if (lIntParam)
+        {
+            I_TdFGripperTaskParSys.Put("CAMERA_Z_FID", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("JAW_OPEN", &lIntParam);
+        if (lIntParam)
+        {
+            I_TdFGripperTaskParSys.Put("JAW_OPEN", lIntParam);
+            lIntParam = 0;
+        }
+        if (tmpId.Exists("JAW_OPEN_IT"))
+        {
+            tmpId.Get("JAW_OPEN_IT", &lIntParam);
+            if (lIntParam)
+            {
+                I_TdFGripperTaskParSys.Put("JAW_OPEN_IT", lIntParam);
+                lIntParam = 0;
+            }
+        }
+        else
+        {
+            tmpId.Get("JAW_OPEN", &lIntParam);
+            if (lIntParam)
+            {
+                I_TdFGripperTaskParSys.Put("JAW_OPEN_IT", lIntParam);
+                lIntParam = 0;
+            }
+        }
+
+        if (tmpId.Exists("JAW_CLOSE_G"))
+        {
+            tmpId.Get("JAW_CLOSE_G", &lIntParam);
+            if (lIntParam)
+            {
+                I_TdFGripperTaskParSys.Put("JAW_CLOSE_G", lIntParam);
+                lIntParam = 0;
+            }
+        }
+        else
+        {
+            tmpId.Get("JAW_CLOSE", &lIntParam);
+            if (lIntParam)
+            {
+                I_TdFGripperTaskParSys.Put("JAW_CLOSE_G", lIntParam);
+                lIntParam = 0;
+            }
+        }
+        tmpId.Get("JAW_OPEN_FULL", &lIntParam);
+        if (lIntParam)
+        {
+            I_TdFGripperTaskParSys.Put("JAW_OPEN_FULL", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("HANDLE_WIDTH", &lIntParam);
+        if (lIntParam)
+        {
+            I_TdFGripperTaskParSys.Put("HANDLE_WIDTH", lIntParam);
+            lIntParam = 0;
+        }
+
+        tmpId.Get("JAW_METHOD_DWN", &strParam);
+        if (strParam.empty() == false)
+        {
+            I_TdFGripperTaskParSys.Put("JAW_METHOD_DWN", strParam);
+            strParam = "";
+        }
+        tmpId.Get("JAW_METHOD_UP", &strParam);
+        if (strParam.empty() == false)
+        {
+            I_TdFGripperTaskParSys.Put("JAW_METHOD_UP", strParam);
+            strParam = "";
         }
 
         tmpId.Get("SETTLE_TIME", &dParam);
         if (dParam)
         {
             I_TdFGripperTaskParSys.Put("SETTLE_TIME", (double)dParam);
-            // DEBUG("settleTime is %f\n", settleTime);
             dParam = 0.0;
-        }
-
-        tmpId.Get("X_ACCURACY", &lIntParam);
-        if (lIntParam)
-        {
-            I_TdFGripperTaskParSys.Put("X_ACCURACY", (INT32)lIntParam);
-            // DEBUG("xaccuracy is %d\n", xaccuracy);
-            lIntParam = 0;
-        }
-
-        tmpId.Get("Y_ACCURACY", &lIntParam);
-        if (lIntParam)
-        {
-            I_TdFGripperTaskParSys.Put("Y_ACCURACY", (INT32)lIntParam);
-            // DEBUG("yaccuracy is %d\n", yaccuracy);
-            lIntParam = 0;
         }
 
         tmpId.Get("TIMEOUT_FAC", &lIntParam);
         if (lIntParam)
         {
-            I_TdFGripperTaskParSys.Put("TIMEOUT_FAC", (INT32)lIntParam);
-            // DEBUG("timeoutFac is %d\n", timeoutFac);
+            I_TdFGripperTaskParSys.Put("TIMEOUT_FAC", lIntParam);
             lIntParam = 0;
         }
 
         tmpId.Get("DPR_FEEDBACK", &strParam);
         if (strParam.empty() == false)
         {
-            details->dprFeedback = strcmp("NO", strParam.c_str()) ? YES : NO;
-            // DEBUG("details->dprFeedback is %hd\n", details->dprFeedback);
+            details->dprFeedback = ("NO" != strParam) ? YES : NO;
+            strParam = "";
+        }
+        tmpId.Get("SEND_ABORT", &strParam);
+        if (strParam.empty() == false)
+        {
+            I_TdFGripperTaskParSys.Put("SEND_ABORT", strParam);
             strParam = "";
         }
 
         tmpId.Get("VFG_OP_ENABLE", &lIntParam);
         if (lIntParam)
         {
-            I_TdFGripperTaskParSys.Put("VFG_OP_ENABLE", (INT32)lIntParam);
-            // DEBUG("overlayPlaneEnabled is %d\n", overlayPlaneEnabled);
+            I_TdFGripperTaskParSys.Put("VFG_OP_ENABLE", lIntParam);
             lIntParam = 0;
+        }
+        tmpId.Get("CROSS_RETRACT_Z", &lIntParam);
+        if (lIntParam)
+        {
+            I_TdFGripperTaskParSys.Put("CROSS_RETRACT_Z", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("JAW_CLOSE", &lIntParam);
+        if (lIntParam)
+        {
+            I_TdFGripperTaskParSys.Put("JAW_CLOSE", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("BACKILL_ALWAYS", &lIntParam);
+        if (lIntParam)
+        {
+            I_TdFGripperTaskParSys.Put("BACKILL_ALWAYS", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("BACKILL_WARMUP", &dParam);
+        if (dParam)
+        {
+            I_TdFGripperTaskParSys.Put("BACKILL_WARMUP", dParam);
+            dParam = 0.0;
         }
 
         tmpId.Get("ZEROCAM_CENWAIT", &dParam);
         if (dParam)
         {
-            I_TdFGripperTaskParSys.Put("ZEROCAM_CENWAIT", (double)dParam);
-            // DEBUG("zerocamCenWait is %f\n", zerocamCenWait);
+            I_TdFGripperTaskParSys.Put("ZEROCAM_CENWAIT", dParam);
             dParam = 0.0;
         }
 
         tmpId.Get("PMAC_LIM_X_POS", &lIntParam);
         if (lIntParam)
         {
-            I_TdFGripperTaskParSys.Put("PMAC_LIM_X_POS", (INT32)lIntParam);
-            // DEBUG("copleyXPosLim is %d\n", copleyXPosLim);
+            I_TdFGripperTaskParSys.Put("PMAC_LIM_X_POS", lIntParam);
             lIntParam = 0;
         }
 
         tmpId.Get("PMAC_LIM_X_NEG", &lIntParam);
         if (lIntParam)
         {
-            I_TdFGripperTaskParSys.Put("PMAC_LIM_X_NEG", (INT32)lIntParam);
-            // DEBUG("copleyXNegLim is %d\n", copleyXNegLim);
+            I_TdFGripperTaskParSys.Put("PMAC_LIM_X_NEG", lIntParam);
             lIntParam = 0;
         }
 
@@ -2344,11 +3289,134 @@ bool TdFGripperTask::tdFgripperReadFile(drama::sds::Id &defId)
             lIntParam = 0;
         }
 
+        tmpId.Get("DIST_REM_ENABLE", &lIntParam);
+        if (lIntParam)
+        {
+            I_TdFGripperTaskParSys.Put("DIST_REM_ENABLE", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("DIST_MAP_FILE", &strParam);
+        if (strParam.empty() == false)
+        {
+            I_TdFGripperTaskParSys.Put("DIST_MAP_FILE", strParam);
+            strParam = "";
+        }
+        if (tmpId.Exists("DIST_P18"))
+        {
+            tmpId.Get("DIST_P1", &dParam);
+            if (dParam)
+            {
+                I_TdFGripperTaskParSys.Put("DIST_P1", dParam);
+                dParam = 0.0;
+            }
+            tmpId.Get("DIST_P2", &dParam);
+            if (dParam)
+            {
+                I_TdFGripperTaskParSys.Put("DIST_P2", dParam);
+                dParam = 0.0;
+            }
+            tmpId.Get("DIST_P3", &dParam);
+            if (dParam)
+            {
+                I_TdFGripperTaskParSys.Put("DIST_P3", dParam);
+                dParam = 0.0;
+            }
+            tmpId.Get("DIST_P4", &dParam);
+            if (dParam)
+            {
+                I_TdFGripperTaskParSys.Put("DIST_P4", dParam);
+                dParam = 0.0;
+            }
+            tmpId.Get("DIST_P5", &dParam);
+            if (dParam)
+            {
+                I_TdFGripperTaskParSys.Put("DIST_P5", dParam);
+                dParam = 0.0;
+            }
+            tmpId.Get("DIST_P6", &dParam);
+            if (dParam)
+            {
+                I_TdFGripperTaskParSys.Put("DIST_P6", dParam);
+                dParam = 0.0;
+            }
+            tmpId.Get("DIST_P7", &dParam);
+            if (dParam)
+            {
+                I_TdFGripperTaskParSys.Put("DIST_P7", dParam);
+                dParam = 0.0;
+            }
+            tmpId.Get("DIST_P8", &dParam);
+            if (dParam)
+            {
+                I_TdFGripperTaskParSys.Put("DIST_P8", dParam);
+                dParam = 0.0;
+            }
+            tmpId.Get("DIST_P9", &dParam);
+            if (dParam)
+            {
+                I_TdFGripperTaskParSys.Put("DIST_P9", dParam);
+                dParam = 0.0;
+            }
+            tmpId.Get("DIST_P10", &dParam);
+            if (dParam)
+            {
+                I_TdFGripperTaskParSys.Put("DIST_P10", dParam);
+                dParam = 0.0;
+            }
+            tmpId.Get("DIST_P11", &dParam);
+            if (dParam)
+            {
+                I_TdFGripperTaskParSys.Put("DIST_P11", dParam);
+                dParam = 0.0;
+            }
+            tmpId.Get("DIST_P12", &dParam);
+            if (dParam)
+            {
+                I_TdFGripperTaskParSys.Put("DIST_P12", dParam);
+                dParam = 0.0;
+            }
+            tmpId.Get("DIST_P13", &dParam);
+            if (dParam)
+            {
+                I_TdFGripperTaskParSys.Put("DIST_P13", dParam);
+                dParam = 0.0;
+            }
+            tmpId.Get("DIST_P14", &dParam);
+            if (dParam)
+            {
+                I_TdFGripperTaskParSys.Put("DIST_P14", dParam);
+                dParam = 0.0;
+            }
+            tmpId.Get("DIST_P15", &dParam);
+            if (dParam)
+            {
+                I_TdFGripperTaskParSys.Put("DIST_P15", dParam);
+                dParam = 0.0;
+            }
+            tmpId.Get("DIST_P16", &dParam);
+            if (dParam)
+            {
+                I_TdFGripperTaskParSys.Put("DIST_P16", dParam);
+                dParam = 0.0;
+            }
+            tmpId.Get("DIST_P17", &dParam);
+            if (dParam)
+            {
+                I_TdFGripperTaskParSys.Put("DIST_P17", dParam);
+                dParam = 0.0;
+            }
+            tmpId.Get("DIST_P18", &dParam);
+            if (dParam)
+            {
+                I_TdFGripperTaskParSys.Put("DIST_P18", dParam);
+                dParam = 0.0;
+            }
+        }
+
         tmpId.Get("PLT1_CFID_OFF_X", &lIntParam);
         if (lIntParam)
         {
             I_TdFGripperTaskParSys.Put("PLT1_CFID_OFF_X", (short)lIntParam);
-            // DEBUG("shortZeroX is %hd\n", shortZeroX);
             lIntParam = 0;
         }
 
@@ -2356,8 +3424,25 @@ bool TdFGripperTask::tdFgripperReadFile(drama::sds::Id &defId)
         if (lIntParam)
         {
             I_TdFGripperTaskParSys.Put("PLT1_CFID_OFF_Y", (short)lIntParam);
-            // DEBUG("shortZeroY is %hd\n", shortZeroY);
             lIntParam = 0;
+        }
+        tmpId.Get("CENTCALCHK_WRN", &lIntParam);
+        if (lIntParam)
+        {
+            I_TdFGripperTaskParSys.Put("CENTCALCHK_WRN", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("CENTCALCHK_ERR", &lIntParam);
+        if (lIntParam)
+        {
+            I_TdFGripperTaskParSys.Put("CENTCALCHK_ERR", lIntParam);
+            lIntParam = 0;
+        }
+        tmpId.Get("ITS_IGNRE_FRST", &strParam);
+        if (strParam.empty() == false)
+        {
+            I_TdFGripperTaskParSys.Put("ITS_IGNRE_FRST", strParam);
+            strParam = "";
         }
     }
     tdFgripperSetMainStruct(details);
@@ -2489,24 +3574,23 @@ void TdFGripperTask::tdFgripperFlexure(long int x, long int y,
 void TdFGripperTask::tdFstateBitSet(unsigned char bit)
 {
     unsigned short oldval, newval = 0;
-    oldval = ushortZero;
+    I_TdFCanTaskParSys.Get("TASK_STATE", &oldval);
     newval = oldval | bit;
 
     /* Only update the parameter (triggering monitors) if value has changed*/
     if (newval != oldval)
-        ushortZero = newval;
+        I_TdFCanTaskParSys.Put("TASK_STATE", newval);
 }
 
 void TdFGripperTask::tdFstateBitClear(unsigned char bit)
 {
     unsigned short oldval, newval = 0;
-    oldval = ushortZero;
-
+    I_TdFCanTaskParSys.Get("TASK_STATE", &oldval);
     newval = oldval & (~bit);
 
     /* Only update the parameter (triggering monitors) if value has changed*/
     if (newval != oldval)
-        ushortZero = newval;
+        I_TdFCanTaskParSys.Put("TASK_STATE", newval);
 }
 
 void TdFGripperTask::tdFgripperConvertFromEnc(int displayText, int xEnc, int yEnc, int zEnc, int tEnc,
@@ -2670,11 +3754,28 @@ void TdFGripperTask::tdFgripperConvertFromEnc(int displayText, int xEnc, int yEn
               *xCon, *yCon, *zCon);
     }
 }
+long int TdFGripperTask::tdFgripperThetaDiffMicroRads(const long int t1, const long int t2)
+{
+    long int t1normalized;
+    long int t2normalized;
+    if (t1 == t2)
+        return 0;
+
+    /*
+     * Put both values in the range -PI to PI.
+     */
+    t1normalized = dRangeMicroRad(t1);
+    t2normalized = dRangeMicroRad(t2);
+    /*
+     * Return the difference - also in the range -PI to PI.
+     */
+    return dRangeMicroRad(t1normalized - t2normalized);
+}
 
 bool TdFGripperTask::tdFgripperUpdatePos(short updateIdeal, short useDpr, short displayText)
 {
     double atFpX, atFpY, atFpZ, atFpJ,
-        oldFpT, newFpT, plateTheta;
+        oldFpT, newFpT;
     long int oldFpX, oldFpY, oldFpZ, oldFpJ,
         newFpX, newFpY, newFpZ, newFpJ;
 
@@ -2705,17 +3806,17 @@ bool TdFGripperTask::tdFgripperUpdatePos(short updateIdeal, short useDpr, short 
                 else if (Index == 3)
                 {
                     I_tdFgripperMainStruct->atEnc.z = (int)CurrentPosition;
-                    DEBUG("\nNow the encoder position of Y axis is %d", I_tdFgripperMainStruct->atEnc.z);
+                    DEBUG("\nNow the encoder position of Z axis is %d", I_tdFgripperMainStruct->atEnc.z);
                 }
                 else if (Index == 4)
                 {
                     I_tdFgripperMainStruct->atEnc.jaw = (int)CurrentPosition;
-                    DEBUG("\nNow the encoder position of Y axis is %d", I_tdFgripperMainStruct->atEnc.jaw);
+                    DEBUG("\nNow the encoder position of JAW axis is %d", I_tdFgripperMainStruct->atEnc.jaw);
                 }
                 else
                 {
-                    I_tdFgripperMainStruct->atEnc.jaw = (int)CurrentPosition;
-                    DEBUG("\nNow the encoder position of Y axis is %d", I_tdFgripperMainStruct->atEnc.jaw);
+                    I_tdFgripperMainStruct->atEnc.theta = (int)CurrentPosition;
+                    DEBUG("\nNow the encoder position of THETA axis is %d", I_tdFgripperMainStruct->atEnc.theta);
                 }
             }
         }
@@ -2727,8 +3828,13 @@ bool TdFGripperTask::tdFgripperUpdatePos(short updateIdeal, short useDpr, short 
     }
     else
     {
+        if (displayText)
+            DEBUG("Assuming current encoder position is previous target position");
         I_tdFgripperMainStruct->atEnc.x = I_tdFgripperMainStruct->toEnc.x;
         I_tdFgripperMainStruct->atEnc.y = I_tdFgripperMainStruct->toEnc.y;
+        I_tdFgripperMainStruct->atEnc.z = I_tdFgripperMainStruct->toEnc.z;
+        I_tdFgripperMainStruct->atEnc.jaw = I_tdFgripperMainStruct->toEnc.jaw;
+        I_tdFgripperMainStruct->atEnc.theta = I_tdFgripperMainStruct->toEnc.theta;
     }
 
     {
@@ -2736,150 +3842,123 @@ bool TdFGripperTask::tdFgripperUpdatePos(short updateIdeal, short useDpr, short 
          * Update the parameters which contain the encoder values - but only if they
          * have actually changed (to avoid flooding parameter monitors)
          */
-        ixPark = I_TdFGripperTaskParSys.GetInt("X");
+        long int ixPark, iyPark, izPark, itPark, ijPark;
+        ixPark = I_TdFGripperTaskParSys.GetInt("X_PMAC");
         if (ixPark != I_tdFgripperMainStruct->atEnc.x)
         {
-            I_TdFGripperTaskParSys.Put("X", (long int)I_tdFgripperMainStruct->atEnc.x);
-            I_TdFGripperTaskParSys.Put("XCopley", (long int)I_tdFgripperMainStruct->atEnc.x);
+            I_TdFGripperTaskParSys.Put("X_PMAC", (long int)I_tdFgripperMainStruct->atEnc.x);
         }
-        iyPark = I_TdFGripperTaskParSys.GetInt("Y");
+        iyPark = I_TdFGripperTaskParSys.GetInt("Y_PMAC");
         if (iyPark != I_tdFgripperMainStruct->atEnc.y)
         {
-            I_TdFGripperTaskParSys.Put("Y", (long int)I_tdFgripperMainStruct->atEnc.y);
-            I_TdFGripperTaskParSys.Put("YCopley", (long int)I_tdFgripperMainStruct->atEnc.y);
+            I_TdFGripperTaskParSys.Put("Y_PMAC", (long int)I_tdFgripperMainStruct->atEnc.y);
+        }
+        izPark = I_TdFGripperTaskParSys.GetInt("Z_PMAC");
+        if (izPark != I_tdFgripperMainStruct->atEnc.z)
+        {
+            I_TdFGripperTaskParSys.Put("Z_PMAC", (long int)I_tdFgripperMainStruct->atEnc.z);
+        }
+        ijPark = I_TdFGripperTaskParSys.GetInt("JAW_PMAC");
+        if (ijPark != I_tdFgripperMainStruct->atEnc.jaw)
+        {
+            I_TdFGripperTaskParSys.Put("JAW_PMAC", (long int)I_tdFgripperMainStruct->atEnc.jaw);
+        }
+        itPark = I_TdFGripperTaskParSys.GetInt("THETA_PMAC");
+        if (itPark != I_tdFgripperMainStruct->atEnc.theta)
+        {
+            I_TdFGripperTaskParSys.Put("THETA_PMAC", (long int)I_tdFgripperMainStruct->atEnc.theta);
+        }
+
+        ixPark = I_TdFGripperTaskParSys.GetInt("X_PMAC_ERR");
+        if (ixPark != (I_tdFgripperMainStruct->atEnc.x - I_tdFgripperMainStruct->toEnc.x))
+        {
+            I_TdFGripperTaskParSys.Put("X_PMAC_ERR", (I_tdFgripperMainStruct->atEnc.x - I_tdFgripperMainStruct->toEnc.x));
+        }
+
+        iyPark = I_TdFGripperTaskParSys.GetInt("Y_PMAC_ERR");
+        if (iyPark != (I_tdFgripperMainStruct->atEnc.y - I_tdFgripperMainStruct->toEnc.y))
+        {
+            I_TdFGripperTaskParSys.Put("Y_PMAC_ERR", (I_tdFgripperMainStruct->atEnc.y - I_tdFgripperMainStruct->toEnc.y));
+        }
+
+        izPark = I_TdFGripperTaskParSys.GetInt("Z_PMAC_ERR");
+        if (izPark != (I_tdFgripperMainStruct->atEnc.z - I_tdFgripperMainStruct->toEnc.z))
+        {
+            I_TdFGripperTaskParSys.Put("Z_PMAC_ERR", (I_tdFgripperMainStruct->atEnc.z - I_tdFgripperMainStruct->toEnc.z));
+        }
+
+        ijPark = I_TdFGripperTaskParSys.GetInt("JAW_PMAC_ERR");
+        if (ijPark != (I_tdFgripperMainStruct->atEnc.jaw - I_tdFgripperMainStruct->toEnc.jaw))
+        {
+            I_TdFGripperTaskParSys.Put("JAW_PMAC_ERR", (I_tdFgripperMainStruct->atEnc.jaw - I_tdFgripperMainStruct->toEnc.jaw));
+        }
+
+        itPark = I_TdFGripperTaskParSys.GetInt("THETA_PMAC_ERR");
+        if (itPark != (I_tdFgripperMainStruct->atEnc.theta - I_tdFgripperMainStruct->toEnc.theta))
+        {
+            long int normalizedError = tdFgripperThetaDiffMicroRads(I_tdFgripperMainStruct->atEnc.theta,
+                                                                    I_tdFgripperMainStruct->toEnc.theta);
+            if (normalizedError != itPark)
+                I_TdFGripperTaskParSys.Put("THETA_PMAC_ERR", normalizedError);
         }
     }
     double dPlateTheta = I_TdFGripperTaskParSys.GetDouble("PLATE_THETA");
     tdFgripperConvertFromEnc(I_tdFgripperMainStruct->atEnc.x,
                              I_tdFgripperMainStruct->atEnc.y,
-                             (double)dPlateTheta, _FULL,
-                             &atFpX, &atFpY);
+                             I_tdFgripperMainStruct->atEnc.z,
+                             I_tdFgripperMainStruct->atEnc.theta,
+                             I_tdFgripperMainStruct->atEnc.jaw,
+                             dPlateTheta, _FULL,
+                             &atFpX, &atFpY, &atFpZ, &newFpT, &atFpJ);
 
-    if (displayText)
-        DEBUG("\ntdFgripper:Converted encoder values %d, %d to plate units %f, %f.\n", I_tdFgripperMainStruct->atEnc.x, I_tdFgripperMainStruct->atEnc.y, atFpX, atFpY);
+    DEBUG("Encoder values x:%d, y:%d z:%d, t:%d, j:%d\n",
+          I_tdFgripperMainStruct->atEnc.x, I_tdFgripperMainStruct->atEnc.y, I_tdFgripperMainStruct->atEnc.z,
+          I_tdFgripperMainStruct->atEnc.theta, I_tdFgripperMainStruct->atEnc.jaw);
+    DEBUG("Converted values x:%g, y:%g z:%g, t:%g, j:%g\n", atFpX, atFpY, atFpZ, newFpT, atFpJ);
 
-    oldFpX = (long int)(ixPark);
     oldFpX = I_TdFGripperTaskParSys.GetLong("X");
-    oldFpY = (long int)(iyPark);
     oldFpY = I_TdFGripperTaskParSys.GetLong("Y");
+    oldFpZ = I_TdFGripperTaskParSys.GetLong("Z");
+    oldFpJ = I_TdFGripperTaskParSys.GetLong("JAW");
+    oldFpT = I_TdFGripperTaskParSys.GetDouble("THETA");
     newFpX = doubleToLong(atFpX);
     newFpY = doubleToLong(atFpY);
-
-    if (oldFpX != newFpX)
-    {
-        xPark = newFpX;
-        xCopleyPark = newFpX;
-        I_TdFGripperTaskParSys.Put("X", (long int)newFpX);
-        I_TdFGripperTaskParSys.Put("XCopley", (long int)newFpX);
-    }
-    if (oldFpY != newFpY)
-    {
-        yPark = newFpY;
-        yCopleyPark = newFpY;
-        I_TdFGripperTaskParSys.Put("Y", (long int)newFpY);
-        I_TdFGripperTaskParSys.Put("YCopley", (long int)newFpY);
-    }
+    newFpZ = doubleToLong(atFpZ);
+    newFpJ = doubleToLong(atFpJ);
     if ((newFpX >= (GRIPPER_CLEAR_X - 1000)) && (newFpY <= (GRIPPER_CLEAR_Y + 1000)))
         tdFstateBitSet(SAFE);
     else
         tdFstateBitClear(SAFE);
 
+    if (oldFpX != newFpX)
+    {
+        I_TdFGripperTaskParSys.Put("X", (long int)newFpX);
+    }
+    if (oldFpY != newFpY)
+    {
+        I_TdFGripperTaskParSys.Put("Y", (long int)newFpY);
+    }
+    if (oldFpZ != newFpZ)
+    {
+        I_TdFGripperTaskParSys.Put("Z", (long int)newFpZ);
+    }
+    if (oldFpJ != newFpJ)
+    {
+        I_TdFGripperTaskParSys.Put("JAW", (long int)newFpJ);
+    }
+    if (((oldFpT - 0.001) > newFpT) || ((oldFpT + 0.001) < newFpT))
+        I_TdFGripperTaskParSys.Put("THETA", newFpT);
+
     if (updateIdeal)
     {
         I_tdFgripperMainStruct->ideal.x = newFpX;
         I_tdFgripperMainStruct->ideal.y = newFpY;
+        I_tdFgripperMainStruct->ideal.z = newFpZ;
+        I_tdFgripperMainStruct->ideal.jaw = newFpJ;
+        I_tdFgripperMainStruct->ideal.theta = newFpT;
     }
-    DEBUG("tdFgripper:I_tdFgripperMainStruct->ideal values: %ld, %ld.\n", I_tdFgripperMainStruct->ideal.x, I_tdFgripperMainStruct->ideal.y);
-    return true;
-}
-
-bool CSearchAction::MoveToSearchPosition(const long searchX, const long searchY, short *const atSearchXY,
-                                         short *const searchStarted)
-{
-    *searchStarted = YES;
-    *atSearchXY = YES;
-    auto ThisTask(GetTask()->TaskPtrAs<TdFGripperTask>());
-    drama::ParSys parSysId(ThisTask->TaskPtr());
-    double plateTheta, toXenc, toYenc;
-
-    if (0) // if (!(ThisTask->SetupAmps()))
-    {
-        DEBUG("MoveToSearchPosition: Failed to set up the amplifiers %s.\n", ThisTask->GetError().c_str());
-        return false;
-    }
-    else
-    {
-        std::string Error;
-        std::string Axes = "X,Y";
-        std::string Velocities = "1,1";
-
-        parSysId.Get("PLATE_THETA", &plateTheta);
-        ThisTask->tdFgripperConvertFromFP(searchX, searchY, plateTheta, _FULL,
-                                          &toXenc, &toYenc);
-
-        details->ideal.x = searchX;
-        details->ideal.y = searchY;
-        details->toEnc.x = (int)doubleToLong(toXenc);
-        details->toEnc.y = (int)doubleToLong(toYenc);
-
-        std::string Positions = to_string(doubleToLong(toXenc)) + "," + to_string(doubleToLong(toYenc));
-        printf("MoveToSearchPosition: the position is %s.\n", Positions.c_str());
-        std::vector<AxisDemand> AxisDemands = GetDemands(Axes, Positions, Velocities, Error);
-        if (!(ThisTask->MoveAxes(AxisDemands, false)))
-        {
-            DEBUG("MoveToSearchPosition: failed to move to the position %s.\n", ThisTask->GetError().c_str());
-            return false;
-        }
-        std::this_thread::sleep_for(2000ms);
-        if (!ThisTask->tdFgripperUpdatePos(YES, YES, YES))
-        {
-            MessageUser("MoveToSearchPosition: failed to Update the current position of gantry.");
-        }
-    }
-    return true;
-}
-
-bool CSearchAction::PerformCentroid(const shared_ptr<tdFgrip_CENtype> &cenWin, const double settletime, short *const centroided)
-{
-    *centroided = YES;
-    if (settletime > 0.0)
-    {
-        std::this_thread::sleep_for(std::chrono::seconds(int(settletime)));
-    }
-    drama::Path thisTaskPath(_theTask);
-
-    MessageUser("C_SEARCH PerformCentroid: - grabbing image");
-    MessageUser("C_SEARCH PerformCentroid:  Window size -> Max %ld %ld off %ld %ld, dim %ld %ld",
-                cenWin->window.MaxX, cenWin->window.MaxY,
-                cenWin->window.Xoffset, cenWin->window.Yoffset,
-                cenWin->window.Xdim, cenWin->window.Ydim);
-
-    drama::sds::Id messageArg(drama::sds::Id::CreateArgStruct());
-    drama::sds::IdPtr returnedArg;
-
-    messageArg.Put("Image", "FREE");
-    messageArg.Put("Window", "FULL");
-
-    // reorganise a class or a function to implement centroid;
-    try
-    {
-        thisTaskPath.Obey(this, "C_CENTROID", messageArg, &returnedArg);
-    }
-    catch (std::exception &what)
-    {
-        DEBUG("C_SEARCH PerformCentroid: Vimba raises an error.\n");
-        return false;
-    }
-
-    if (!(*returnedArg))
-    {
-        DEBUG("C_SEARCH PerformCentroid: Failed to perform centroid and return an image.\n");
-        return false;
-    }
-
-    returnedArg->Get("XERR", &m_tdFgripperSFStruct->xErr);
-    returnedArg->Get("YERR", &m_tdFgripperSFStruct->yErr);
-    returnedArg->Get("FIBREINIMAGE", &m_tdFgripperSFStruct->centroidOK);
+    DEBUG("tdFgripper:I_tdFgripperMainStruct->ideal values: %ld, %ld, %ld, %ld, %d.\n", I_tdFgripperMainStruct->ideal.x, I_tdFgripperMainStruct->ideal.y, I_tdFgripperMainStruct->ideal.z,
+          I_tdFgripperMainStruct->ideal.jaw, I_tdFgripperMainStruct->ideal.theta);
     return true;
 }
 
@@ -2889,7 +3968,7 @@ bool TdFGripperTask::SetupAmps(void)
     //  See if all the amps have already been setup successfully.
 
     // bool AllFound = I_X1Amp && I_X2Amp && I_YAmp && I_ZAmp && I_ThetaAmp && I_JawAmp;
-    bool AllFound = AllFound = I_X1Amp && I_X2Amp && I_YAmp && I_ZAmp && I_ThetaAmp && I_JawAmp;
+    bool AllFound = I_X1Amp && I_X2Amp && I_YAmp && I_ZAmp && I_ThetaAmp && I_JawAmp;
 
     if (!AllFound)
     {
@@ -2927,7 +4006,7 @@ bool TdFGripperTask::SetupAmps(void)
         //  Access the CML::Amp objects used to control the specified axes.
 
         static CML::Amp **AmpAddrs[MAX_TDF_AMPS] =
-            {&I_X1Amp, &I_X2Amp, &I_YAmp, &I_ZAmp, &I_ThetaAmp, &I_JawAmp};
+            {&I_X1Amp, &I_X2Amp, &I_YAmp, &I_ZAmp, &I_JawAmp, &I_ThetaAmp};
 
         if (I_CanAccessInitialised)
         {
@@ -3100,7 +4179,22 @@ bool TdFGripperTask::HomeAxes(bool HomeX, bool HomeY, bool HomeZ, bool HomeTheta
         if (HomeY)
         {
             HomeFlags[Y_AMP] = true;
-            I_tdFgripperMainStruct->toEnc.x = 0;
+            I_tdFgripperMainStruct->toEnc.y = 0;
+        }
+        if (HomeZ)
+        {
+            HomeFlags[Z_AMP] = true;
+            I_tdFgripperMainStruct->toEnc.z = 0;
+        }
+        if (HomeJaw)
+        {
+            HomeFlags[JAW_AMP] = true;
+            I_tdFgripperMainStruct->toEnc.jaw = 0;
+        }
+        if (HomeTheta)
+        {
+            HomeFlags[THETA_AMP] = true;
+            I_tdFgripperMainStruct->toEnc.theta = 0;
         }
 
         //  Set all the amps in the linkage to a pre-programmed halt mode, specifying that a
@@ -3183,12 +4277,18 @@ bool TdFGripperTask::HomeAxes(bool HomeX, bool HomeY, bool HomeZ, bool HomeTheta
 
 bool TdFGripperTask::SetParameter(string &ParameterName, string &ParameterValue)
 {
+    std::string tdfCanMode;
+    I_TdFGripperTaskParSys.Get("MODE", &tdfCanMode);
     if (strcmp(ParameterName.c_str(), "MODE") == 0)
     {
-        tdfCanMode = ParameterValue;
+        I_TdFGripperTaskParSys.Put("MODE", ParameterValue);
         DEBUG("\nSetting up the mode %s\n", ParameterValue.c_str());
     }
-    else if ((strcmp(ParameterName.c_str(), "X") == 0) || (strcmp(ParameterName.c_str(), "Y") == 0))
+    else if ((strcmp(ParameterName.c_str(), "X") == 0) ||
+             (strcmp(ParameterName.c_str(), "Y") == 0) ||
+             (strcmp(ParameterName.c_str(), "Z") == 0) ||
+             (strcmp(ParameterName.c_str(), "JAW") == 0) ||
+             (strcmp(ParameterName.c_str(), "THETA") == 0))
     {
         if (tdfCanMode != "NOT_PROTECTED")
         {
@@ -3197,58 +4297,82 @@ bool TdFGripperTask::SetParameter(string &ParameterName, string &ParameterValue)
         }
         else
         {
-            int PosVal = stoi(ParameterValue);
             if (strcmp(ParameterName.c_str(), "X") == 0)
             {
+                int PosVal = stoi(ParameterValue);
                 I_TdFGripperTaskParSys.Put("X", (INT32)PosVal);
+                I_tdFgripperMainStruct->ideal.x = PosVal;
             }
-            else
+            else if (strcmp(ParameterName.c_str(), "Y") == 0)
             {
+                int PosVal = stoi(ParameterValue);
                 I_TdFGripperTaskParSys.Put("Y", (INT32)PosVal);
+                I_tdFgripperMainStruct->ideal.y = PosVal;
             }
-        }
-    }
-    else if (strcmp(ParameterName.c_str(), "XY_VEL") == 0)
-    {
-        int VelVal = stoi(ParameterValue);
-        I_TdFGripperTaskParSys.Put("XY_VEL", (INT32)VelVal);
-        DEBUG("Setting up the velocity %d\n", (int)xyVel);
-    }
-    else if ((strcmp(ParameterName.c_str(), "X_ACCURACY") == 0) ||
-             (strcmp(ParameterName.c_str(), "Y_ACCURACY") == 0))
-    {
-        int accuracy = stoi(ParameterValue);
-        if (strcmp(ParameterName.c_str(), "X_ACCURACY") == 0)
-        {
-            I_TdFGripperTaskParSys.Put("X_ACCURACY", (INT32)accuracy);
-            DEBUG("Setting up the X_ACCURACY %d\n", (int)xaccuracy);
-        }
-        else
-        {
-            I_TdFGripperTaskParSys.Put("Y_ACCURACY", (INT32)accuracy);
-            DEBUG("Setting up the Y_ACCURACY %d\n", (int)yaccuracy);
+            else if (strcmp(ParameterName.c_str(), "Z") == 0)
+            {
+                int PosVal = stoi(ParameterValue);
+                I_TdFGripperTaskParSys.Put("Z", (INT32)PosVal);
+                I_tdFgripperMainStruct->ideal.z = PosVal;
+            }
+            else if (strcmp(ParameterName.c_str(), "JAW") == 0)
+            {
+                int PosVal = stoi(ParameterValue);
+                I_TdFGripperTaskParSys.Put("JAW", (INT32)PosVal);
+                I_tdFgripperMainStruct->ideal.jaw = PosVal;
+            }
+            else if (strcmp(ParameterName.c_str(), "THETA") == 0)
+            {
+                double PosVal = stod(ParameterValue);
+                I_TdFGripperTaskParSys.Put("THETA", PosVal);
+                I_tdFgripperMainStruct->ideal.theta = PosVal;
+            }
         }
     }
     else if (strcmp(ParameterName.c_str(), "PLATE_THETA") == 0)
     {
         double ThetaVal = stod(ParameterValue);
         I_TdFGripperTaskParSys.Put("PLATE_THETA", (double)ThetaVal);
-        DEBUG("Setting up the plate theta %f\n", (double)plateTheta);
     }
-    else if (strcmp(ParameterName.c_str(), "PARKED") == 0)
+    else if (strncmp(ParameterName.c_str(), "DIST_P", 6) == 0)
+    {
+        double distVal = stod(ParameterValue);
+        I_TdFGripperTaskParSys.Put(ParameterName, (double)distVal);
+    }
+    else if (strcmp(ParameterName.c_str(), "XY_VEL") == 0 ||
+             strcmp(ParameterName.c_str(), "Z_VEL") == 0 ||
+             strcmp(ParameterName.c_str(), "JAW_VEL") == 0 ||
+             strcmp(ParameterName.c_str(), "THETA_VEL") == 0)
+    {
+        int VelVal = stoi(ParameterValue);
+        I_TdFGripperTaskParSys.Put(ParameterName, (INT32)VelVal);
+        DEBUG("Setting up the velocity to be %d\n", (int)VelVal);
+    }
+    else if (strcmp(ParameterName.c_str(), "SETTLE_LEVEL") == 0)
+    {
+        I_TdFGripperTaskParSys.Put(ParameterName, ParameterValue);
+        DEBUG("Setting up the settle level to be %s\n", ParameterValue.c_str());
+    }
+    else if (strcmp(ParameterName.c_str(), "PARKED") == 0 ||
+             strcmp(ParameterName.c_str(), "CARRYING_BUTTON") == 0)
     {
         if (tdfCanMode != "NOT_PROTECTED")
         {
-            I_ErrorString += "In Protected Mode, cannot set up the Parked Mode!";
+            I_ErrorString += "In Protected Mode, cannot set up the Parked/Carrying Button Mode!";
             return false;
         }
         // validate the value
         if (ParameterValue == "YES" || ParameterValue == "NO")
         {
-            I_TdFGripperTaskParSys.Put("PARKED", std::string(ParameterValue));
+            I_TdFGripperTaskParSys.Put(ParameterName, std::string(ParameterValue));
         }
-
-        DEBUG("Setting up the PARKED Mode %s\n", ParameterValue.c_str());
+        DEBUG("Setting up the %s Mode to be %s\n", ParameterName, c_str(), ParameterValue.c_str());
+    }
+    else if (strcmp(ParameterName.c_str(), "ITS_IGNRE_FRST") == 0)
+    {
+        if (ParameterValue == "YES" || ParameterValue == "NO")
+            I_TdFGripperTaskParSys.Put(ParameterName, ParameterValue);
+        DEBUG("Setting up %s to be %s\n", ParameterName, c_str(), ParameterValue.c_str());
     }
     else if ((strcmp(ParameterName.c_str(), "HA") == 0) ||
              (strcmp(ParameterName.c_str(), "DEC") == 0))
@@ -3264,60 +4388,126 @@ bool TdFGripperTask::SetParameter(string &ParameterName, string &ParameterValue)
         }
         DEBUG("Setting up the %s to be %f\n", ParameterName.c_str(), dVal);
     }
+    /*
+     *  Change CENTRE_X_ROT parameter.
+     */
+    else if (strcmp(ParameterName.c_str(), "CENTRE_X_ROT") == 0)
+    {
+        double dVal = stod(ParameterValue);
+        I_TdFGripperTaskParSys.Put("CENTRE_X_ROT", dVal);
+    }
+    else if (strcmp(ParameterName.c_str(), "CENTRE_Y_ROT") == 0)
+    {
+        double dVal = stod(ParameterValue);
+        I_TdFGripperTaskParSys.Put("CENTRE_Y_ROT", dVal);
+    }
+    else if (strcmp(ParameterName.c_str(), "IT_METHOD") == 0)
+    {
+        I_TdFGripperTaskParSys.Put(ParameterName, ParameterValue);
+        DEBUG("Setting up %s to be %s\n", ParameterName, c_str(), ParameterValue.c_str());
+    }
+    else if ((strcmp(ParameterName.c_str(), "X_ACCURACY_HI") == 0) ||
+             (strcmp(ParameterName.c_str(), "Y_ACCURACY_HI") == 0) ||
+             (strcmp(ParameterName.c_str(), "Z_ACCURACY_HI") == 0) ||
+             (strcmp(ParameterName.c_str(), "T_ACCURACY_HI") == 0) ||
+             (strcmp(ParameterName.c_str(), "J_ACCURACY_HI") == 0))
+    {
+        int accuracy = stoi(ParameterValue);
+        I_TdFGripperTaskParSys.Put(ParameterName, (INT32)accuracy);
+        DEBUG("Setting up the %s to be %d\n", ParameterName.c_str(), accuracy);
+    }
+    else if ((strcmp(ParameterName.c_str(), "X_ACCURACY_MED") == 0) ||
+             (strcmp(ParameterName.c_str(), "Y_ACCURACY_MED") == 0) ||
+             (strcmp(ParameterName.c_str(), "Z_ACCURACY_MED") == 0) ||
+             (strcmp(ParameterName.c_str(), "T_ACCURACY_MED") == 0) ||
+             (strcmp(ParameterName.c_str(), "J_ACCURACY_MED") == 0))
+    {
+        int accuracy = stoi(ParameterValue);
+        I_TdFGripperTaskParSys.Put(ParameterName, (INT32)accuracy);
+        DEBUG("Setting up the %s to be %d\n", ParameterName.c_str(), accuracy);
+    }
+    else if ((strcmp(ParameterName.c_str(), "X_ACCURACY_LOW") == 0) ||
+             (strcmp(ParameterName.c_str(), "Y_ACCURACY_LOW") == 0) ||
+             (strcmp(ParameterName.c_str(), "Z_ACCURACY_LOW") == 0) ||
+             (strcmp(ParameterName.c_str(), "T_ACCURACY_LOW") == 0) ||
+             (strcmp(ParameterName.c_str(), "J_ACCURACY_LOW") == 0))
+    {
+        int accuracy = stoi(ParameterValue);
+        I_TdFGripperTaskParSys.Put(ParameterName, (INT32)accuracy);
+        DEBUG("Setting up the %s to be %d\n", ParameterName.c_str(), accuracy);
+    }
     else if ((strcmp(ParameterName.c_str(), "STEP_SIZE") == 0) ||
              (strcmp(ParameterName.c_str(), "MAX_ERROR") == 0) ||
              (strcmp(ParameterName.c_str(), "FIBRE_IN_IMAGE") == 0) ||
+             (strcmp(ParameterName.c_str(), "IT_TOL_PLACE") == 0) ||
+             (strcmp(ParameterName.c_str(), "IT_TOL_PARK") == 0) ||
+             (strcmp(ParameterName.c_str(), "IT_ERROR_DIST") == 0) ||
+             (strcmp(ParameterName.c_str(), "LIFT_DRAG_TOL") == 0) ||
              (strcmp(ParameterName.c_str(), "POS_TOL") == 0) ||
+             (strcmp(ParameterName.c_str(), "IT_Z") == 0) ||
+             (strcmp(ParameterName.c_str(), "CARRY_Z") == 0) ||
+             (strcmp(ParameterName.c_str(), "CROSS_RETRACT_Z") == 0) ||
+             (strcmp(ParameterName.c_str(), "BUTTON_Z") == 0) ||
+             (strcmp(ParameterName.c_str(), "PUTDOWN_Z") == 0) ||
+             (strcmp(ParameterName.c_str(), "PARK_Z") == 0) ||
+             (strcmp(ParameterName.c_str(), "CLEAN_Z") == 0) ||
+             (strcmp(ParameterName.c_str(), "CAMERA_Z") == 0) ||
+             (strcmp(ParameterName.c_str(), "CAMERA_Z_FID") == 0) ||
+             (strcmp(ParameterName.c_str(), "JAW_OPEN") == 0) ||
+             (strcmp(ParameterName.c_str(), "JAW_OPEN_IT") == 0) ||
+             (strcmp(ParameterName.c_str(), "JAW_OPEN_FULL") == 0) ||
+             (strcmp(ParameterName.c_str(), "JAW_CLOSE") == 0) ||
+             (strcmp(ParameterName.c_str(), "JAW_CLOSE_G") == 0) ||
+             (strcmp(ParameterName.c_str(), "HANDLE_WIDTH") == 0) ||
              (strcmp(ParameterName.c_str(), "VFG_OP_ENABLE") == 0) ||
-             (strcmp(ParameterName.c_str(), "TIMEOUT_FAC") == 0))
+             (strcmp(ParameterName.c_str(), "TIMEOUT_FAC") == 0) ||
+             (strcmp(ParameterName.c_str(), "CHECKS_DONE") == 0) ||
+             (strcmp(ParameterName.c_str(), "BACKILL_ALWAYS") == 0))
     {
         int iVal = stoi(ParameterValue);
-        if (strcmp(ParameterName.c_str(), "STEP_SIZE") == 0)
-        {
-            I_TdFGripperTaskParSys.Put("STEP_SIZE", (INT32)(iVal));
-        }
-        else if (strcmp(ParameterName.c_str(), "MAX_ERROR") == 0)
-        {
-            I_TdFGripperTaskParSys.Put("MAX_ERROR", (INT32)(iVal));
-        }
-        else if (strcmp(ParameterName.c_str(), "FIBRE_IN_IMAGE") == 0)
-        {
-            I_TdFGripperTaskParSys.Put("FIBRE_IN_IMAGE", (INT32)(iVal));
-        }
-        else if (strcmp(ParameterName.c_str(), "POS_TOL") == 0)
-        {
-            I_TdFGripperTaskParSys.Put("POS_TOL", (INT32)(iVal));
-        }
-        else if (strcmp(ParameterName.c_str(), "TIMEOUT_FAC") == 0)
-        {
-            I_TdFGripperTaskParSys.Put("TIMEOUT_FAC", (INT32)(iVal));
-        }
-        else if (strcmp(ParameterName.c_str(), "VFG_OP_ENABLE") == 0)
-        {
-            I_TdFGripperTaskParSys.Put("VFG_OP_ENABLE", (INT32)(iVal));
-        }
+        I_TdFGripperTaskParSys.Put(ParameterName, iVal);
         DEBUG("Setting up the %s to be %d\n", ParameterName.c_str(), iVal);
+        if (strcmp(ParameterName.c_str(), "BACKILL_ALWAYS") == 0)
+        {
+            tdFgripBackIllum(iVal, DISPLAY);
+            if (iVal)
+                tdFstateBitSet(BACKILLAL, status);
+            else
+                tdFstateBitClear(BACKILLAL, status);
+        }
     }
     else if ((strcmp(ParameterName.c_str(), "PLT1_CFID_OFF_X") == 0) ||
-             (strcmp(ParameterName.c_str(), "PLT1_CFID_OFF_Y") == 0))
+             (strcmp(ParameterName.c_str(), "PLT1_CFID_OFF_Y") == 0) ||
+             (strcmp(ParameterName.c_str(), "CENTCALCHK_WRN") == 0) ||
+             (strcmp(ParameterName.c_str(), "CENTCALCHK_ERR") == 0) ||
+             (strcmp(ParameterName.c_str(), "DIST_REM_ENABLE") == 0))
     {
         int iVal = stoi(ParameterValue);
-        if (strcmp(ParameterName.c_str(), "PLT1_CFID_OFF_X") == 0)
+        I_TdFGripperTaskParSys.Put(ParameterName, (short)(iVal));
+        DEBUG("Setting up the %s to be %d\n", ParameterName.c_str(), iVal);
+        if (strcmp(ParameterName.c_str(), "DIST_REM_ENABLE") == 0)
         {
-            I_TdFGripperTaskParSys.Put("PLT1_CFID_OFF_X", (short)(iVal));
+            tdFgripperReadDistMap();
         }
-        else
+        else if (strncmp(ParameterName.c_str(), "CENTCALCHK_", sizeof("CENTCALCHK_") - 1) == 0)
         {
-            I_TdFGripperTaskParSys.Put("PLT1_CFID_OFF_Y", (short)(iVal));
+            /* force the first move checks to be done again */
+            I_TdFGripperTaskParSys.Put("CHECKS_DONE", 0);
         }
-
+    }
+    else if ((strcmp(ParameterName.c_str(), "MAX_ITS_PLACE") == 0) ||
+             (strcmp(ParameterName.c_str(), "MAX_ITS_PARK") == 0) ||
+             (strcmp(ParameterName.c_str(), "POS_ATTEMPTS") == 0))
+    {
+        int iVal = stoi(ParameterValue);
+        I_TdFGripperTaskParSys.Put(ParameterName, (short)(iVal));
         DEBUG("Setting up the %s to be %d\n", ParameterName.c_str(), iVal);
     }
-    else if (strcmp(ParameterName.c_str(), "POS_ATTEMPTS") == 0)
+    else if ((strcmp(ParameterName.c_str(), "JAW_METHOD_DWN") == 0) ||
+             (strcmp(ParameterName.c_str(), "JAW_METHOD_UP") == 0))
     {
-        int iVal = stoi(ParameterValue);
-        I_TdFGripperTaskParSys.Put("POS_ATTEMPTS", (short)(iVal));
-        DEBUG("Setting up the %s to be %d\n", ParameterName.c_str(), iVal);
+        I_TdFGripperTaskParSys.Put(ParameterName, ParameterValue);
+        DEBUG("Setting up the %s to be %s\n", ParameterName.c_str(), ParameterValue.c_str());
     }
     else if (strcmp(ParameterName.c_str(), "SETTLE_TIME") == 0)
     {
@@ -3325,7 +4515,8 @@ bool TdFGripperTask::SetParameter(string &ParameterName, string &ParameterValue)
         I_TdFGripperTaskParSys.Put("SETTLE_TIME", (double)(dVal));
         DEBUG("Setting up the %s to be %f\n", ParameterName.c_str(), dVal);
     }
-    else if (strcmp(ParameterName.c_str(), "ZEROCAM_CENWAIT") == 0)
+    else if (strcmp(ParameterName.c_str(), "ZEROCAM_CENWAIT") == 0 ||
+             (strcmp(ParameterName.c_str(), "BACKILL_WARMUP") == 0))
     {
         double dVal = stod(ParameterValue);
         I_TdFGripperTaskParSys.Put("ZEROCAM_CENWAIT", (double)(dVal));
@@ -3333,8 +4524,15 @@ bool TdFGripperTask::SetParameter(string &ParameterName, string &ParameterValue)
     }
     else if (strcmp(ParameterName.c_str(), "GANTRY_LAMPS") == 0)
     {
-        I_TdFGripperTaskParSys.Put("GANTRY_LAMPS", std::string(ParameterValue));
+        I_TdFGripperTaskParSys.Put(ParameterName, ParameterValue);
         DEBUG("Setting up the %s to be %s\n", ParameterName.c_str(), ParameterValue.c_str());
+    }
+
+    else if (strcmp(ParameterName.c_str(), "POS_ATTEMPTS") == 0)
+    {
+        int iVal = stoi(ParameterValue);
+        I_TdFGripperTaskParSys.Put("POS_ATTEMPTS", (short)(iVal));
+        DEBUG("Setting up the %s to be %d\n", ParameterName.c_str(), iVal);
     }
     else if ((strcmp(ParameterName.c_str(), "PMAC_LIM_X_POS") == 0) ||
              (strcmp(ParameterName.c_str(), "PMAC_LIM_X_NEG") == 0) ||
@@ -3363,13 +4561,148 @@ bool TdFGripperTask::SetParameter(string &ParameterName, string &ParameterValue)
         }
         DEBUG("Setting up the %s to be %d\n", ParameterName.c_str(), iVal);
     }
-    else if (strcmp(ParameterName.c_str(), "DEBUG_CENTROID") == 0)
+    else if (strcmp(ParameterName.c_str(), "DEBUG_CENTROID") == 0 ||
+             (strcmp(ParameterName.c_str(), "DEBUG_CVT") == 0) ||
+             (strcmp(ParameterName.c_str(), "DEBUG_ITS") == 0))
     {
         int iVal = stoi(ParameterValue);
-        I_TdFGripperTaskParSys.Put("DEBUG_CENTROID", (unsigned short)(iVal));
+        I_TdFGripperTaskParSys.Put(ParameterName, (unsigned short)(iVal));
         DEBUG("Setting up the %s to be %d\n", ParameterName.c_str(), iVal);
     }
+    else if (strcmp(ParameterName.c_str(), "DITS_MAP_FILE") == 0)
+    {
+        I_TdFGripperTaskParSys.Put(ParameterName, ParameterValue);
+        DEBUG("Setting up the %s to be %s\n", ParameterName.c_str(), ParameterValue.c_str());
+    }
+    else if ((strcmp(ParameterName.c_str(), "THETA_SHIFT") == 0) ||
+             (strcmp(ParameterName.c_str(), "JAW_SHIFT") == 0) ||
+             (strcmp(ParameterName.c_str(), "Z_SHIFT") == 0))
+    {
+        int iParam = stoi(ParameterValue);
+        I_TdFGripperTaskParSys.Put(ParameterName, iParam);
+        DEBUG("Setting up the %s to be %d\n", ParameterName.c_str(), iParam);
+        if (strcmp(ParameterName.c_str(), "THETA_SHIFT") == 0)
+        {
+            I_tdFgripperMainStruct->convert.thetaShift = iParam;
+        }
+        else if (strcmp(ParameterName.c_str(), "JAW_SHIFT") == 0)
+        {
+            I_tdFgripperMainStruct->convert.jawShift = iParam;
+        }
+        else if (strcmp(ParameterName.c_str(), "Z_SHIFT") == 0)
+        {
+            I_tdFgripperMainStruct->convert.zShift = iParam;
+        }
+    }
     return true;
+}
+
+int TdFGripperTask::tdFgripBackIllum(int on, int display)
+{
+    if (I_tdFgripperMainStruct->configPlate == -1)
+    {
+        if (display)
+            DEBUG("Attempt to set back illumination with no config plate\n");
+    }
+    else if (on)
+    {
+        if ((I_tdFgripperMainStruct->backIllumOn) &&
+            (I_tdFgripperMainStruct->illumPlate == I_tdFgripperMainStruct->configPlate))
+        {
+            if (display)
+                DEBUG("Back illumination already on for plate %d\n",
+                      I_tdFgripperMainStruct->configPlate);
+        }
+        else
+        {
+            if ((I_tdFgripperMainStruct->illumPlate != I_tdFgripperMainStruct->configPlate) &&
+                (I_tdFgripperMainStruct->backIllumOn) && display)
+            {
+                DEBUG("Back illumination turned off for plate %d\n",
+                      I_tdFgripperMainStruct->illumPlate);
+            }
+            if (display)
+                DEBUG("Back illumination turned on for plate %d\n",
+                      I_tdFgripperMainStruct->configPlate);
+
+            I_tdFgripperMainStruct->illumPlate = I_tdFgripperMainStruct->configPlate;
+            I_TdFGripperTaskParSys.Put("BACKILL_PLATE", I_tdFgripperMainStruct->illumPlate);
+            if (!I_tdFgripperMainStruct->Simulation)
+            {
+                /*
+                 *              Select the bits to turn on and off
+                 */
+                unsigned char off, on;
+                if (I_tdFgripperMainStruct->configPlate == 0)
+                {
+                    off = POS_OF_BI_S1_P1 | POS_OF_BI_S2_P1;
+                    on = POS_OF_BI_S1_P0 | POS_OF_BI_S2_P0;
+                }
+                else
+                {
+                    off = POS_OF_BI_S1_P0 | POS_OF_BI_S2_P0;
+                    on = POS_OF_BI_S1_P1 | POS_OF_BI_S2_P1;
+                }
+                /*
+                 *  	        Turn on the correct bit (We must also turn off the other plate
+                 *              if it is currently on
+                 */
+                if (tdFposVmeIOWrite(off, on) == ERROR)
+                {
+                    I_TdFGripperTaskParSys.Put("BACKILL_STATE", "ERROR");
+                    DEBUG("Error setting back illumination relay.\n");
+                    I_tdFgripperMainStruct->backIllumOn = 0;
+                }
+                else
+                {
+                    I_TdFGripperTaskParSys.Put("BACKILL_STATE", "ON");
+                    I_tdFgripperMainStruct->backIllumOn = 1;
+                    return 1;
+                }
+            } /* Not simulating */
+            else
+            {
+                /* Simlation - set parameter */
+                I_TdFGripperTaskParSys.Put("BACKILL_STATE", "ON");
+            }
+        } /* Change was required */
+    } /* Turn a lamp on */
+    else
+    {
+        if (I_tdFgripperMainStruct->backIllumOn)
+        {
+            if (display)
+                DEBUG("Back illumination turned off for plate %d\n",
+                      I_tdFgripperMainStruct->illumPlate);
+
+            if (!I_tdFgripperMainStruct->Simulation)
+            {
+                unsigned char off; /* Mask of relays to turn off */
+                off = POS_OF_BI_S1_P1 | POS_OF_BI_S2_P1 |
+                      POS_OF_BI_S1_P0 | POS_OF_BI_S2_P0;
+                if (tdFposVmeIOWrite(off, 0) == -1)
+                {
+                    I_TdFGripperTaskParSys.Put("BACKILL_STATE", "ERROR");
+                    DEBUG("Error setting back illumination relay.\n");
+                }
+                else
+                {
+                    I_TdFGripperTaskParSys.Put("BACKILL_STATE", "OFF");
+                    I_tdFgripperMainStruct->backIllumOn = 0;
+                    return 1;
+                }
+
+            } /* Not simulating */
+            else
+            {
+                /* Simlation - set parameter */
+                I_TdFGripperTaskParSys.Put("BACKILL_STATE", "OFF");
+            }
+        } /* Turn them off */
+        else if (display)
+            DEBUG("Back illumination already off\n");
+    }
+    return 0;
 }
 
 bool TdFGripperTask::SetupHomeConfig(CML::HomeConfig HomeConfigs[], int Index, AmpId Amp)
@@ -3511,7 +4844,7 @@ void TdFGripperTask::tdFgripperPositionCheck(int Index, CML::uunit &Position)
         {
             Position = XMIN;
         }
-        else if (Position > XMAX)
+        if (Position > XMAX)
             Position = XMAX;
         break;
     }
@@ -3521,7 +4854,7 @@ void TdFGripperTask::tdFgripperPositionCheck(int Index, CML::uunit &Position)
         {
             Position = YMIN;
         }
-        else if (Position > YMAX)
+        if (Position > YMAX)
             Position = YMAX;
         break;
     }
@@ -3531,8 +4864,34 @@ void TdFGripperTask::tdFgripperPositionCheck(int Index, CML::uunit &Position)
         {
             Position = ZMIN;
         }
-        else if (Position > ZMAX)
+        if (Position > ZMAX)
+        {
             Position = ZMAX;
+        }
+        break;
+    }
+    case 4:
+    {
+        if (Position < JAWMIN)
+        {
+            Position = JAWMIN;
+        }
+        if (Position > JAWMAX)
+        {
+            Position = JAWMAX;
+        }
+        break;
+    }
+    case 5:
+    {
+        if (Position < THETAMIN)
+        {
+            Position = THETAMIN;
+        }
+        if (Position > THETAMAX)
+        {
+            Position = THETAMAX;
+        }
         break;
     }
     }
@@ -3587,14 +4946,6 @@ bool TdFGripperTask::MoveAxes(const std::vector<AxisDemand> &AxisDemands, bool M
             Targets[Index] = TargetPosition;
             TargetPoint[Index] = TargetPosition;
             DEBUG("Target for axis %d is %f\n", Index, TargetPosition);
-            if (Index == 0 || Index == 1)
-            {
-                I_tdFgripperMainStruct->toEnc.x = doubleToLong(TargetPosition);
-            }
-            else if (Index == 2)
-            {
-                I_tdFgripperMainStruct->toEnc.y = doubleToLong(TargetPosition);
-            }
             MoveFlags[Index] = Found;
         }
         TargetPoint.setDim(MAX_TDF_AMPS);
@@ -3699,6 +5050,25 @@ void InitialiseAction::ActionThread(const drama::sds::Id &)
          *  For parameters we want quick access to, get pointers to them
          *  (we  can't do data conversion when getting such parameters)
          */
+        id = parSysId.Find("BACKILL_ALWAYS");
+        id.Pointer(&details->pars.backIllAlways, &length);
+        if (length != sizeof(*(details->pars.backIllAlways)))
+        {
+
+            DEBUG("Parameter BACKILL_ALWAYS length mismatch");
+            return;
+        }
+        length = 0;
+
+        id = parSysId.Find("BACKILL_WARMUP");
+        id.Pointer(&details->pars.backIllWarmUp, &length);
+        if (length != sizeof(*(details->pars.backIllWarmUp)))
+        {
+
+            DEBUG("Parameter BACKILL_WARMUP length mismatch");
+            return;
+        }
+        length = 0;
 
         id = parSysId.Find("ZEROCAM_CENWAIT");
         id.Pointer(&details->pars.zeroCamCenWait, &length);
@@ -3706,6 +5076,16 @@ void InitialiseAction::ActionThread(const drama::sds::Id &)
         {
 
             DEBUG("Parameter ZEROCAM_CENWAIT length mismatch");
+            return;
+        }
+        length = 0;
+
+        id = parSysId.Find("DIST_REM_ENABLE");
+        id.Pointer(&details->pars.distRemEnable, &length);
+        if (length != sizeof(*(details->pars.distRemEnable)))
+        {
+
+            DEBUG("Parameter DIST_REM_ENABLE length mismatch");
             return;
         }
         length = 0;
@@ -3728,8 +5108,171 @@ void InitialiseAction::ActionThread(const drama::sds::Id &)
         }
         length = 0;
 
+        id = parSysId.Find("DIST_P1");
+        id.Pointer(&details->pars.distPar1, &length);
+        if (length != sizeof(double))
+        {
+            DEBUG("Parameter DIST_P1 length mismatch");
+            return;
+        }
+        length = 0;
+
+        id = parSysId.Find("DIST_P2");
+        id.Pointer(&details->pars.distPar2, &length);
+        if (length != sizeof(double))
+        {
+            DEBUG("Parameter DIST_P2 length mismatch");
+            return;
+        }
+        length = 0;
+
+        id = parSysId.Find("DIST_P3");
+        id.Pointer(&details->pars.distPar3, &length);
+        if (length != sizeof(double))
+        {
+            DEBUG("Parameter DIST_P3 length mismatch");
+            return;
+        }
+        length = 0;
+
+        id = parSysId.Find("DIST_P4");
+        id.Pointer(&details->pars.distPar4, &length);
+        if (length != sizeof(double))
+        {
+            DEBUG("Parameter DIST_P4 length mismatch");
+            return;
+        }
+        length = 0;
+
+        id = parSysId.Find("DIST_P5");
+        id.Pointer(&details->pars.distPar5, &length);
+        if (length != sizeof(double))
+        {
+            DEBUG("Parameter DIST_P5 length mismatch");
+            return;
+        }
+        length = 0;
+
+        id = parSysId.Find("DIST_P6");
+        id.Pointer(&details->pars.distPar6, &length);
+        if (length != sizeof(double))
+        {
+            DEBUG("Parameter DIST_P6 length mismatch");
+            return;
+        }
+        length = 0;
+
+        id = parSysId.Find("DIST_P7");
+        id.Pointer(&details->pars.distPar7, &length);
+        if (length != sizeof(double))
+        {
+            DEBUG("Parameter DIST_P7 length mismatch");
+            return;
+        }
+        length = 0;
+
+        id = parSysId.Find("DIST_P8");
+        id.Pointer(&details->pars.distPar8, &length);
+        if (length != sizeof(double))
+        {
+            DEBUG("Parameter DIST_P8 length mismatch");
+            return;
+        }
+        length = 0;
+
+        id = parSysId.Find("DIST_P9");
+        id.Pointer(&details->pars.distPar9, &length);
+        if (length != sizeof(double))
+        {
+            DEBUG("Parameter DIST_P9 length mismatch");
+            return;
+        }
+        length = 0;
+
+        id = parSysId.Find("DIST_P10");
+        id.Pointer(&details->pars.distPar10, &length);
+        if (length != sizeof(double))
+        {
+            DEBUG("Parameter DIST_P10 length mismatch");
+            return;
+        }
+        length = 0;
+
+        id = parSysId.Find("DIST_P11");
+        id.Pointer(&details->pars.distPar11, &length);
+        if (length != sizeof(double))
+        {
+            DEBUG("Parameter DIST_P11 length mismatch");
+            return;
+        }
+        length = 0;
+
+        id = parSysId.Find("DIST_P12");
+        id.Pointer(&details->pars.distPar12, &length);
+        if (length != sizeof(double))
+        {
+            DEBUG("Parameter DIST_P12 length mismatch");
+            return;
+        }
+        length = 0;
+
+        id = parSysId.Find("DIST_P13");
+        id.Pointer(&details->pars.distPar13, &length);
+        if (length != sizeof(double))
+        {
+            DEBUG("Parameter DIST_P13 length mismatch");
+            return;
+        }
+        length = 0;
+
+        id = parSysId.Find("DIST_P14");
+        id.Pointer(&details->pars.distPar14, &length);
+        if (length != sizeof(double))
+        {
+            DEBUG("Parameter DIST_P14 length mismatch");
+            return;
+        }
+        length = 0;
+
+        id = parSysId.Find("DIST_P15");
+        id.Pointer(&details->pars.distPar15, &length);
+        if (length != sizeof(double))
+        {
+            DEBUG("Parameter DIST_P15 length mismatch");
+            return;
+        }
+        length = 0;
+
+        id = parSysId.Find("DIST_P16");
+        id.Pointer(&details->pars.distPar16, &length);
+        if (length != sizeof(double))
+        {
+            DEBUG("Parameter DIST_P16 length mismatch");
+            return;
+        }
+        length = 0;
+
+        id = parSysId.Find("DIST_P17");
+        id.Pointer(&details->pars.distPar17, &length);
+        if (length != sizeof(double))
+        {
+            DEBUG("Parameter DIST_P17 length mismatch");
+            return;
+        }
+        length = 0;
+
+        id = parSysId.Find("DIST_P18");
+        id.Pointer(&details->pars.distPar18, &length);
+        if (length != sizeof(double))
+        {
+            DEBUG("Parameter DIST_P18 length mismatch");
+            return;
+        }
+        length = 0;
+
         details->inUse = YES;
 
+        details->distMap.loaded = NO;
         bool defRead = ThisTask->tdFgripperDefRead(DEFS_FILE | FLEX_FILE,
                                                    check);
         if (defRead == false)
@@ -3737,14 +5280,6 @@ void InitialiseAction::ActionThread(const drama::sds::Id &)
             details->inUse = NO;
             return;
         }
-
-        details->ipsMode = 0;
-        details->dprAddress = ERROR;
-        details->toEnc.x = 0;
-        details->toEnc.y = 0;
-
-        details->Initialised = YES;
-        details->inUse = NO;
 
         ThisTask->tdFGetCameraPath().GetPath(this);
         try
@@ -3760,6 +5295,15 @@ void InitialiseAction::ActionThread(const drama::sds::Id &)
         MessageUser("INITIALISE: camera initialisation completes.\n");
 
         details->cameraInit = YES;
+        details->ipsMode = 0;
+        details->dprAddress = ERROR;
+        details->toEnc.x = 0;
+        details->toEnc.y = 0;
+        details->toEnc.z = 0;
+        details->toEnc.jaw = 0;
+        details->toEnc.theta = 0;
+
+        parSysId.Put("TASK_STATE", 0);
 
         if (!(ThisTask->SetupAmps()))
         {
@@ -3772,8 +5316,356 @@ void InitialiseAction::ActionThread(const drama::sds::Id &)
             DEBUG("Setup amps OK\n");
             MessageUser("INITIALISE: Task initialised from configuration file " + CONFIGURATION_FILE);
         }
+
+        details->Initialised = YES;
+        details->inUse = NO;
+
+        details->toEnc.x = 0; /* Used for simulation only */
+        details->toEnc.y = 0; /* Used for simulation only */
+        details->toEnc.z = GRIP_Z_PARK;
+        details->toEnc.jaw = 0;
+        details->toEnc.theta = 0;
+        tdFgripperUpdatePos(YES, YES, YES);
+        parSysId.Put("PARKED", "NO");
+        tdFstateBitClear(PARKED);
         ThisTask->tdFgripperSetMainStruct(details);
     }
+}
+
+void TdFGripperTask::tdFgripperGetActZ(long int &z)
+{
+    switch (z)
+    {
+    case Z_UP: /* Z for crossing retractors */
+        I_TdFGripperTaskParSys.Get("CROSS_RETRACT_Z", &z);
+        break;
+    case Z_DOWN: /* Z for putting fibre down */
+        I_TdFGripperTaskParSys.Get("PUTDOWN_Z", &z);
+        break;
+    case Z_CARRY: /* Z for carrying buttons */
+        I_TdFGripperTaskParSys.Get("CARRY_Z", &z);
+        break;
+    case Z_CAM: /* Z for viewing fibres though plunex */
+        I_TdFGripperTaskParSys.Get("CAMERA_Z", &z);
+        break;
+    case Z_CAM_FID: /* Z for viewing fiducials though plunex */
+        I_TdFGripperTaskParSys.Get("CAMERA_Z_FID", &z);
+        break;
+    case Z_IT: /* Z for iterations	*/
+        I_TdFGripperTaskParSys.Get("IT_Z", &z);
+        break;
+    case Z_PARK: /* Z park position  (can we move to this ?? ) */
+        I_TdFGripperTaskParSys.Get("PARK_Z", &z);
+        break;
+    case Z_CLEAN: /* Z for cleaning */
+        I_TdFGripperTaskParSys.Get("CLEAN_Z", &z);
+        break;
+    default:
+        break;
+    }
+}
+
+bool TdFGripperTask::tdFgripperCheckXYZTmove(long int tarX, long int tarY, long int tarZ, double tarT)
+{
+    double curT;
+    long int curX, curY, curZ, safeZ;
+    std::string carryingBut;
+    int carrying = 0;
+    long int zAccuracy;
+    curX = I_tdFgripperMainStruct->ideal.x;
+    curY = I_tdFgripperMainStruct->ideal.y;
+    curZ = I_tdFgripperMainStruct->ideal.z;
+    curT = I_tdFgripperMainStruct->ideal.theta;
+    I_TdFGripperTaskParSys.Get("CARRY_Z", &safeZ);
+    I_TdFGripperTaskParSys.Get("Z_ACCURACY_LOW", &zAccuracy);
+    safeZ -= (zAccuracy + 1); /* Allow for inaccuracy in Z */
+    carryingBut = I_TdFGripperTaskParSys.GetString("CARRYING_BUTTON");
+    if ((tarZ < safeZ) || (curZ < safeZ))
+    {
+        if ((!IntEqual(tarX, curX, "X_ACCURACY_LOW")) ||
+            (!IntEqual(tarY, curY, "Y_ACCURACY_LOW")) ||
+            ((tarT < curT - THETA_TOL) || (tarT > curT + THETA_TOL)))
+        {
+            DEBUG("XYZT Move: Only Z motion allowed below safe Z height\n");
+            DEBUG("Target Z %ld, current Z %ld, Safe Z %ld (CARRY_Z-Z_ACCURACY_LOW).\n",
+                  tarZ, curZ, safeZ);
+            return false;
+        }
+    }
+    /*
+     *  If carrying a button enable the check by the next routine.
+     */
+    if (strcmp(carryingBut.c_str(), "NO") != 0)
+        carrying = 1;
+    /*
+     *  If we reached here, check for crossing of the retractors.
+     */
+    return tdFgripperCheckCross(tarX, tarY, tarZ, tarT, carrying);
+}
+
+bool TdFGripperTask::tdFgripperCheckCross(long int tarX, long int tarY, long int tarZ, double tarT, int carrying)
+{
+    long int curX, curY, curZ, safeZ, zAccuracy;
+    double curT;
+
+    int targetInside, currentInside;
+    int targetOutside, currentOutside;
+    int targetForbidden, currentForbidden;
+    curX = I_tdFgripperMainStruct->ideal.x;
+    curY = I_tdFgripperMainStruct->ideal.y;
+    curZ = I_tdFgripperMainStruct->ideal.z;
+    curT = I_tdFgripperMainStruct->ideal.theta;
+
+    I_TdFGripperTaskParSys.Get("CROSS_RETRACT_Z", &safeZ);
+    I_TdFGripperTaskParSys.Get("Z_ACCURACY_LOW", &zAccuracy);
+    curZ += zAccuracy;
+
+    if ((curZ >= safeZ) && (tarZ >= safeZ) && (!carrying))
+        return YES;
+
+    currentForbidden = tdFforbidden(curX, curY, curT, QUADRANT_RADIUS, INSIDE_RADIUS,
+                                    OUTSIDE_RADIUS, HALF_GUIDE_EXPAN,
+                                    JAW_HWP, JAW_HWM, JAW_LENGTH, 0, &currentInside, &currentOutside);
+    targetForbidden = tdFforbidden(tarX, tarY, tarT, QUADRANT_RADIUS, INSIDE_RADIUS,
+                                   OUTSIDE_RADIUS, HALF_GUIDE_EXPAN,
+                                   JAW_HWP, JAW_HWM, JAW_LENGTH, 0, &targetInside, &targetOutside);
+
+    /*
+     *  If carrying a button, then the target must be inside
+     */
+    if (carrying && (!targetInside))
+    {
+        DEBUG("Cannot move outside park radius while carrying a button.\n");
+        return false;
+    }
+    /*
+     *  We are not carrying a button and Z height is ok, any move allowed
+     */
+    else if ((curZ >= safeZ) && (tarZ >= safeZ))
+        return true;
+
+    /*
+     *  At this point, we know the target or current Z value is lower then safeZ.
+     */
+    else if (currentForbidden)
+    {
+        DEBUG("Should not have Z below %ld at this point, raise it before proceding.\n", safeZ);
+        return false;
+    }
+    else if (targetForbidden)
+    {
+        DEBUG("Need Z above %ld at both ends of move to go to %ld,%ld.\n", safeZ, tarX, tarY);
+        return false;
+    }
+    else if (currentOutside && targetOutside)
+    {
+        DEBUG("All moves outside the retractors require Z to be above %ld.\n", safeZ);
+        return false;
+    }
+    else if (currentInside && targetInside)
+        return true;
+    else
+    {
+        DEBUG("Attempting to cross retractors with low Z, must be above %ld.\n",
+              safeZ);
+        return false;
+    }
+}
+
+bool TdFGripperTask::IntEqual(long int target, long int cur, const char *parameter)
+{
+    long int accuracy;
+    I_TdFGripperTaskParSys.Get(parameter, &accuracy);
+    if ((target >= cur - accuracy) &&
+        (target <= cur + accuracy))
+        return true;
+    else
+        return false;
+}
+
+bool TdFGripperTask::tdFgripperCheckIntMove(long int tarX, long int tarY, long int tarZ,
+                                            double tarT, long int carryZ, long int crossRetractZ, long int *intX, long int *intY)
+{
+    long int curX, curY, curZ, zAccuracy;
+    double curT;
+
+    double qa, qb, qc, qd;
+
+    int targetInside, currentInside;
+    int targetOutside, currentOutside;
+    int targetForbidden, currentForbidden;
+    const double radius = INSIDE_RADIUS - JAW_HWP;
+
+    double slope, intercept, radsq, actradsq;
+    if ((tarZ < carryZ) || (tarZ >= crossRetractZ))
+        return false;
+    curX = I_tdFgripperMainStruct->ideal.x;
+    curY = I_tdFgripperMainStruct->ideal.y;
+    curZ = I_tdFgripperMainStruct->ideal.z;
+    curT = I_tdFgripperMainStruct->ideal.theta;
+    I_TdFGripperTaskParSys.Get("Z_ACCURACY_LOW", &zAccuracy);
+
+    curZ += zAccuracy;
+    currentForbidden = tdFforbidden(curX, curY, curT, QUADRANT_RADIUS, INSIDE_RADIUS,
+                                    OUTSIDE_RADIUS, HALF_GUIDE_EXPAN,
+                                    JAW_HWP, JAW_HWM, JAW_LENGTH, 0,
+                                    &currentInside, &currentOutside);
+    targetForbidden = tdFforbidden(tarX, tarY, tarT, QUADRANT_RADIUS, INSIDE_RADIUS,
+                                   OUTSIDE_RADIUS, HALF_GUIDE_EXPAN,
+                                   JAW_HWP, JAW_HWM, JAW_LENGTH, 0,
+                                   &targetInside, &targetOutside);
+    if ((currentForbidden || currentOutside) &&
+        (targetInside) && (curZ >= crossRetractZ))
+        ;
+    else
+        return false;
+
+    radsq = radius * radius;
+    if (tarX == curX)
+        ++tarX; /* Ensure no divide by zero error */
+    actradsq = (double)(tarX) * (double)(tarX) + (+(double)(tarY) * (double)(tarY));
+
+    if (actradsq > radsq)
+    {
+        double actrad = sqrt(actradsq);
+        double x, y;
+        double ratio = radius / actrad;
+        /*
+         *	 Outside the circle.
+         *
+         *       The actual field plate is four quadrants of radius INSIDE_RADIUS
+         *       separated by a distance of (HALF_GUIDE_EXPAN*2).  Scale the x and
+         *	 y such that we are moved inside this circle.
+         *
+         */
+        x = tarX * ratio;
+        y = tarY * ratio;
+        tarX = (long int)x;
+        tarY = (long int)y;
+    }
+
+    /*
+     *  We are now certain that the target position is inside or on the circle
+     *
+     *  Get slope and intercept of the line between the current and target
+     *  positions  (note, a line above ensures tarX and curX are not equal,
+     *  thus no divide by zero error can occur).
+     */
+
+    slope = (double)(tarY - curY) / (double)(tarX - curX);
+    intercept = curY - slope * curX;
+
+    /*
+     *  Get the intercept of this line and the circle.
+     *
+     *  X is determined as the solution of the following quadratic
+     *
+     *  (1+m^2)X^2 + 2.m.b.X + (b^2 - r^2) = 0
+     *
+     *  Where
+     *  	m = slope
+     *  	b = intercept
+     *  	r = radius
+     */
+
+    qa = 1 + slope * slope;
+    qb = 2 * slope * intercept;
+    qc = (intercept * intercept) - radsq;
+
+    qd = qb * qb - 4 * qa * qc; /* quadratic solution - part under */
+                                /* the square root sign 		  */
+
+    /*
+     *  Handle the three cases for qd.
+     */
+
+    if (qd > 0)
+    {
+        /*
+         *  	Normal result, qd is positive.
+         */
+
+        double x1, x2, y1, y2, dist1sq, dist2sq;
+        /*
+         *      The line cuts the circle twice.  We want the closest point to the
+         *      current position.
+         */
+        x1 = (-1 * qb + sqrt(qd)) / (2 * qa);
+        y1 = slope * x1 + intercept;
+
+        dist1sq = ((curX - x1) * (curX - x1)) + ((curY - y1) * (curY - y1));
+
+        x2 = (-1 * qb - sqrt(qd)) / (2 * qa);
+        y2 = slope * x2 + intercept;
+
+        dist2sq = ((curX - x2) * (curX - x2)) + ((curY - y2) * (curY - y2));
+
+        if (dist1sq < dist2sq)
+        {
+            *intX = (long int)x1;
+            *intY = (long int)y1;
+        }
+        else
+        {
+            *intX = (long int)x2;
+            *intY = (long int)y2;
+        }
+    }
+    else if (qd == 0)
+    {
+        /*
+         *      qd = 0, line is tanget to the circle.  This is really only likely
+         *      if the destination is on the circle.
+         */
+
+        double x;
+        /*
+         *      The line cuts the circle twice.  We want the closest point to the
+         *      current position.
+         */
+        x = -1 * qb / (2 * qa);
+        *intX = (long int)(x);
+        *intY = (long int)(slope * x + intercept);
+    }
+    else
+    {
+        /*
+         *  	This should not occur.  It infers the target position is outside the
+         *  	circle which we insured above it was not.
+         */
+
+        DEBUG("Warning, programming error, tdFgripCheckPreMove, failed to solve quadratic\n");
+        return false;
+    }
+
+    /*
+     *  Once here, we should have the desired intermediate position.  Check it
+     *  just to be sure, since the equipement is expensive.
+     */
+
+    targetForbidden = tdFforbidden(*intX, *intY, crossRetractZ, QUADRANT_RADIUS,
+                                   INSIDE_RADIUS, OUTSIDE_RADIUS, HALF_GUIDE_EXPAN,
+                                   JAW_HWP, JAW_HWM, JAW_LENGTH, 0,
+                                   &targetInside, &targetOutside);
+
+    if (targetForbidden)
+    {
+        DEBUG("Warning, programming error, tdFgripCheckPreMove, intermediate target forbidden\n");
+        return false;
+    }
+    else if (targetOutside)
+    {
+        DEBUG("Warning, programming error, tdFgripCheckPreMove, intermediate target outside\n");
+        return false;
+    }
+
+    /*
+     *  Since we are comming from outside the retractor ring, we can't be
+     *  carrying a button.  We ensured above that the destination Z is above
+     *  the carry height.  As a result, we can be sure that the move from
+     *  intX,intY to tarX,tarY is safe.
+     */
+    return true;
 }
 
 void GMoveAxisActionNT::ActionThread(const drama::sds::Id &Arg)
@@ -3799,30 +5691,35 @@ void GMoveAxisActionNT::ActionThread(const drama::sds::Id &Arg)
         return;
     }
 
-    std::string Axes;
-    std::string Positions;
-    std::string Velocities;
+    long int toX, toY, toZ;
+    long int intX, intY, intZ;
+    double toT;
+    int raiseZ = 0;
+    bool useIntermediate = false;
     std::string OffsetFlag = "";
-    if (Arg)
+    if (!Arg)
     {
-        try
-        {
-            drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
-            drama::gitarg::String AxesArg(this, Arg, "AXES", 1, "", NoFlags);
-            Axes = AxesArg;
-            drama::gitarg::String PositionsArg(this, Arg, "POSITIONS", 2, "", NoFlags);
-            Positions = PositionsArg;
-            drama::gitarg::String VelocitiesArg(this, Arg, "VELOCITIES", 3, "", NoFlags);
-            Velocities = VelocitiesArg;
-            drama::gitarg::String OffsetFlagArg(this, Arg, "OFFSET", 4, "", NoFlags);
-            OffsetFlag = OffsetFlagArg;
-        }
-        catch (...)
-        {
-        }
+        DramaTHROW(TDFGRIPPERTASK_NO_INPUT_ARGUMENT, "No input argument for G_MOVE_AXIS_NT.");
     }
-    std::string Error;
-    std::vector<AxisDemand> AxisDemands = GetDemands(Axes, Positions, Velocities, Error);
+    try
+    {
+        drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
+        drama::gitarg::Int<XMIN, XMAX> XArg(this, Arg, "X", 1, 0, NoFlags);
+        toX = XArg;
+        drama::gitarg::Int<YMIN, YMAX> YArg(this, Arg, "Y", 2, 0, NoFlags);
+        toY = YArg;
+        drama::gitarg::Int<Z_SP_MIN, ZMAX> ZArg(this, Arg, "Z", 3, 0, NoFlags);
+        toZ = ZArg;
+        ThisTask->tdFgripperGetActZ(toZ);
+        drama::gitarg::Real<THETAMIN, THETAMAX> ThetaArg(this, Arg, "Theta", 4, 0.0, NoFlags);
+        toT = ThetaArg;
+        drama::gitarg::String OffsetFlagArg(this, Arg, "OFFSET", 5, "", NoFlags);
+        OffsetFlag = OffsetFlagArg;
+    }
+    catch (...)
+    {
+        DramaTHROW(TDFGRIPPERTASK_INV_INPUT_ARGUMENT, "The input argument for G_MOVE_AXIS_NT is not valid.");
+    }
     bool MoveOffset = false;
     bool MoveBackward = false;
     if (!OffsetFlag.compare("+") || !OffsetFlag.compare("-"))
@@ -3831,67 +5728,143 @@ void GMoveAxisActionNT::ActionThread(const drama::sds::Id &Arg)
         if (!OffsetFlag.compare("-"))
             MoveBackward = true;
     }
-    int NumberAxes = AxisDemands.size();
-    if (NumberAxes <= 0)
     {
-        MessageUser("G_MOVE_AXIS_NT: " + Error);
-    }
-    else
-    {
-        details->inUse = YES;
-        double plateTheta;
         drama::ParSys parSysId(ThisTask->TaskPtr());
-        parSysId.Get("PLATE_THETA", &plateTheta);
-        long int toX, toY;
+
         double toXenc = 0.0, toYenc = 0.0;
-        unsigned int NumberAxes = AxisDemands.size();
-        for (unsigned int Index = 0; Index < NumberAxes; Index++)
-        {
+        double toZenc, toTenc, toJenc, plateTheta;
+        long int jawFpPos,
+
             if (MoveBackward == true)
-            {
-
-                AxisDemands[Index].Position *= (-1.0);
-            }
-            if (MoveOffset == true)
-            {
-                AxisDemands[Index].Position += (Index < 2 ? details->ideal.x : details->ideal.y);
-            }
-            if (Index < 2)
-            {
-                toX = doubleToLong(AxisDemands[Index].Position);
-                details->ideal.x = toX;
-            }
-            if (Index == 2)
-            {
-                toY = doubleToLong(AxisDemands[Index].Position);
-                details->ideal.y = toY;
-            }
-            DEBUG("AxisId: %d, plate position %f, velocity %f\n", AxisDemands[Index].AxisId,
-                  AxisDemands[Index].Position, AxisDemands[Index].Velocity);
-        }
-        ThisTask->tdFgripperSetMainStruct(details);
-        ThisTask->tdFgripperConvertFromFP(toX, toY, plateTheta, _FULL,
-                                          &toXenc, &toYenc);
-        for (unsigned int Index = 0; Index < NumberAxes; Index++)
         {
-            if (Index < 2)
-            {
-                AxisDemands[Index].Position = toXenc;
-            }
-            else if (Index == 2)
-            {
-                AxisDemands[Index].Position = toYenc;
-            }
-            DEBUG("AxisId: %d, encoder position %f, velocity %f\n", AxisDemands[Index].AxisId,
-                  AxisDemands[Index].Position, AxisDemands[Index].Velocity);
+
+            toX *= (-1);
+            toY *= (-1);
+            toZ *= (-1);
+            toT *= (-1);
+        }
+        if (MoveOffset == true)
+        {
+            toX += details->ideal.x;
+            toY += details->ideal.y;
+            toZ += details->ideal.z;
+            toT += details->ideal.theta;
         }
 
+        DEBUG("The original poisiton is %ld %ld %ld %f .\n
+        And the moveto position is %ld %ld %ld %f\n", details->ideal.x, details->ideal.y, details->ideal.z,  details->ideal.theta, toX, toY, toZ, toT);
+        
+        if (ThisTask->tdFgripperCheckXYZTmove(toX,toY,toZ,toT) == false)
+        {
+            long int crossRetractZ, carryZ;
+            int curZ = details->ideal.z;
+            int useCarryZ = 0;
+            int useCrossZ = 0;
+            parSysId.Get("CROSS_RETRACT_Z", &crossRetractZ);
+            parSysId.Get("CARRY_Z", &crossRetractZ);
+            details->ideal.z = carryZ;
+            useCarryZ = ThisTask->tdFgripperCheckXYZTmove(toX, toY, toZ, toT);
+            details->ideal.z = crossRetractZ;
+            useCrossZ = ThisTask->tdFgripperCheckXYZTmove(toX, toY, toZ, toT);
+            details->ideal.z = curZ;
+            if (useCarryZ)
+            {
+                raiseZ = carryZ;
+            }
+            else if (useCrossZ)
+            {
+                raiseZ = crossRetractZ;
+            }
+            else
+            {
+                useIntermediate = ThisTask->tdFgripperCheckIntMove(toX, toY, toZ, toT,
+                                                                   carryZ, crossRetractZ, &intX, &intY);
+                if (useIntermediate)
+                {
+                    intZ = crossRetractZ;
+                }
+                else
+                {
+                    DramaTHROW(TDFGRIPPERTASK_NOT_SAFEMOVE), "Unable to perform G_MOVE_AXIS_NT, the move is not safe.");
+                }
+            }
+        }
+        details->inUse = YES;
+        if(raiseZ)
+        {
+            MessageUser("G_MOVE_AXIS_NT: Raising Z to %d before doing move.\n", raiseZ);
+            ThisTask->tdFgripperConvertFromFP(toX, toY, raiseZ, toT, jawFpPos, plateTheta, _FULL,
+                                              &toXenc, &toYenc, &toZenc, &toTenc, &toJenc);
+            std::vector<AxisDemand> AxisDemands = ThisTask->SetUpEncodePositions(toXenc, toYenc, toZenc, toTenc);
+            if (!(ThisTask->SetupAmps()))
+            {
+                MessageUser("G_MOVE_AXIS_NT: " + ThisTask->GetError());
+                DramaTHROW(TDFGRIPPERTASK__AMP_ERR, "G_MOVE_AXIS_NT: some amplifiers are not initialised.");
+            }
+            if (!(ThisTask->MoveAxes(AxisDemands, false)))
+            {
+                MessageUser("G_MOVE_AXIS_NT: " + ThisTask->GetError());
+                DramaTHROW_S(TDFGRIPPERTASK__NO_GANTRY_MOVEMENT, "G_MOVE_AXIS_NT: failed to raise Z to %d before doing move.\n", raiseZ);
+            }
+            else
+            {
+                MessageUser("G_MOVE_AXIS_NT: Move to intermediate X/Y/Z position complete");
+                std::this_thread::sleep_for(2000ms);
+                ThisTask->tdFgripperUpdatePos(YES, details->dprFeedback, YES);
+            }
+        }
+        else if(useIntermediate)
+        {
+            MessageUser("G_MOVE_AXIS_NT: Move to intermediate X/Y/Z position %d %d %d.\n", intx, inty, intz);
+            ThisTask->tdFgripperConvertFromFP(intx, inty, intz, toT, jawFpPos, plateTheta, _FULL,
+                                              &toXenc, &toYenc, &toZenc, &toTenc, &toJenc);
+            std::vector<AxisDemand> AxisDemands = ThisTask->SetUpEncodePositions(toXenc, toYenc, toZenc, toTenc);
+            if (!(ThisTask->SetupAmps()))
+            {
+                MessageUser("G_MOVE_AXIS_NT: " + ThisTask->GetError());
+                DramaTHROW(TDFGRIPPERTASK__AMP_ERR, "G_MOVE_AXIS_NT: some amplifiers are not initialised.");
+            }
+            if (!(ThisTask->MoveAxes(AxisDemands, false)))
+            {
+                MessageUser("G_MOVE_AXIS_NT: " + ThisTask->GetError());
+                DramaTHROW(TDFGRIPPERTASK__NO_GANTRY_MOVEMENT, "G_MOVE_AXIS_NT: failed to move to intermediate X/Y/Z position.");
+            }
+            else
+            {
+                MessageUser("G_MOVE_AXIS_NT: Move to intermediate X/Y/Z position complete");
+                std::this_thread::sleep_for(2000ms);
+                ThisTask->tdFgripperUpdatePos(YES, details->dprFeedback, YES);
+            }
+        }
+
+        details = (ThisTask->tdFgripperGetMainStruct());
+        if(!ThisTask->tdFgripperNSMaskCheck(toZ))
+        {
+            DramaTHROW(TDFGRIPPERTASK__NO_GANTRY_MOVEMENT, "G_MOVE_AXIS_NT: failed to move to intermediate X/Y/Z position.");
+        }
+        jawFpPos = details->ideal.jaw;
+        parSysId.Get("PLATE_THETA", &plateTheta);
+        ThisTask->tdFgripperConvertFromFP(toX, toY, toZ, toT, jawFpPos, plateTheta, _FULL,
+                                          &toXenc, &toYenc, &toZenc,&toTenc,&toJenc);
+        details->ideal.x = toX;
+        details->ideal.y = toY;
+        details->ideal.z = toZ;
+        details->ideal.theta = toT;
+        details->ideal.jaw = jawFpPos;
+        details->toEnc.x = (int)doubleToLong(toXenc);
+        details->toEnc.y = (int)doubleToLong(toYenc);
+        details->toEnc.z = (int)doubleToLong(toZenc);
+        details->toEnc.theta = (int)doubleToLong(toTenc);
+        details->toEnc.jaw = (int)doubleToLong(toJenc);    
+        ThisTask->tdFgripperSetMainStruct(details);
         if (!(ThisTask->SetupAmps()))
         {
             MessageUser("G_MOVE_AXIS_NT: " + ThisTask->GetError());
         }
         else
         {
+            std::string Error;
+            std::vector<AxisDemand> AxisDemands = ThisTask->SetUpEncodePositions(toXenc, toYenc, toZenc, toTenc);
             if (!(ThisTask->MoveAxes(AxisDemands, false)))
             {
                 MessageUser("G_MOVE_AXIS_NT: " + ThisTask->GetError());
@@ -3911,6 +5884,128 @@ void GMoveAxisActionNT::ActionThread(const drama::sds::Id &Arg)
         details->inUse = NO;
         ThisTask->tdFgripperSetMainStruct(details);
     }
+}
+
+bool TdFGripperTask::tdFgripperNSMaskCheck(long int target)
+{
+    long int crossRetractorZ;
+    int safe;
+    const char *parameters[] = {"NS_MASK", "NS_MASK_P0", "NS_MASK_P1"};
+
+    I_TdFGripperTaskParSys.Get("CROSS_RETRACT_Z", &crossRetractorZ);
+    if ((target >= I_tdFgripperMainStruct->ideal.z) ||
+        (target >= crossRetractorZ))
+    {
+        DEBUG("Target Z position of %ld does not trigger NSMask check (%ld, %ld).\n",
+              target, I_tdFgripperMainStruct->ideal.z, crossRetractorZ);
+        return true;
+    }
+    tdFposNSMaskCheck(parameters, &safe);
+    if (!safe)
+    {
+        DEBUG("An attempt was made to move Z to %ld, which is below the minimum of %ld allowed when the Nod and Shuffle mask is in place.\n",
+              target, crossRetractorZ);
+        return false;
+    }
+    return true;
+}
+
+void TdFGripperTask::tdFposNSMaskCheck(const char *parameters[], int *safe)
+{
+    unsigned char data = 0;
+    int vmeStat = 0;
+    int flags;
+
+#ifndef VxWorks /* Something else should pick up this error before now */
+    if (I_tdFgripperMainStruct->Simulation == 0)
+        I_tdFgripperMainStruct->Simulation = 1;
+#endif
+    if (I_tdFgripperMainStruct->Simulation)
+    {
+        short simVal;
+
+        I_TdFGripperTaskParSys.Get("NS_MASK_SIM", &simVal);
+        /* Invert the parameter to get the value of interest */
+        data = ~simVal;
+    }
+#ifdef VxWorks
+    else
+    {
+#warning "VxWorks code compiled"
+        /*
+         * The N&S interlocks are on VME Interlock board 2, register 3.
+         */
+        vmeStat = vmeIORead(VME_IO_ILK_BRD_2 | VME_IO_ILK_R3, &data);
+    }
+#endif
+    /*
+     * Invert and grab the required bits.
+     */
+    flags = ~data & NSMASK_INTERLOCK_BOTH;
+    /*
+     * The raw data goes into the first parameter, and plate specific values
+     * in the two other parameters.  Only update parameter if value has changed
+     * (to avoid monitors being triggered all the time)
+     */
+    if (parameters)
+    {
+        short curVal;
+        short newVal;
+        I_TdFGripperTaskParSys.Get(parameters[0], &curVal);
+        if (curVal != flags)
+            I_TdFGripperTaskParSys.Put(parameters[0], flags);
+
+        I_TdFGripperTaskParSys.Get(parameters[1], &curVal);
+        newVal = ((flags & NSMASK_INTERLOCK_PLATE_0) ? 1 : 0);
+        if (curVal != newVal)
+            I_TdFGripperTaskParSys.Put(parameters[1], newVal);
+
+        I_TdFGripperTaskParSys.Get(parameters[2], &curVal);
+        newVal = ((flags & NSMASK_INTERLOCK_PLATE_1) ? 1 : 0);
+        if (curVal != newVal)
+            I_TdFGripperTaskParSys.Put(parameters[2], newVal);
+    }
+
+    /*
+     * Debugging message.
+     */
+
+    DEBUG("tdFposNSMaskCheck: VmeStatus %d Raw data %d, Masked %d, plate %d, Simulation %d, Parameter %s",
+          vmeStat, (int)data, flags, I_tdFgripperMainStruct->configPlate, I_tdFgripperMainStruct->Simulation,
+          parameters ? parameters[0] : "<none>");
+
+    if (*status != STATUS__OK)
+        *safe = 0; /* Something when wrong - presume we are not safe */
+    else if ((I_tdFgripperMainStruct->configPlate == 0) && (flags & NSMASK_INTERLOCK_PLATE_0))
+        *safe = 0;
+    else if ((I_tdFgripperMainStruct->configPlate == 1) && (flags & NSMASK_INTERLOCK_PLATE_1))
+        *safe = 0;
+    else
+        *safe = 1; /* The relevant plate is clear - we are safe */
+}
+
+bool TdFGripperTask::tdFgripperCheckAxisMove(short checkButInJaws, long int tarX, long int tarY, double tarT)
+{
+    long int curZ, safeZ, zAccuracy;
+    int carrying = 0;
+    curZ = I_tdFgripperMainStruct->ideal.z;
+    I_TdFGripperTaskParSys.Get("Z_ACCURACY_LOW", &zAccuracy);
+    I_TdFGripperTaskParSys.Get("CARRY_Z", &safeZ);
+    curZ += zAccuracy;
+    if (curZ < safeZ)
+    {
+        DEBUG("Axis Move:Only Z motion allowed below safe Z height.\n");
+        DEBUG("Current Z %ld, Safe Z %ld.\n", curZ, safeZ);
+        return false;
+    }
+    if (checkButInJaws)
+    {
+        std::string carryingBut = "";
+        carryingBut = I_TdFGripperTaskParSys.GetString("CARRYING_BUTTON");
+        if (strcmp(carryingBut.c_str(), "NO") != 0)
+            carrying = 1;
+    }
+    return tdFgripperCheckCross(tarX, tarY, curZ, tarT, carrying);
 }
 
 void GParkGantryActionNT::ActionThread(const drama::sds::Id &Arg)
@@ -3971,6 +6066,49 @@ void GParkGantryActionNT::ActionThread(const drama::sds::Id &Arg)
         {
             details->inUse = YES;
             ThisTask->tdFgripperSetMainStruct(details);
+            std::string carryingBut;
+            carryingBut = parSysId.GetString("CARRYING_BUTTON");
+            short raiseZ;
+            if (carryingBut == "YES")
+            {
+                MessageUser("G_PARK_NT: Can't park gantry if carrying button.\n");
+                return;
+            }
+            else
+            {
+                raiseZ = NO;
+                parSysId.Get("CROSS_RETRACT_Z", &safeZ);
+                if (details->ideal.z < safeZ)
+                    raiseZ = YES;
+
+                if (raiseZ)
+                {
+                    double plateTheta, toX, toY, toZ, toT, toJ;
+                    double toXenc, toYenc, toZenc, toTenc, toJenc;
+                    parSysId.Get("PLATE_THETA", &plateTheta);
+                    toX = details->ideal.x;
+                    toY = details->ideal.y;
+                    toZ = details->ideal.z;
+                    toT = details->ideal.theta;
+                    toJ = details->ideal.jaw;
+                    ThisTask->tdFgripperConvertFromFP(toX, toY, toZ, toT, toJ, plateTheta, _FULL,
+                                                      &toXenc, &toYenc, &toZenc, &toTenc, &toJenc);
+
+                    std::string Error;
+                    std::vector<AxisDemand> AxisDemands = ThisTask->SetUpEncodePositions(toXenc, toYenc, safeZ, toTenc);
+                    if (!(ThisTask->MoveAxes(AxisDemands)))
+                    {
+                        MessageUser("G_PARK_NT: fail to raise z axis before parking " + ThisTask->GetError());
+                        details->inUse = NO;
+                        ThisTask->tdFgripperSetMainStruct(details);
+                        return;
+                    }
+                    else
+                    {
+                        MessageUser("G_PARK_NT: Z axis raised to safe place.");
+                    }
+                }
+            }
             std::string Error;
             std::vector<AxisDemand> AxisDemands = GetDemands(Axes, Positions, Velocities, Error);
             if (!(ThisTask->MoveAxes(AxisDemands)))
@@ -3990,6 +6128,7 @@ void GParkGantryActionNT::ActionThread(const drama::sds::Id &Arg)
             }
             details->inUse = NO;
             ThisTask->tdFgripperSetMainStruct(details);
+            MessageUser("G_PARK_NT: Action complete.");
         }
     }
     else
@@ -4039,7 +6178,15 @@ void GHomeActionNT::ActionThread(const drama::sds::Id &Arg)
         if (Y)
             MessageUser("Home Y axis");
         if (Z)
+        {
             MessageUser("Home Z axis");
+            if (tdFgripperCheckAxisMove(YES, GRIP_X_PARK, GRIP_Y_PARK,
+                                        GRIP_THETA_PARK) == false)
+            {
+                MessageUser("Home Z axis is not safe, Abort the action");
+                return;
+            }
+        }
         if (Theta)
             MessageUser("Home Theta axis");
         if (Jaw)
@@ -4186,111 +6333,190 @@ void GMoveOffsetActionNT::ActionThread(const drama::sds::Id &Arg)
         return;
     }
 
-    std::string Axes;
-    std::string Positions;
-    std::string Velocities;
+    long int toX, toY, toZ;
+    long int intX, intY, intZ;
+    double toT;
+    int raiseZ = 0;
+    bool useIntermediate = false;
     std::string OffsetFlag = "";
-    if (Arg)
+    if (!Arg)
     {
-        try
-        {
-            drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
-            drama::gitarg::String AxesArg(this, Arg, "AXES", 1, "", NoFlags);
-            Axes = AxesArg;
-            drama::gitarg::String PositionsArg(this, Arg, "POSITIONS", 2, "", NoFlags);
-            Positions = PositionsArg;
-            drama::gitarg::String VelocitiesArg(this, Arg, "VELOCITIES", 3, "", NoFlags);
-            Velocities = VelocitiesArg;
-            drama::gitarg::String OffsetFlagArg(this, Arg, "OFFSET", 4, "", NoFlags);
-            OffsetFlag = OffsetFlagArg;
-        }
-        catch (...)
-        {
-        }
+        DramaTHROW(TDFGRIPPERTASK_NO_INPUT_ARGUMENT, "No input argument for G_MOVEOFFSET_NT.");
     }
-
+    try
+    {
+        drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
+        drama::gitarg::Int<XMIN, XMAX> XArg(this, Arg, "X", 1, 0, NoFlags);
+        toX = XArg;
+        drama::gitarg::Int<YMIN, YMAX> YArg(this, Arg, "Y", 2, 0, NoFlags);
+        toY = YArg;
+        drama::gitarg::Int<Z_SP_MIN, ZMAX> ZArg(this, Arg, "Z", 3, 0, NoFlags);
+        toZ = ZArg;
+        ThisTask->tdFgripperGetActZ(toZ);
+        drama::gitarg::Real<THETAMIN, THETAMAX> ThetaArg(this, Arg, "Theta", 4, 0.0, NoFlags);
+        toT = ThetaArg;
+        drama::gitarg::String OffsetFlagArg(this, Arg, "OFFSET", 5, "", NoFlags);
+        OffsetFlag = OffsetFlagArg;
+    }
+    catch (...)
+    {
+        DramaTHROW(TDFGRIPPERTASK_INV_INPUT_ARGUMENT, "The input argument for G_MOVEOFFSET_NT is not valid.");
+    }
     bool MoveBackward = false;
     if (!OffsetFlag.compare("-"))
-    {
         MoveBackward = true;
-    }
 
-    std::string Error;
-    std::vector<AxisDemand> AxisDemands = GetDemands(Axes, Positions, Velocities, Error);
-    int NumberAxes = AxisDemands.size();
-    if (NumberAxes <= 0)
     {
-        MessageUser("G_MOVEOFFSET_NT: " + Error);
-    }
-    else
-    {
-        details->inUse = YES;
-        unsigned int NumberAxes = AxisDemands.size();
-
-        double plateTheta;
         drama::ParSys parSysId(ThisTask->TaskPtr());
-        parSysId.Get("PLATE_THETA", &plateTheta);
-        long int toX, toY;
+
         double toXenc = 0.0, toYenc = 0.0;
+        double toZenc, toTenc, toJenc, plateTheta;
+        long int jawFpPos;
 
-        for (unsigned int Index = 0; Index < NumberAxes; Index++)
+        if (MoveBackward == true)
         {
-            if (MoveBackward == true)
-                AxisDemands[Index].Position *= (-1.0);
 
-            AxisDemands[Index].Position += (Index < 2 ? details->ideal.x : details->ideal.y);
-
-            if (Index < 2)
-            {
-                toX = doubleToLong(AxisDemands[Index].Position);
-                details->ideal.x = toX;
-            }
-            if (Index == 2)
-            {
-                toY = doubleToLong(AxisDemands[Index].Position);
-                details->ideal.y = toY;
-            }
-            DEBUG("AxisId: %d, plate position %f, velocity %f\n", AxisDemands[Index].AxisId,
-                  AxisDemands[Index].Position, AxisDemands[Index].Velocity);
+            toX *= (-1);
+            toY *= (-1);
+            toZ *= (-1);
+            toT *= (-1);
         }
+
+        toX += details->ideal.x;
+        toY += details->ideal.y;
+        toZ += details->ideal.z;
+        toT += details->ideal.theta;
+
+        DEBUG("The original poisiton is %ld %ld %ld %f .\n
+        And the moveto position is %ld %ld %ld %f\n", details->ideal.x, details->ideal.y, details->ideal.z,  details->ideal.theta, toX, toY, toZ, toT);
+        
+        if (ThisTask->tdFgripperCheckXYZTmove(toX,toY,toZ,toT) == false)
+        {
+            long int crossRetractZ, carryZ;
+            int curZ = details->ideal.z;
+            int useCarryZ = 0;
+            int useCrossZ = 0;
+            parSysId.Get("CROSS_RETRACT_Z", &crossRetractZ);
+            parSysId.Get("CARRY_Z", &crossRetractZ);
+            details->ideal.z = carryZ;
+            useCarryZ = ThisTask->tdFgripperCheckXYZTmove(toX, toY, toZ, toT);
+            details->ideal.z = crossRetractZ;
+            useCrossZ = ThisTask->tdFgripperCheckXYZTmove(toX, toY, toZ, toT);
+            details->ideal.z = curZ;
+            if (useCarryZ)
+            {
+                raiseZ = carryZ;
+            }
+            else if (useCrossZ)
+            {
+                raiseZ = crossRetractZ;
+            }
+            else
+            {
+                useIntermediate = ThisTask->tdFgripperCheckIntMove(toX, toY, toZ, toT,
+                                                                   carryZ, crossRetractZ, &intX, &intY);
+                if (useIntermediate)
+                {
+                    intZ = crossRetractZ;
+                }
+                else
+                {
+                    DramaTHROW(TDFGRIPPERTASK_NOT_SAFEMOVE, "Unable to perform G_MOVEOFFSET_NT, the move is not safe.");
+                }
+            }
+        }
+        details->inUse = YES;
+        if(raiseZ)
+        {
+            MessageUser("G_MOVEOFFSET_NT: Raising Z to %d before doing move.\n", raiseZ);
+            ThisTask->tdFgripperConvertFromFP(toX, toY, raiseZ, toT, jawFpPos, plateTheta, _FULL,
+                                              &toXenc, &toYenc, &toZenc, &toTenc, &toJenc);
+            std::vector<AxisDemand> AxisDemands = ThisTask->SetUpEncodePositions(toXenc, toYenc, toZenc, toTenc);
+            if (!(ThisTask->SetupAmps()))
+            {
+                MessageUser("G_MOVEOFFSET_NT: " + ThisTask->GetError());
+                DramaTHROW(TDFGRIPPERTASK__AMP_ERR, "G_MOVEOFFSET_NT: some amplifiers are not initialised.");
+            }
+            if (!(ThisTask->MoveAxes(AxisDemands, false)))
+            {
+                MessageUser("G_MOVEOFFSET_NT: " + ThisTask->GetError());
+                DramaTHROW_S(TDFGRIPPERTASK__NO_GANTRY_MOVEMENT, "G_MOVEOFFSET_NT: failed to raise Z to %d before doing move.\n", raiseZ);
+            }
+            else
+            {
+                MessageUser("G_MOVEOFFSET_NT: Move to intermediate X/Y/Z position complete");
+                std::this_thread::sleep_for(2000ms);
+                ThisTask->tdFgripperUpdatePos(YES, details->dprFeedback, YES);
+            }
+        }
+        else if(useIntermediate)
+        {
+            MessageUser("G_MOVEOFFSET_NT: Move to intermediate X/Y/Z position %d %d %d.\n", intx, inty, intz);
+            ThisTask->tdFgripperConvertFromFP(intx, inty, intz, toT, jawFpPos, plateTheta, _FULL,
+                                              &toXenc, &toYenc, &toZenc, &toTenc, &toJenc);
+            std::vector<AxisDemand> AxisDemands = ThisTask->SetUpEncodePositions(toXenc, toYenc, toZenc, toTenc);
+            if (!(ThisTask->SetupAmps()))
+            {
+                MessageUser("G_MOVEOFFSET_NT: " + ThisTask->GetError());
+                DramaTHROW(TDFGRIPPERTASK__AMP_ERR, "G_MOVEOFFSET_NT: some amplifiers are not initialised.");
+            }
+            if (!(ThisTask->MoveAxes(AxisDemands, false)))
+            {
+                MessageUser("G_MOVEOFFSET_NT: " + ThisTask->GetError());
+                DramaTHROW(TDFGRIPPERTASK__NO_GANTRY_MOVEMENT, "G_MOVEOFFSET_NT: failed to move to intermediate X/Y/Z position.");
+            }
+            else
+            {
+                MessageUser("G_MOVEOFFSET_NT: Move to intermediate X/Y/Z position complete");
+                std::this_thread::sleep_for(2000ms);
+                ThisTask->tdFgripperUpdatePos(YES, details->dprFeedback, YES);
+            }
+        }
+
+        details = (ThisTask->tdFgripperGetMainStruct());
+        if(!ThisTask->tdFgripperNSMaskCheck(toZ))
+        {
+            DramaTHROW(TDFGRIPPERTASK__NO_GANTRY_MOVEMENT, "G_MOVEOFFSET_NT: failed to move to intermediate X/Y/Z position.");
+        }
+        jawFpPos = details->ideal.jaw;
+        parSysId.Get("PLATE_THETA", &plateTheta);
+        ThisTask->tdFgripperConvertFromFP(toX, toY, toZ, toT, jawFpPos, plateTheta, _FULL,
+                                          &toXenc, &toYenc, &toZenc,&toTenc,&toJenc);
+        details->ideal.x = toX;
+        details->ideal.y = toY;
+        details->ideal.z = toZ;
+        details->ideal.theta = toT;
+        details->ideal.jaw = jawFpPos;
+        details->toEnc.x = (int)doubleToLong(toXenc);
+        details->toEnc.y = (int)doubleToLong(toYenc);
+        details->toEnc.z = (int)doubleToLong(toZenc);
+        details->toEnc.theta = (int)doubleToLong(toTenc);
+        details->toEnc.jaw = (int)doubleToLong(toJenc);    
         ThisTask->tdFgripperSetMainStruct(details);
-        ThisTask->tdFgripperConvertFromFP(toX, toY, plateTheta, _FULL,
-                                          &toXenc, &toYenc);
-        for (unsigned int Index = 0; Index < NumberAxes; Index++)
-        {
-            if (Index < 2)
-            {
-                AxisDemands[Index].Position = toXenc;
-            }
-            else if (Index == 2)
-            {
-                AxisDemands[Index].Position = toYenc;
-            }
-            DEBUG("AxisId: %d, encoder position %f, velocity %f\n", AxisDemands[Index].AxisId,
-                  AxisDemands[Index].Position, AxisDemands[Index].Velocity);
-        }
-
         if (!(ThisTask->SetupAmps()))
         {
             MessageUser("G_MOVEOFFSET_NT: " + ThisTask->GetError());
         }
         else
         {
+            std::string Error;
+            std::vector<AxisDemand> AxisDemands = ThisTask->SetUpEncodePositions(toXenc, toYenc, toZenc, toTenc);
             if (!(ThisTask->MoveAxes(AxisDemands, false)))
             {
                 MessageUser("G_MOVEOFFSET_NT: " + ThisTask->GetError());
             }
             else
             {
-                MessageUser("G_MOVEOFFSET_NT: Move complete.");
+                MessageUser("G_MOVEOFFSET_NT: Move complete");
                 MessageUser("G_MOVEOFFSET_NT: Waiting to receive signals about the current position of the gantry.");
                 std::this_thread::sleep_for(2000ms);
                 if (!(ThisTask->tdFgripperUpdatePos(YES, details->dprFeedback, YES)))
                 {
-                    MessageUser("G_MOVEOFFSET_NT: Failed to update the position of gantry.");
+                    MessageUser("G_MOVEOFFSET_NT: Failed to update the position of the gantry");
                 }
             }
         }
+
         details->inUse = NO;
         ThisTask->tdFgripperSetMainStruct(details);
     }
@@ -4369,9 +6595,14 @@ void GMOVEActionNT::ActionThread(const drama::sds::Id &Arg)
     }
 
     std::string Axes;
-    std::string Positions;
-    std::string Velocities;
-    std::string OffsetFlag;
+    long int toX, toY, toZ, toJ;
+    double toT;
+
+    toX = details->ideal.x;
+    toY = details->ideal.y;
+    toZ = details->ideal.z;
+    toJ = details->ideal.jaw;
+    toT = details->ideal.theta;
     if (Arg)
     {
         try
@@ -4379,83 +6610,85 @@ void GMOVEActionNT::ActionThread(const drama::sds::Id &Arg)
             drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
             drama::gitarg::String AxesArg(this, Arg, "AXES", 1, "", NoFlags);
             Axes = AxesArg;
-            drama::gitarg::String PositionsArg(this, Arg, "POSITIONS", 2, "", NoFlags);
-            Positions = PositionsArg;
-            drama::gitarg::String VelocitiesArg(this, Arg, "VELOCITIES", 3, "", NoFlags);
-            Velocities = VelocitiesArg;
-            drama::gitarg::String OffsetFlagArg(this, Arg, "OFFSET", 4, "", NoFlags);
-            OffsetFlag = OffsetFlagArg;
+            if (Axes == "X")
+            {
+                drama::gitarg::Int<XMIN, XMAX> PositionsArg(this, Arg, "POSITIONS", 2, 0, NoFlags);
+                toX = PositionsArg;
+            }
+            else if (Axes == "Y")
+            {
+                drama::gitarg::Int<YMIN, YMAX> PositionsArg(this, Arg, "POSITIONS", 2, 0, NoFlags);
+                toY = PositionsArg;
+            }
+            else if (Axes == "Z")
+            {
+                drama::gitarg::Int<Z_SP_MIN, ZMAX> PositionsArg(this, Arg, "POSITIONS", 2, 0, NoFlags);
+                toZ = PositionsArg;
+                ThisTask->tdFgripperGetActZ(toZ);
+            }
+            else if (Axes == "JAW")
+            {
+                drama::gitarg::INT<JAWMIN, JAWMAX> PositionsArg(this, Arg, "POSITIONS", 2, 0, NoFlags);
+                toJ = PositionsArg;
+            }
+            else if (Axes == "THETA")
+            {
+                drama::gitarg::Real<THETAMIN, THETAMAX> PositionsArg(this, Arg, "POSITIONS", 2, 0, NoFlags);
+                toT = PositionsArg;
+            }
+            else
+            {
+                MessageUser("G_MOVE_NT can only work on one axis. Please check the input of axes.\n");
+                return;
+            }
         }
         catch (...)
         {
         }
     }
-    bool MoveOffset = false;
-    bool MoveBackward = false;
-    if (!OffsetFlag.compare("+") || !OffsetFlag.compare("-"))
+
+    if (Axes != "JAW" && Aexs != "Z")
     {
-        MoveOffset = true;
-        if (!OffsetFlag.compare("-"))
-            MoveBackward = true;
-    }
-    if (Axes.size() > 1 || Velocities.find(",") != string::npos || Positions.find(",") != string::npos)
-    {
-        MessageUser("G_MOVE_NT can only work on one axis. If more than one axes need to move, please choose G_MOVE_AXIS_NT.\n");
-        return;
-    }
-    std::string Error;
-    std::vector<AxisDemand> AxisDemands = GetDemands(Axes, Positions, Velocities, Error);
-    int NumberAxes = AxisDemands.size();
-    if ((NumberAxes != 1 && Axes != "X"))
-    {
-        MessageUser("G_MOVE_NT can only work on one axis. If more than one axes need to move, please choose G_MOVE_AXIS_NT.\n" + Error);
-    }
-    else
-    {
-        double plateTheta;
-        drama::ParSys parSysId(ThisTask->TaskPtr());
-        parSysId.Get("PLATE_THETA", &plateTheta);
-        long int toX, toY;
-        double toXenc = 0.0, toYenc = 0.0;
-        details->inUse = YES;
-        unsigned int NumberAxes = AxisDemands.size();
-        for (unsigned int Index = 0; Index < NumberAxes; Index++)
+        long int toXX, toYY;
+        toXX = details->ideal.x;
+        toYY = details->ideal.y;
+        if (Axes == "X")
+            toXX = (long int)Positions;
+        else if (Axes == "Y")
+            toYY = (long int)Positions;
+        if (tdFgripperCheckAxisMove(YES, toXX, toYY, details->ideal.theta) == false)
         {
-            if (MoveBackward)
-                AxisDemands[Index].Position *= (-1.0);
-            if (MoveOffset == true)
-            {
-                AxisDemands[Index].Position += (Axes == "X" ? details->ideal.x : details->ideal.y);
-            }
-            if (Axes == "X")
-            {
-                toX = doubleToLong(AxisDemands[Index].Position);
-                details->ideal.x = toX;
-            }
-            else if (Axes == "Y")
-            {
-                toY = doubleToLong(AxisDemands[Index].Position);
-                details->ideal.y = toY;
-            }
-            DEBUG("AxisId: %d, plate position %f, velocity %f\n", AxisDemands[Index].AxisId,
-                  AxisDemands[Index].Position, AxisDemands[Index].Velocity);
+            MessageUser("G_MOVE_NT: the move is unsafe Abort the action.\n");
+            return;
         }
+    }
+    drama::ParSys parSysId(ThisTask->TaskPtr());
+
+    double toXenc = 0.0, toYenc = 0.0;
+    double toZenc, toTenc, toJenc, plateTheta;
+    parSysId.Get("PLATE_THETA", &plateTheta);
+
+    MessageUser("G_MOVE_NT: The original poisiton is %ld %ld %ld &ld %f .\n
+    And the moveto position is %ld %ld %ld %ld %f\n", details->ideal.x, details->ideal.y, details->ideal.z, details->ideal.jaw, details->ideal.theta, toX, toY, toZ, toJ, toT);
+    
+    ThisTask->tdFgripperConvertFromFP(toX, toY, toZ, toT, toJ, plateTheta, _FULL,
+                                              &toXenc, &toYenc, &toZenc, &toTenc, &toJenc);
+    std::vector<AxisDemand> AxisDemands = ThisTask->SetUpEncodePositions(toXenc, toYenc, toZenc, toTenc);
+    
+    {
+        details->ideal.x = toX;
+        details->ideal.y = toY;
+        details->ideal.z = toZ;
+        details->ideal.theta = toT;
+        details->ideal.jaw = toJ;
+
+        details->toEnc.x = (int)doubleToLong(toXenc);
+        details->toEnc.y = (int)doubleToLong(toYenc);
+        details->toEnc.z = (int)doubleToLong(toZenc);
+        details->toEnc.theta = (int)doubleToLong(toTenc);
+        details->toEnc.jaw = (int)doubleToLong(toJenc);
+
         ThisTask->tdFgripperSetMainStruct(details);
-        ThisTask->tdFgripperConvertFromFP(toX, toY, plateTheta, _FULL,
-                                          &toXenc, &toYenc);
-        for (unsigned int Index = 0; Index < NumberAxes; Index++)
-        {
-            if (Axes == "X")
-            {
-                AxisDemands[Index].Position = toXenc;
-            }
-            else if (Axes == "Y")
-            {
-                AxisDemands[Index].Position = toYenc;
-            }
-            DEBUG("AxisId: %d, encoder position %f, velocity %f\n", AxisDemands[Index].AxisId,
-                  AxisDemands[Index].Position, AxisDemands[Index].Velocity);
-        }
 
         if (!(ThisTask->SetupAmps()))
         {
@@ -4493,22 +6726,52 @@ void GRESETActionNT::ActionThread(const drama::sds::Id &)
 
     parSysId.Put("ENQ_VER_NUM", TdFGripperTaskVersion);
     parSysId.Put("ENQ_VER_DATE", TdFGripperTaskDate);
+
     std::shared_ptr<tdFgripperTaskType> details = ThisTask->tdFgripperGetMainStruct();
     if (details == nullptr)
     {
         details = std::make_shared<tdFgripperTaskType>();
-        ThisTask->tdFgripperSetMainStruct(details);
     }
+    details->Initialised = NO;
     drama::sds::Id id;        /* Parameter id                    */
     unsigned long int length; /* Length of parameter item        */
     short check = SHOW;
+    /*
+     *  For parameters we want quick access to, get pointers to them
+     *  (we  can't do data conversion when getting such parameters)
+     */
+    id = parSysId.Find("BACKILL_ALWAYS");
+    id.Pointer(&details->pars.backIllAlways, &length);
+    if (length != sizeof(*(details->pars.backIllAlways)))
+    {
+        DEBUG("Parameter BACKILL_ALWAYS length mismatch");
+        return;
+    }
+    length = 0;
+
+    id = parSysId.Find("BACKILL_WARMUP");
+    id.Pointer(&details->pars.backIllWarmUp, &length);
+    if (length != sizeof(*(details->pars.backIllWarmUp)))
+    {
+        DEBUG("Parameter BACKILL_WARMUP length mismatch");
+        return;
+    }
+    length = 0;
 
     id = parSysId.Find("ZEROCAM_CENWAIT");
     id.Pointer(&details->pars.zeroCamCenWait, &length);
     if (length != sizeof(*(details->pars.zeroCamCenWait)))
     {
-
         DEBUG("Parameter ZEROCAM_CENWAIT length mismatch");
+        return;
+    }
+    length = 0;
+
+    id = parSysId.Find("DIST_REM_ENABLE");
+    id.Pointer(&details->pars.distRemEnable, &length);
+    if (length != sizeof(*(details->pars.distRemEnable)))
+    {
+        DEBUG("Parameter DIST_REM_ENABLE length mismatch");
         return;
     }
     length = 0;
@@ -4531,44 +6794,226 @@ void GRESETActionNT::ActionThread(const drama::sds::Id &)
     }
     length = 0;
 
+    id = parSysId.Find("DIST_P1");
+    id.Pointer(&details->pars.distPar1, &length);
+    if (length != sizeof(double))
+    {
+        DEBUG("Parameter DIST_P1 length mismatch");
+        return;
+    }
+    length = 0;
+
+    id = parSysId.Find("DIST_P2");
+    id.Pointer(&details->pars.distPar2, &length);
+    if (length != sizeof(double))
+    {
+        DEBUG("Parameter DIST_P2 length mismatch");
+        return;
+    }
+    length = 0;
+
+    id = parSysId.Find("DIST_P3");
+    id.Pointer(&details->pars.distPar3, &length);
+    if (length != sizeof(double))
+    {
+        DEBUG("Parameter DIST_P3 length mismatch");
+        return;
+    }
+    length = 0;
+
+    id = parSysId.Find("DIST_P4");
+    id.Pointer(&details->pars.distPar4, &length);
+    if (length != sizeof(double))
+    {
+        DEBUG("Parameter DIST_P4 length mismatch");
+        return;
+    }
+    length = 0;
+
+    id = parSysId.Find("DIST_P5");
+    id.Pointer(&details->pars.distPar5, &length);
+    if (length != sizeof(double))
+    {
+        DEBUG("Parameter DIST_P5 length mismatch");
+        return;
+    }
+    length = 0;
+
+    id = parSysId.Find("DIST_P6");
+    id.Pointer(&details->pars.distPar6, &length);
+    if (length != sizeof(double))
+    {
+        DEBUG("Parameter DIST_P6 length mismatch");
+        return;
+    }
+    length = 0;
+
+    id = parSysId.Find("DIST_P7");
+    id.Pointer(&details->pars.distPar7, &length);
+    if (length != sizeof(double))
+    {
+        DEBUG("Parameter DIST_P7 length mismatch");
+        return;
+    }
+    length = 0;
+
+    id = parSysId.Find("DIST_P8");
+    id.Pointer(&details->pars.distPar8, &length);
+    if (length != sizeof(double))
+    {
+        DEBUG("Parameter DIST_P8 length mismatch");
+        return;
+    }
+    length = 0;
+
+    id = parSysId.Find("DIST_P9");
+    id.Pointer(&details->pars.distPar9, &length);
+    if (length != sizeof(double))
+    {
+        DEBUG("Parameter DIST_P9 length mismatch");
+        return;
+    }
+    length = 0;
+
+    id = parSysId.Find("DIST_P10");
+    id.Pointer(&details->pars.distPar10, &length);
+    if (length != sizeof(double))
+    {
+        DEBUG("Parameter DIST_P10 length mismatch");
+        return;
+    }
+    length = 0;
+
+    id = parSysId.Find("DIST_P11");
+    id.Pointer(&details->pars.distPar11, &length);
+    if (length != sizeof(double))
+    {
+        DEBUG("Parameter DIST_P11 length mismatch");
+        return;
+    }
+    length = 0;
+
+    id = parSysId.Find("DIST_P12");
+    id.Pointer(&details->pars.distPar12, &length);
+    if (length != sizeof(double))
+    {
+        DEBUG("Parameter DIST_P12 length mismatch");
+        return;
+    }
+    length = 0;
+
+    id = parSysId.Find("DIST_P13");
+    id.Pointer(&details->pars.distPar13, &length);
+    if (length != sizeof(double))
+    {
+        DEBUG("Parameter DIST_P13 length mismatch");
+        return;
+    }
+    length = 0;
+
+    id = parSysId.Find("DIST_P14");
+    id.Pointer(&details->pars.distPar14, &length);
+    if (length != sizeof(double))
+    {
+        DEBUG("Parameter DIST_P14 length mismatch");
+        return;
+    }
+    length = 0;
+
+    id = parSysId.Find("DIST_P15");
+    id.Pointer(&details->pars.distPar15, &length);
+    if (length != sizeof(double))
+    {
+        DEBUG("Parameter DIST_P15 length mismatch");
+        return;
+    }
+    length = 0;
+
+    id = parSysId.Find("DIST_P16");
+    id.Pointer(&details->pars.distPar16, &length);
+    if (length != sizeof(double))
+    {
+        DEBUG("Parameter DIST_P16 length mismatch");
+        return;
+    }
+    length = 0;
+
+    id = parSysId.Find("DIST_P17");
+    id.Pointer(&details->pars.distPar17, &length);
+    if (length != sizeof(double))
+    {
+        DEBUG("Parameter DIST_P17 length mismatch");
+        return;
+    }
+    length = 0;
+
+    id = parSysId.Find("DIST_P18");
+    id.Pointer(&details->pars.distPar18, &length);
+    if (length != sizeof(double))
+    {
+        DEBUG("Parameter DIST_P18 length mismatch");
+        return;
+    }
+    length = 0;
+
     details->inUse = YES;
 
+    details->distMap.loaded = NO;
     bool defRead = ThisTask->tdFgripperDefRead(DEFS_FILE | FLEX_FILE,
                                                check);
     if (defRead == false)
     {
         details->inUse = NO;
-        ThisTask->tdFgripperSetMainStruct(details);
         return;
     }
 
+    ThisTask->tdFGetCameraPath().GetPath(this);
+    try
+    {
+        ThisTask->tdFGetCameraPath().Obey(this, "RESET");
+    }
+    catch (...)
+    {
+        MessageUser("RESET: failed to initialise the camera.");
+        DramaTHROW(TDFGRIPPERTASK__CAMERA, "RESET: failed to reset the camera.");
+    }
+
+    MessageUser("RESET: camera initialisation completes.\n");
+
+    details->cameraInit = YES;
     details->ipsMode = 0;
     details->dprAddress = ERROR;
     details->toEnc.x = 0;
     details->toEnc.y = 0;
+    details->toEnc.z = 0;
+    details->toEnc.jaw = 0;
+    details->toEnc.theta = 0;
 
-    details->Initialised = YES;
-    DEBUG("Reset tdFgripperTaskType OK\n");
+    parSysId.Put("TASK_STATE", 0);
 
-    if (ThisTask->DisableAmps() == true)
+    if (!(ThisTask->SetupAmps()))
     {
-        DEBUG("Disable all the amps, now reset the amps\n");
-        if (ThisTask->SetupAmps() == true)
-        {
-            DEBUG("Reset amps OK\n");
-        }
-        else
-        {
-            DEBUG("Reset Amps fails\n");
-            MessageUser("G_RESET: " + ThisTask->GetError());
-        }
+        DEBUG("SetupAmps fails\n");
+        MessageUser("RESET: " + ThisTask->GetError());
+        return;
     }
     else
     {
-        DEBUG("Reset Amps fails\n");
-        MessageUser("G_RESET: " + ThisTask->GetError());
+        DEBUG("Setup amps OK\n");
+        MessageUser("RESET: Task initialised from configuration file " + CONFIGURATION_FILE);
     }
+
+    details->Initialised = YES;
     details->inUse = NO;
+
+    details->toEnc.x = 0; /* Used for simulation only */
+    details->toEnc.y = 0; /* Used for simulation only */
+    details->toEnc.z = GRIP_Z_PARK;
+    details->toEnc.jaw = 0;
+    details->toEnc.theta = 0;
+    tdFgripperUpdatePos(YES, YES, YES);
+    parSysId.Put("PARKED", "NO");
+    tdFstateBitClear(PARKED);
     ThisTask->tdFgripperSetMainStruct(details);
 }
 
@@ -4808,31 +7253,58 @@ void PSetImageActionNT::ActionThread(const drama::sds::Id &Arg)
         coeffs[4] = (Coeffs5Arg.empty() ? 0.0 : stod(Coeffs5Arg));
         drama::gitarg::String Coeffs6Arg(this, Arg, "camCoeffs5", 8, "", NoFlags);
         coeffs[5] = (Coeffs6Arg.empty() ? 0.0 : stod(Coeffs6Arg));
-
-        details->freeImg.bias = (int)bias;
-        DEBUG("The free image bias is %d\n", details->freeImg.bias);
-        DEBUG("The camCoeffs array is:\n");
-        for (int counter = 0; counter < 6; counter++)
+        if (ImageArg == "GRASP")
         {
-            details->freeImg.camCoeffs[counter] = coeffs[counter];
-            DEBUG("%f ", details->freeImg.camCoeffs[counter]);
-        }
-        DEBUG("\n");
+            details->graspImg.bias = (int)bias;
+            DEBUG("The grasp image bias is %d\n", details->graspImg.bias);
+            DEBUG("The camCoeffs array is:\n");
+            for (int counter = 0; counter < 6; counter++)
+            {
+                details->graspImg.camCoeffs[counter] = coeffs[counter];
+                DEBUG("%f ", details->graspImg.camCoeffs[counter]);
+            }
+            DEBUG("\n");
 
-        DEBUG("The Inverse camCoeffs array is:\n");
-        slaInvf(details->freeImg.camCoeffs, details->freeImg.invCoeffs, &j);
-        if (j != 0)
-        {
-            int i;
-            for (i = 0; i < 6; i++)
-                details->freeImg.invCoeffs[i] = details->freeImg.camCoeffs[i];
+            DEBUG("The Inverse camCoeffs array is:\n");
+            slaInvf(details->graspImg.camCoeffs, details->graspImg.invCoeffs, &j);
+            if (j != 0)
+            {
+                int i;
+                for (i = 0; i < 6; i++)
+                    details->graspImg.invCoeffs[i] = details->graspImg.camCoeffs[i];
+            }
+            for (int i = 0; i < 6; i++)
+            {
+                DEBUG("%f ", details->graspImg.invCoeffs[i]);
+            }
+            DEBUG("\n");
         }
-        for (int i = 0; i < 6; i++)
+        else
         {
-            DEBUG("%f ", details->freeImg.invCoeffs[i]);
-        }
-        DEBUG("\n");
+            details->freeImg.bias = (int)bias;
+            DEBUG("The free image bias is %d\n", details->freeImg.bias);
+            DEBUG("The camCoeffs array is:\n");
+            for (int counter = 0; counter < 6; counter++)
+            {
+                details->freeImg.camCoeffs[counter] = coeffs[counter];
+                DEBUG("%f ", details->freeImg.camCoeffs[counter]);
+            }
+            DEBUG("\n");
 
+            DEBUG("The Inverse camCoeffs array is:\n");
+            slaInvf(details->freeImg.camCoeffs, details->freeImg.invCoeffs, &j);
+            if (j != 0)
+            {
+                int i;
+                for (i = 0; i < 6; i++)
+                    details->freeImg.invCoeffs[i] = details->freeImg.camCoeffs[i];
+            }
+            for (int i = 0; i < 6; i++)
+            {
+                DEBUG("%f ", details->freeImg.invCoeffs[i]);
+            }
+            DEBUG("\n");
+        }
         if (!ThisTask->tdFgripperDefWrite(DEFS_FILE, check))
         {
             MessageUser("P_SET_IMAGE: Save Image failed " + ThisTask->GetError());
@@ -4919,14 +7391,51 @@ void PSetVelActionNT::ActionThread(const drama::sds::Id &Arg)
     if (Arg)
     {
         drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
-        drama::gitarg::Int<GRIPPER_XY_FR_MIN, GRIPPER_XY_FR_MAX> feedRateArg(this, Arg, "feedrate", 1, 0, NoFlags);
-        iFeedrate = feedRateArg;
-        drama::ParId paramFeedRate(GetTask(), "XY_VEL");
-        MessageUser("P_SET_VEL: before the setting, the value of XY_VEL is: \n");
-        paramFeedRate.List();
-        paramFeedRate.Put((int)iFeedrate);
-        MessageUser("P_SET_VEL: after the setting, the value of XY_VEL is: \n");
-        paramFeedRate.List();
+        drama::gitarg::String axisArg(this, Arg, "", 1, 0, NoFlagSet);
+        if (axisArg == "X" || axisArg == "Y")
+        {
+            drama::gitarg::Int<GRIPPER_XY_FR_MIN, GRIPPER_XY_FR_MAX> feedRateArg(this, Arg, "feedrate", 2, 0, NoFlags);
+            iFeedrate = feedRateArg;
+            drama::ParId paramFeedRate(GetTask(), "XY_VEL");
+            MessageUser("P_SET_VEL: before the setting, the value of XY_VEL is: \n");
+            paramFeedRate.List();
+            paramFeedRate.Put((int)iFeedrate);
+            MessageUser("P_SET_VEL: after the setting, the value of XY_VEL is: \n");
+            paramFeedRate.List();
+        }
+        else if (axisArg == "Z")
+        {
+            drama::gitarg::Int<GRIPPER_Z_FR_MIN, GRIPPER_Z_FR_MAX> feedRateArg(this, Arg, "feedrate", 2, 0, NoFlags);
+            iFeedrate = feedRateArg;
+            drama::ParId paramFeedRate(GetTask(), "Z_VEL");
+            MessageUser("P_SET_VEL: before the setting, the value of Z_VEL is: \n");
+            paramFeedRate.List();
+            paramFeedRate.Put((int)iFeedrate);
+            MessageUser("P_SET_VEL: after the setting, the value of Z_VEL is: \n");
+            paramFeedRate.List();
+        }
+        else if (axisArg == "JAW")
+        {
+            drama::gitarg::Int<JAW_FR_MIN, JAW_FR_MAX> feedRateArg(this, Arg, "feedrate", 2, 0, NoFlags);
+            iFeedrate = feedRateArg;
+            drama::ParId paramFeedRate(GetTask(), "JAW_VEL");
+            MessageUser("P_SET_VEL: before the setting, the value of JAW_VEL is: \n");
+            paramFeedRate.List();
+            paramFeedRate.Put((int)iFeedrate);
+            MessageUser("P_SET_VEL: after the setting, the value of JAW_VEL is: \n");
+            paramFeedRate.List();
+        }
+        else if (axisArg == "THETA")
+        {
+            drama::gitarg::Int<THETA_FR_MIN, THETA_FR_MAX> feedRateArg(this, Arg, "feedrate", 2, 0, NoFlags);
+            iFeedrate = feedRateArg;
+            drama::ParId paramFeedRate(GetTask(), "THETA_VEL");
+            MessageUser("P_SET_VEL: before the setting, the value of THETA_VEL is: \n");
+            paramFeedRate.List();
+            paramFeedRate.Put((int)iFeedrate);
+            MessageUser("P_SET_VEL: after the setting, the value of THETA_VEL is: \n");
+            paramFeedRate.List();
+        }
 
         if (!ThisTask->tdFgripperDefWrite(DEFS_FILE, 0))
         {
@@ -4957,17 +7466,53 @@ void PSetPlateActionNT::ActionThread(const drama::sds::Id &Arg)
     if (Arg)
     {
         drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
-        drama::gitarg::Int<-1, 1> plateArg(this, Arg, "PLATE", 1, 0, NoFlags);
+        drama::gitarg::Int<-1, 1> plateArg(this, Arg, "CONFIG_PLATE", 1, 0, NoFlags);
         iPlate = plateArg;
-        DEBUG("P_SET_PLATE: before the setting, the value of plate is: %hd\n", details->currentPlate);
-        details->currentPlate = (short)iPlate;
-        DEBUG("P_SET_PLATE: after the setting, the value of plate is: %hd\n", details->currentPlate);
+        details->configPlate = (short)iPlate;
+        DEBUG("P_SET_PLATE: setting plate is: %hd\n", details->configPlate);
+        ThisTask->tdFgripBackIllum(details->backIllumOn, YES);
         MessageUser("P_SET_PLATE: Set Plate completed.\n");
         ThisTask->tdFgripperSetMainStruct(details);
     }
     else
     {
         MessageUser("P_SET_PLATE: No input arguments.\n");
+    }
+}
+
+void PSetZMapActionNT::ActionThread(const drama::sds::Id &Arg)
+{
+    std::shared_ptr<tdFgripperTaskType> details = ThisTask->tdFgripperGetMainStruct();
+    if (details == nullptr)
+    {
+        MessageUser("P_SET_ZMAP: the structure pointer is null, please initialise the task first.\n");
+        return;
+    }
+    if (Arg)
+    {
+        drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
+        drama::gitarg::Int<ZMAP_MIN, ZMAP_MAX> cenArg(this, Arg, "cen", 1, 0, NoFlags);
+        drama::gitarg::Int<ZMAP_MIN, ZMAP_MAX> xmArg(this, Arg, "xm", 2, 0, NoFlags);
+        drama::gitarg::Int<ZMAP_MIN, ZMAP_MAX> xpArg(this, Arg, "xp", 3, 0, NoFlags);
+        drama::gitarg::Int<ZMAP_MIN, ZMAP_MAX> ymArg(this, Arg, "ym", 4, 0, NoFlags);
+        drama::gitarg::Int<ZMAP_MIN, ZMAP_MAX> ypArg(this, Arg, "yp", 5, 0, NoFlags);
+        details->convert.zmap._cen = cenArg;
+        details->convert.zmap._xm = xmArg;
+        details->convert.zmap._xp = xpArg;
+        details->convert.zmap._ym = ymArg;
+        details->convert.zmap._yp = ypArg;
+        ThisTask->tdFgripperSetMainStruct(details);
+
+        if (!ThisTask->tdFgripperDefWrite(DEFS_FILE, 0))
+        {
+            MessageUser("P_SET_ZMAP: Save ZMap failed " + ThisTask->GetError());
+        }
+        else
+            MessageUser("P_SET_ZMAP: Set ZMap completed.\n");
+    }
+    else
+    {
+        MessageUser("P_SET_ZMAP: No input arguments.\n");
     }
 }
 
@@ -5064,7 +7609,7 @@ void PReportLocksActionNT::ActionThread(const drama::sds::Id &)
     MessageUser("P_REPORT_LOCKS: action completed.\n");
 }
 
-void PReportImageActionNT::ActionThread(const drama::sds::Id &)
+void PReportImageActionNT::ActionThread(const drama::sds::Id &Arg)
 {
     auto ThisTask(GetTask()->TaskPtrAs<TdFGripperTask>());
 
@@ -5075,27 +7620,53 @@ void PReportImageActionNT::ActionThread(const drama::sds::Id &)
         MessageUser("P_REPORT_IMAGE: the structure pointer is null, please initialise the task!\n");
         return;
     }
-    DEBUG("FREE image details: \n");
-    DEBUG("The bias(centroiding) is: %hd\n", (short)details->freeImg.bias);
-    DEBUG("The Camera coeffs array is: \n");
-    for (int index = 0; index < 6; ++index)
+    if (!Arg)
     {
-        DEBUG("%f  ", details->freeImg.camCoeffs[index]);
+        MessageUser("P_REPORT_IMAGE: no input argument.\n");
+        return;
     }
-    DEBUG("\n");
-    DEBUG("The Inverse coeffs array is: \n");
-    for (int index = 0; index < 6; ++index)
+    drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
+    drama::gitarg::String ImgNameArg(this, Arg, "image", 1, "FREE", NoFlags);
+    if (ImgNameArg == "FREE")
     {
-        DEBUG("%f  ", details->freeImg.invCoeffs[index]);
+        MessageUser("FREE image details: \n");
+        MessageUser("The bias(centroiding) is: %hd\n", (short)details->freeImg.bias);
+        MessageUser("The Camera coeffs array is: \n");
+        for (int index = 0; index < 6; ++index)
+        {
+            MessageUser("%f  ", details->freeImg.camCoeffs[index]);
+        }
+        MessageUser("\n");
+        MessageUser("The Inverse coeffs array is: \n");
+        for (int index = 0; index < 6; ++index)
+        {
+            MessageUser("%f  ", details->freeImg.invCoeffs[index]);
+        }
+        MessageUser("\n");
     }
-    DEBUG("\n");
-    MessageUser("P_REPORT_COEFFS: action completed.\n");
+    else
+    {
+        MessageUser("GRASP image details: \n");
+        MessageUser("The bias(centroiding) is: %hd\n", (short)details->graspImg.bias);
+        MessageUser("The Camera coeffs array is: \n");
+        for (int index = 0; index < 6; ++index)
+        {
+            MessageUser("%f  ", details->graspImg.camCoeffs[index]);
+        }
+        MessageUser("\n");
+        MessageUser("The Inverse coeffs array is: \n");
+        for (int index = 0; index < 6; ++index)
+        {
+            MessageUser("%f  ", details->graspImg.invCoeffs[index]);
+        }
+        MessageUser("\n");
+    }
+    MessageUser("P_REPORT_IMAGE: action completed.\n");
 }
 
 void PReportWindowActionNT::ActionThread(const drama::sds::Id &Arg)
 {
     auto ThisTask(GetTask()->TaskPtrAs<TdFGripperTask>());
-
     ThisTask->ClearError();
     std::shared_ptr<tdFgripperTaskType> details = ThisTask->tdFgripperGetMainStruct();
     if (details == nullptr)
@@ -5115,25 +7686,63 @@ void PReportWindowActionNT::ActionThread(const drama::sds::Id &Arg)
         }
         if (windowStr == "SEARCH")
         {
-            DEBUG("SEARCH window details:\n");
-            DEBUG("Window centre = %.1f,  %.1f\n", details->searchWin.xCen, details->searchWin.yCen);
-            DEBUG("Window span   = %d,  %d\n", details->searchWin.xSpan, details->searchWin.ySpan);
+            MessageUser("SEARCH window details:\n");
+            MessageUser("Window centre = %.1f,  %.1f\n", details->searchWin.xCen, details->searchWin.yCen);
+            MessageUser("Window span   = %d,  %d\n", details->searchWin.xSpan, details->searchWin.ySpan);
         }
         else
         {
-            DEBUG("NORM window details:\n");
-            DEBUG("Window centre = %.1f,  %.1f\n", details->normWin.xCen, details->normWin.yCen);
-            DEBUG("Window span   = %d,  %d\n", details->normWin.xSpan, details->normWin.ySpan);
+            MessageUser("NORM window details:\n");
+            MessageUser("Window centre = %.1f,  %.1f\n", details->normWin.xCen, details->normWin.yCen);
+            MessageUser("Window span   = %d,  %d\n", details->normWin.xSpan, details->normWin.ySpan);
         }
     }
     else
     {
-        DEBUG("SEARCH window details:\n");
-        DEBUG("Window centre = %.1f,  %.1f\n", details->searchWin.xCen, details->searchWin.yCen);
-        DEBUG("Window span   = %d,  %d\n", details->searchWin.xSpan, details->searchWin.ySpan);
+        MessageUser("SEARCH window details:\n");
+        MessageUser("Window centre = %.1f,  %.1f\n", details->searchWin.xCen, details->searchWin.yCen);
+        MessageUser("Window span   = %d,  %d\n", details->searchWin.xSpan, details->searchWin.ySpan);
     }
 
     MessageUser("P_REPORT_WINDOW: action completed.\n");
+}
+
+void PReportCoeffsActionNT::ActionThread(const drama::sds::Id &)
+{
+    auto ThisTask(GetTask()->TaskPtrAs<TdFGripperTask>());
+    ThisTask->ClearError();
+    std::shared_ptr<tdFgripperTaskType> details = ThisTask->tdFgripperGetMainStruct();
+    if (details == nullptr)
+    {
+        MessageUser("P_REPORT_COEFFS: the structure pointer is null, please initialise the task!\n");
+        return;
+    }
+    MessageUser("The coeffs array is: \n");
+    for (int index = 0; index < 6; ++index)
+    {
+        MessageUser("%f  ", details->convert.coeffs[index]);
+    }
+    MessageUser("\n");
+    MessageUser("P_REPORT_COEFFS: action completed.\n");
+}
+
+void PReportZMapActionNT::ActionThread(const drama::sds::Id &)
+{
+    std::shared_ptr<tdFgripperTaskType> details = ThisTask->tdFgripperGetMainStruct();
+    if (details == nullptr)
+    {
+        MessageUser("P_REPORT_ZMAP: the structure pointer is null, please initialise the task first.\n");
+        return;
+    }
+    {
+        MessageUser("ZMap details are: \n");
+        MessageUser("ZMap cen: %d.\n", details->convert.zmap._cen);
+        MessageUser("ZMap xm: %d.\n", details->convert.zmap._xm);
+        MessageUser("ZMap xp: %d.\n", details->convert.zmap._xp);
+        MessageUser("ZMap ym: %d.\n", details->convert.zmap._ym);
+        MessageUser("ZMap yp: %d.\n", details->convert.zmap._yp);
+        MessageUser("P_REPORT_ZMAP: Report ZMap completed.\n");
+    }
 }
 
 void PSaveDefsActionNT::ActionThread(const drama::sds::Id &)
@@ -5174,86 +7783,100 @@ void CSearchAction::ActionThread(const drama::sds::Id &Arg)
     }
     details->inUse = YES;
     ThisTask->tdFgripperSetMainStruct(details);
-    drama::ParSys parSysId(ThisTask->TaskPtr());
+    parSysId = drama::ParSys::ParSys(ThisTask->TaskPtr());
     drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
     drama::gitarg::Int<XMIN, XMAX> XFArg(this, Arg, "XF", 1, 0, NoFlags);
-    long int searchStartX = XFArg;
-    long int searchX = searchStartX;
+    long int searchX = XFArg;
     drama::gitarg::Int<YMIN, YMAX> YFArg(this, Arg, "YF", 2, 0, NoFlags);
-    long int searchStartY = YFArg;
-    long int searchY = searchStartY;
+    long int searchY = YFArg;
+    drama::gitarg::String TypeArg(this, Arg, "TYPE", 3, "", NoFlags);
+    if (TypeArg != "F" && TypeArg != "P")
+    {
+        DramaTHROW(TDFGRIPPERTASK__INV_INPUT_ARGUMENT, "C_SEARCH: The input argument is invalid. The type is either \"F\" or \"P\".");
+    }
+    short type = TypeArg;
+    drama::gitarg::Bool StatArg(this, Arg, "STAT_CHECK", 4, false, NoFlags);
+    bool statCheck = StatArg;
+    drama::gitarg::Bool PlateignoreArg(this, Arg, "PLT1_IGNORE", 5, false, NoFlags);
+    bool plate1Ignore = PlateignoreArg;
+    if (plate1Ignore)
+    {
+        MessageUser("C_SEARCH: Ignoring plate 1 offset and gripper distortion removal.");
+    }
+    drama::gitarg::Int<INT_MIN, INT_MAX> MaxArg(this, Arg, "MaxDistance", 6, -1, NoFlags);
+    int maxdistance = MaxArg;
 
     int inside, outside, forbidden;
     double settletime;
     double platetheta;
+    int warmUp = 0;
 
+    m_tdFgripperSFStruct->searchStartX = searchX;
+    m_tdFgripperSFStruct->searchStartY = searchY;
+    m_tdFgripperSFStruct->resultsValid = 0;
+    m_tdFgripperSFStruct->statCheck = statCheck;
+    if (TypeArg == "F")
+    {
+        parSysId.Get("CAMERA_Z_FID", &m_tdFgripperSFStruct->searchStartZ);
+    }
+    else
+    {
+        warmUp = ThisTask->tdFgripBackIllum(1, YES);
+        parSysId.Get("CAMERA_Z", &m_tdFgripperSFStruct->searchStartZ);
+        if (SQRD((double)searchX) + SQRD((double)searchY) > SQRD((double)FIELD_RAD))
+        {
+            long int parkHeight, buttonHeight;
+            parSysId.Get("PARK_Z", &parkHeight);
+            parSysId.Get("BUTTON_Z", &buttonHeight);
+            m_tdFgripperSFStruct->searchStartZ += parkHeight - buttonHeight;
+        }
+    }
     parSysId.Get("STEP_SIZE", &m_tdFgripperSFStruct->stepSize);
     m_tdFgripperSFStruct->stepSize = 200;
-    parSysId.Get("MAX_ERROR", &m_tdFgripperSFStruct->maxError);
-    m_tdFgripperSFStruct->maxError = 200;
+    if (maxdistance > 0)
+    {
+        m_tdFgripperSFStruct->maxError = maxError;
+    }
+    else
+    {
+        parSysId.Get("MAX_ERROR", &m_tdFgripperSFStruct->maxError);
+        m_tdFgripperSFStruct->maxError = 200;
+    }
     parSysId.Get("POS_TOL", &m_tdFgripperSFStruct->tolerance);
     m_tdFgripperSFStruct->tolerance = 10;
     parSysId.Get("POS_ATTEMPTS", &m_tdFgripperSFStruct->attempts);
     parSysId.Get("SETTLE_TIME", &settletime);
     parSysId.Get("PLATE_THETA", &platetheta);
-
-    m_tdFgripperSFStruct->searchStartX = searchStartX;
-    m_tdFgripperSFStruct->searchStartY = searchStartY;
-    m_tdFgripperSFStruct->resultsValid = 0;
-
+    if (warmUp)
+    {
+        std::this_thread::sleep_for(std::chrono::seconds(int(*details->pars.backIllWarmUp)));
+    }
     auto cenWin = std::make_shared<tdFgrip_CENtype>();
+    double theta;
     int i = 1, j = 1, k = 0;   /* Used to determine next search point  */
     short atSearchXY = NO,     /* Flag - above fibre-end location      */
         centroided = NO,       /*      - fibre-end centroided          */
         checkedCentroid = NO,  /*      - analysed last centroid        */
-        iAttempts = 0,         /* Current number of positioning trys   */
+        attempts = 0,          /* Current number of positioning trys   */
         foundIt = NO,          /* Have we found the fibre              */
+        isSurvey = NO,         /* Is this a survey              */
         searchStarted = NO,    /* Have we completed our first move     */
         centroidRepeated = NO, /* Have we repeated the centroid        */
         repeatChecked = NO;    // m_tdFgripperSFStruct->statCheck ? NO : YES; /* Has the repeated centroid been checks */
-
-    double theta = ThisTask->tdFautoThetaPos(m_tdFgripperSFStruct->searchStartX, m_tdFgripperSFStruct->searchStartY);
-    forbidden = ThisTask->tdFforbidden(m_tdFgripperSFStruct->searchStartX, m_tdFgripperSFStruct->searchStartY,
-                                       theta, QUADRANT_RADIUS, INSIDE_RADIUS,
-                                       OUTSIDE_RADIUS, HALF_GUIDE_EXPAN,
-                                       JAW_HWP, JAW_HWM, JAW_LENGTH, 0, &inside, &outside);
-    if (forbidden || outside)
+    if (m_tdFgripperSFStruct->reset = YES)
     {
-        details->inUse = NO;
-        DramaTHROW_S(TDFGRIPPERTASK__INV_POS, "C_SEARCH: Initial search position (%d,%d) invalid.\n", m_tdFgripperSFStruct->searchStartX, m_tdFgripperSFStruct->searchStartX);
+        Reset(&atSearchXY, &centroided, &checkedCentroid, &attempts, &foundIt, &i, &j, &k, cenWin, &searchStarted,
+              &centroidRepeated, &repeatChecked, &theta, &isSurvey);
     }
-    details->imagePos.enable = 1;
-    details->imagePos.displayText = 1;
-    details->imagePos.useDpr = details->dprFeedback;
-
-    ThisTask->tdFgripperUpdatePos(YES, details->dprFeedback, YES);
-
-    cenWin->window.MaxX = details->freeImg.xMax;
-    cenWin->window.MaxY = details->freeImg.yMax;
-    cenWin->window.PixelSize = details->freeImg.PixelSize;
-    cenWin->window.Xoffset = details->searchWin.xCen - details->searchWin.xSpan / 2;
-    cenWin->window.Yoffset = details->searchWin.yCen - details->searchWin.ySpan / 2;
-    if (cenWin->window.Xoffset < 0)
-        cenWin->window.Xoffset = 0;
-    if (cenWin->window.Yoffset < 0)
-        cenWin->window.Yoffset = 0;
-    cenWin->window.Xdim = details->searchWin.xSpan;
-    cenWin->window.Ydim = details->searchWin.ySpan;
-    if (cenWin->window.Xdim + cenWin->window.Xoffset > cenWin->window.MaxX)
-        cenWin->window.Xdim = cenWin->window.MaxX - cenWin->window.Xoffset;
-    if (cenWin->window.Ydim + cenWin->window.Yoffset > cenWin->window.MaxY)
-        cenWin->window.Ydim = cenWin->window.MaxY - cenWin->window.Yoffset;
-    cenWin->img = &details->freeImg;
-
     bool flag = true;
     drama::Path taskPath(ThisTask->TaskPtr());
     while ((!atSearchXY || !centroided || !checkedCentroid || !centroidRepeated || !repeatChecked))
     {
         if (!atSearchXY)
         {
-            if (!MoveToSearchPosition(searchX, searchY, &atSearchXY, &searchStarted))
+            if (!MoveToSearchPosition(searchX, searchY, theta, &atSearchXY, &searchStarted, attempts))
             {
-                MessageUser("C_SEARCH: Fail to move to search position (%d,%d).\n", searchX, searchY);
+                MessageUser("C_SEARCH: Fail to move to search position (%d,%d,%d,%d).\n", searchX, searchY, m_tdFgripperSFStruct->searchStartZ, theta);
                 flag = false;
                 break;
             }
@@ -5265,7 +7888,7 @@ void CSearchAction::ActionThread(const drama::sds::Id &Arg)
             ThisTask->tdFgripperSetMainStruct(details);
             if (!PerformCentroid(cenWin, settletime, &centroided))
             {
-                MessageUser("C_SEARCH: Fail to perform centroid at position (%d,%d).\n", searchX, searchY);
+                MessageUser("C_SEARCH: Fail to perform centroid at position (%d,%d,%d,%d).\n", searchX, searchY, m_tdFgripperSFStruct->searchStartZ, theta);
                 flag = false;
                 break;
             }
@@ -5275,7 +7898,7 @@ void CSearchAction::ActionThread(const drama::sds::Id &Arg)
         else if (!checkedCentroid)
         {
 
-            if (!CheckCentroid(&iAttempts, &searchX, &searchY, &atSearchXY, &centroided,
+            if (!CheckCentroid(&attempts, &searchX, &searchY, &atSearchXY, &centroided,
                                &foundIt, &i, &j, &k, &checkedCentroid, &centroidRepeated, &repeatChecked))
             {
                 MessageUser("C_SEARCH: Fail to check centroid at position (%d,%d).\n", searchX, searchY);
@@ -5311,19 +7934,16 @@ void CSearchAction::ActionThread(const drama::sds::Id &Arg)
 
     if (flag == true)
     {
-        ActionComplete(searchX, searchY, foundIt);
+        ActionComplete(searchX, searchY, foundIt, isSurvey, platetheta);
 
         newArg = drama::sds::Id::CreateArgStruct();
-        double expXenc, expYenc, atXenc, atYenc;
-        ThisTask->tdFgripperConvertFromFP(m_tdFgripperSFStruct->searchStartX, m_tdFgripperSFStruct->searchStartY,
-                                          platetheta, _FULL, &expXenc, &expYenc);
-        // expXenc = m_tdFgripperSFStruct->searchStartX;
-        // expYenc = m_tdFgripperSFStruct->searchStartY;
+        double expXenc, expYenc, atXenc, atYenc, tmpZ, tmpT, tmpJ;
 
-        ThisTask->tdFgripperConvertFromFP(searchX, searchY, platetheta, _FULL,
-                                          &atXenc, &atYenc);
-        // atXenc = searchX;
-        // atYenc = searchY;
+        ThisTask->tdFgripperConvertFromFP(m_tdFgripperSFStruct->searchStartX, m_tdFgripperSFStruct->searchStartY,
+                                          m_tdFgripperSFStruct->searchStartZ, 0.0, 0, platetheta, _FULL,
+                                          &expXenc, &expYenc, &tmpZ, &tmpT, &tmpJ);
+        ThisTask->tdFgripperConvertFromFP(searchX, searchY, m_tdFgripperSFStruct->searchStartZ,
+                                          0.0, 0, platetheta, _FULL, &atXenc, &atYenc, &tmpZ, &tmpT, &tmpJ);
 
         newArg.Put("FOUND", foundIt);
         newArg.Put("MEASUREDX", searchX);
@@ -5336,11 +7956,209 @@ void CSearchAction::ActionThread(const drama::sds::Id &Arg)
         newArg.Put("YErr", m_tdFgripperSFStruct->yErr);
         newArg.Put("XEncoderErr", doubleToLong(atXenc - expXenc));
         newArg.Put("YEncoderErr", doubleToLong(atYenc - expYenc));
+        newArg.Put("saturatedPixs", m_tdFgripperSFStruct->saturated);
+        newArg.Put("PEAKVAL", m_tdFgripperSFStruct->peakVal);
+        if (!(*details->pars.backIllAlways))
+        {
+            ThisTask->tdFgripBackIllum(0, YES);
+        }
     }
     SetReturnArg(&newArg);
+    if (plate1Ignore)
+    {
+        // needs double-check
+        details->plateOneDontRemove = 1;
+    }
+    else
+    {
+        details->plateOneDontRemove = 0;
+    }
     details->inUse = NO;
     ThisTask->tdFgripperSetMainStruct(details);
     MessageUser("C_SEARCH: action completed.\n");
+}
+
+void CSearchAction::Reset(short *const atSearchXY, short *const centroided, short *const checkedCentroid, short *const attempts, short *const foundIt,
+                          int *const i, int *const j, int *const k, std::shared_ptr<GCamWindowType> cenWin, short *const searchStarted,
+                          short *const centroidRepeated, short *const repeatChecked, double *const theta, short *const isSurvey)
+{
+    auto ThisTask(GetTask()->TaskPtrAs<TdFGripperTask>());
+    if ((labs(m_tdFgripperSFStruct->searchStartX) > 100) || (labs(m_tdFgripperSFStruct->searchStartY) > 100))
+    {
+        *theta = ThisTask->tdFautoThetaPos(m_tdFgripperSFStruct->searchStartX, m_tdFgripperSFStruct->searchStartY);
+    }
+    else
+    {
+        *theta = 0.0;
+    }
+    forbidden = ThisTask->tdFforbidden(m_tdFgripperSFStruct->searchStartX, m_tdFgripperSFStruct->searchStartY,
+                                       *theta, QUADRANT_RADIUS, INSIDE_RADIUS,
+                                       OUTSIDE_RADIUS, HALF_GUIDE_EXPAN,
+                                       JAW_HWP, JAW_HWM, JAW_LENGTH, 0, &inside, &outside);
+    if (forbidden || outside)
+    {
+        details->inUse = NO;
+        DramaTHROW_S(TDFGRIPPERTASK__INV_POS, "C_SEARCH: Initial search position (%d,%d) invalid.\n", m_tdFgripperSFStruct->searchStartX, m_tdFgripperSFStruct->searchStartY);
+    }
+    std::string inJaws;
+    parSysId.Get("CARRYING_BUTTON", inJaws);
+    if ("YES" == inJaws)
+    {
+        DramaTHROW(TDFGRIPPERTASK__BUTT_IN_JAWS, "C_SEARCH: The button is in jaws.");
+    }
+
+    details->imagePos.enable = 1;
+    details->imagePos.displayText = 1;
+    details->imagePos.useDpr = details->dprFeedback;
+
+    ThisTask->tdFgripperUpdatePos(YES, details->dprFeedback, YES);
+
+    cenWin->window.MaxX = details->freeImg.xMax;
+    cenWin->window.MaxY = details->freeImg.yMax;
+    cenWin->window.PixelSize = details->freeImg.PixelSize;
+    cenWin->window.Xoffset = details->searchWin.xCen - details->searchWin.xSpan / 2;
+    cenWin->window.Yoffset = details->searchWin.yCen - details->searchWin.ySpan / 2;
+    if (cenWin->window.Xoffset < 0)
+        cenWin->window.Xoffset = 0;
+    if (cenWin->window.Yoffset < 0)
+        cenWin->window.Yoffset = 0;
+    cenWin->window.Xdim = details->searchWin.xSpan;
+    cenWin->window.Ydim = details->searchWin.ySpan;
+    if (cenWin->window.Xdim + cenWin->window.Xoffset > cenWin->window.MaxX)
+        cenWin->window.Xdim = cenWin->window.MaxX - cenWin->window.Xoffset;
+    if (cenWin->window.Ydim + cenWin->window.Yoffset > cenWin->window.MaxY)
+        cenWin->window.Ydim = cenWin->window.MaxY - cenWin->window.Yoffset;
+    cenWin->img = &details->freeImg;
+
+    *i = *j = 1;
+    *k = 0;
+    *attempts = 0;
+    *foundIt = NO;
+    *atSearchXY = *centroided = *checkedCentroid = NO;
+    *searchStarted = NO;
+    *centroidRepeated = NO;
+    if (m_tdFgripperSFStruct->statCheck)
+        *repeatChecked = NO;
+    else
+        *repeatChecked = YES;
+
+    m_tdFgripperSFStruct->resultsValid = 0;
+    *isSurvey = NO;
+    MessageUser("**** Search Starting  at %ld, %ld%s  *****\n", m_tdFgripperSFStruct->searchStartX, m_tdFgripperSFStruct->searchStartY));
+    m_tdFgripperSFStruct->reset = NO;
+}
+
+bool CSearchAction::MoveToSearchPosition(const long searchX, const long searchY, const double theta, short *const atSearchXY,
+                                         short *const searchStarted, const short attempts)
+{
+
+    *atSearchXY = YES;
+    auto ThisTask(GetTask()->TaskPtrAs<TdFGripperTask>());
+    double plateTheta, toXenc, toYenc, toZenc, toTenc, toJenc;
+    long int jawFpPos;
+    jawFpPos = details->ideal.jaw;
+    long int pmacLimXPos, pmacLimXNeg, pmacLimYPos, pmacLimYNeg;
+    ParSys.Get("PMAC_LIM_X_POS", &pmacLimXPos);
+    ParSys.Get("PMAC_LIM_X_NEG", &pmacLimXNeg);
+    ParSys.Get("PMAC_LIM_Y_POS", &pmacLimYPos);
+    ParSys.Get("PMAC_LIM_Y_NEG", &pmacLimYNeg);
+    bool failed = false;
+
+    parSysId.Get("PLATE_THETA", &plateTheta);
+    ThisTask->tdFgripperConvertFromFP(searchX, searchY, m_tdFgripperSFStruct->searchStartZ, theta,
+                                      jawFpPos, plateTheta, _FULL,
+                                      &toXenc, &toYenc, &toZenc, &toTenc, &toJenc);
+    if (toXenc < pmacLimXNeg || toXenc > pmacLimXPos || toYenc < pmacLimYNeg || toYenc > pmacLimYPos)
+    {
+        failed = true;
+    }
+    if (failed)
+    {
+        if (!searchStarted)
+        {
+            MessageUser("MoveToSearchPosition: Search initial position - %ld, %ld, is outside of PMAC limits\n", searchX, searchY);
+            return false;
+        }
+        else if (attempts)
+        {
+            MessageUser("MoveToSearchPosition: Search found object, but the position - %ld, %ld, is outside of PMAC limits\n", searchX, searchY);
+            return false;
+        }
+        MessageUser("MoveToSearchPosition: Search Spiral position %ld, %ld is outside of PMAC limits - skipped\n", searchX, searchY);
+        return true;
+    }
+    *searchStarted = YES;
+    MessageUser("MoveToSearchPosition: About to perform XYZT traverse (%ld,%ld,%ld,%f)", searchX, searchY, m_tdFgripperSFStruct->searchStartZ, theta);
+    details->ideal.x = searchX;
+    details->ideal.y = searchY;
+    details->ideal.z = m_tdFgripperSFStruct->searchStartZ;
+    details->ideal.theta = theta;
+
+    details->toEnc.x = (int)doubleToLong(toXenc);
+    details->toEnc.y = (int)doubleToLong(toYenc);
+    details->toEnc.z = (int)doubleToLong(toZenc);
+    details->toEnc.theta = (int)doubleToLong(toTenc);
+
+    std::vector<AxisDemand> AxisDemands = ThisTask->SetUpEncodePositions(toXenc, toYenc, toZenc, toTenc);
+
+    if (!(ThisTask->MoveAxes(AxisDemands, false)))
+    {
+        MessageUser("MoveToSearchPosition: failed to move to the position %s.\n", ThisTask->GetError().c_str());
+        return false;
+    }
+    std::this_thread::sleep_for(2000ms);
+    if (!ThisTask->tdFgripperUpdatePos(YES, YES, YES))
+    {
+        MessageUser("MoveToSearchPosition: failed to Update the current position of gantry.");
+    }
+
+    return true;
+}
+
+bool CSearchAction::PerformCentroid(const shared_ptr<tdFgrip_CENtype> cenWin, const double settletime, short *const centroided)
+{
+    *centroided = YES;
+    if (settletime > 0.0)
+    {
+        std::this_thread::sleep_for(std::chrono::seconds(int(settletime)));
+    }
+    drama::Path thisTaskPath(_theTask);
+
+    MessageUser("C_SEARCH PerformCentroid: - grabbing image");
+    MessageUser("C_SEARCH PerformCentroid:  Window size -> Max %ld %ld off %ld %ld, dim %ld %ld",
+                cenWin->window.MaxX, cenWin->window.MaxY,
+                cenWin->window.Xoffset, cenWin->window.Yoffset,
+                cenWin->window.Xdim, cenWin->window.Ydim);
+
+    drama::sds::Id messageArg(drama::sds::Id::CreateArgStruct());
+    drama::sds::IdPtr returnedArg;
+
+    messageArg.Put("Image", "FREE");
+    messageArg.Put("Window", "FULL");
+
+    // reorganise a class or a function to implement centroid;
+    try
+    {
+        thisTaskPath.Obey(this, "C_CENTROID", messageArg, &returnedArg);
+    }
+    catch (std::exception &what)
+    {
+        MessageUser("C_SEARCH PerformCentroid: Vimba raises an error.\n");
+        return false;
+    }
+
+    if (!(*returnedArg))
+    {
+        MessageUser("C_SEARCH PerformCentroid: Failed to perform centroid and return an image.\n");
+        return false;
+    }
+
+    returnedArg->Get("XERR", &m_tdFgripperSFStruct->xErr);
+    returnedArg->Get("YERR", &m_tdFgripperSFStruct->yErr);
+    returnedArg->Get("FIBREINIMAGE", &m_tdFgripperSFStruct->centroidOK);
+    returnedArg->Get("PEAKVAL", &m_tdFgripperSFStruct->peakVal);
+    returnedArg->Get("SATURATEDPIXS", &m_tdFgripperSFStruct->saturated);
+    return true;
 }
 
 void CSearchAction::CheckCent_ObjectHasNotYetBeenSeen(long *const searchX, long *const searchY, short *const atSearchXY,
@@ -5354,6 +8172,8 @@ void CSearchAction::CheckCent_ObjectHasNotYetBeenSeen(long *const searchX, long 
     }
     else
     {
+        if ((*i == 1) && (*j == 1) && (*k == 0))
+            MessageUser("CheckCent_ObjectHasNotYetBeenSeen: Object not found at target position - will search.\n");
         CheckCent_ObjectNotFound(searchX, searchY, atSearchXY, centroided, i, j, k, checkedCentroid, centroidRepeated, repeatChecked);
     }
 }
@@ -5374,7 +8194,7 @@ bool CSearchAction::CheckRepeatCentroid(short *const centroidRepeated, short *co
         MessageUser("CheckRepeatCentroid: Search Object found at position %ld, %ld (in tolerance image %d)",
                     m_tdFgripperSFStruct->resultsX[index], m_tdFgripperSFStruct->resultsY[index], m_tdFgripperSFStruct->resultsValid);
 
-#define SEARCH_TOL 4 /* A difference of this amount in 3 centroids is ignored */
+#define SEARCH_TOL 2 /* this is different from FPI task */
         if (m_tdFgripperSFStruct->resultsValid == 3)
         {
             if ((labs(m_tdFgripperSFStruct->resultsX[0] - m_tdFgripperSFStruct->resultsX[1]) <= SEARCH_TOL) &&
@@ -5420,7 +8240,7 @@ void CSearchAction::CheckCent_ObjectNotFound(long *const searchX, long *const se
     int pi = *i; /* Save values on entry of i,j and k */
     int pj = *j;
     int pk = *k;
-
+    MessageUser("CheckCent_ObjectNotFound: - object not found on this centroid.\n");
     if (*j > *i)
     { /*  A little cryptic, but this just */
         if (*k == 0)
@@ -5635,7 +8455,7 @@ bool CSearchAction::ActionComplete_CalculateMean(long *const searchX, long *cons
     }
 }
 
-void CSearchAction::ActionComplete_FoundItCheck(long *const searchX, long *const searchY, short *const foundIt)
+void CSearchAction::ActionComplete_FoundItCheck(const short isSurvey, long *const searchX, long *const searchY, short *const foundIt)
 {
     long int dist;
 
@@ -5651,6 +8471,9 @@ void CSearchAction::ActionComplete_FoundItCheck(long *const searchX, long *const
     else
         dist = ABS(*searchY - m_tdFgripperSFStruct->searchStartY);
 
+    if (!isSurvey)
+        MessageUser("ActionComplete_FoundItCheck: Search found object %ld microns from starting position (max %ld)",
+                    dist, m_tdFgripperSFStruct->maxError);
     if (dist > m_tdFgripperSFStruct->maxError)
     {
         MessageUser("ActionComplete_FoundItCheck: Search found object outside search distance - so it is considered not found");
@@ -5658,19 +8481,28 @@ void CSearchAction::ActionComplete_FoundItCheck(long *const searchX, long *const
     }
 }
 
-void CSearchAction::ActionComplete(long searchX, long searchY, short &foundIt)
+void CSearchAction::ActionComplete(long searchX, long searchY, short &foundIt, short isSurvey, const double plateTheta)
 {
+
     if (foundIt == YES)
     {
-        ActionComplete_FoundItCheck(&searchX, &searchY, &foundIt);
+        ActionComplete_FoundItCheck(isSurvey, &searchX, &searchY, &foundIt);
     }
+    auto ThisTask(GetTask()->TaskPtrAs<TdFGripperTask>());
+    double expXenc, expYenc, atXenc, atYenc, tmpZ, tmpT, tmpJ;
+
+    ThisTask->tdFgripperConvertFromFP(m_tdFgripperSFStruct->searchStartX, m_tdFgripperSFStruct->searchStartY,
+                                      m_tdFgripperSFStruct->searchStartZ, 0.0, 0, plateTheta, _FULL,
+                                      &expXenc, &expYenc, &tmpZ, &tmpT, &tmpJ);
+    ThisTask->tdFgripperConvertFromFP(searchX, searchY, m_tdFgripperSFStruct->searchStartZ,
+                                      0.0, 0, plateTheta, _FULL, &atXenc, &atYenc, &tmpZ, &tmpT, &tmpJ);
 
     MessageUser("ActionComplete: Given fibre location  = %ld,%ld", m_tdFgripperSFStruct->searchStartX, m_tdFgripperSFStruct->searchStartY);
     MessageUser("ActionComplete: Current encoder location = %d,%d", details->imagePos.enc.x, details->imagePos.enc.y);
     if (foundIt == YES)
     {
         MessageUser("ActionComplete: Final fibre position  = %ld,%ld", searchX, searchY);
-        MessageUser("ActionComplete: Offset from expected     = %ld,%ld", doubleToLong(m_tdFgripperSFStruct->searchStartX - searchX), doubleToLong(m_tdFgripperSFStruct->searchStartY - searchY));
+        MessageUser("ActionComplete: Offset from expected     = %ld,%ld", doubleToLong(atXenc - expXenc), doubleToLong(atYenc - expYenc));
         MessageUser("ActionComplete: Gantry/image-centroid offset = %ld,%ld", m_tdFgripperSFStruct->xErr, m_tdFgripperSFStruct->yErr);
     }
     else
@@ -5698,9 +8530,9 @@ void CCentroidAction::ActionThread(const drama::sds::Id &Arg)
     drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
     drama::gitarg::String ImageArg(this, Arg, "Image", 1, "FREE", NoFlags);
     string strImage = "FREE";
-    if (ImageArg != "FREE" && ImageArg != "free")
+    if (ImageArg != "FREE" && ImageArg != "GRASP")
     {
-        DramaTHROW(TDFGRIPPERTASK__INV_INPUT_ARGUMENT, "C_CENTROID: TdFGripperTask can only take \"FREE\" Image type.");
+        DramaTHROW(TDFGRIPPERTASK__INV_INPUT_ARGUMENT, "C_CENTROID: TdFGripperTask can only take \"FREE\" and \"GRASP\" Image type.");
     }
     drama::gitarg::String WindowArg(this, Arg, "Window", 2, "FULL", NoFlags);
     if (WindowArg != "FULL" && WindowArg != "NORM" && WindowArg != "SEARCH")
@@ -5712,10 +8544,22 @@ void CCentroidAction::ActionThread(const drama::sds::Id &Arg)
     auto cenData = std::make_shared<tdFgrip_CENtype>();
     drama::ParSys parSysId(ThisTask->TaskPtr());
     sprintf(cenData->saveName, "%s_%ld", "Centroid", (long int)time(0));
-    cenData->window.MaxX = details->freeImg.xMax;
-    cenData->window.MaxY = details->freeImg.yMax;
-    cenData->window.PixelSize = details->freeImg.PixelSize;
-    cenData->img = &details->freeImg;
+    if (ImageArg == "GRASP")
+    {
+        MessageUser("C_CENTROID: - GRASP image details being used.");
+        cenData->window.MaxX = details->graspImg.xMax;
+        cenData->window.MaxY = details->graspImg.yMax;
+        cenData->window.PixelSize = details->graspImg.PixelSize;
+        cenData->img = &details->graspImg;
+    }
+    else
+    {
+        MessageUser("C_CENTROID: - FREE image details being used.");
+        cenData->window.MaxX = details->freeImg.xMax;
+        cenData->window.MaxY = details->freeImg.yMax;
+        cenData->window.PixelSize = details->freeImg.PixelSize;
+        cenData->img = &details->freeImg;
+    }
 
     details->imagePos.enable = 1;
     details->imagePos.displayText = 1;
@@ -5725,12 +8569,14 @@ void CCentroidAction::ActionThread(const drama::sds::Id &Arg)
 
     if (strWindow == "FULL")
     {
+        MessageUser("C_CENTROID: - FULL window definition being used.");
         cenData->window.Xdim = cenData->window.MaxX;
         cenData->window.Ydim = cenData->window.MaxY;
         cenData->window.Xoffset = cenData->window.Yoffset = 0;
     }
     else if (strWindow == "SEARCH")
     {
+        MessageUser("C_CENTROID: - SEARCH window definition being used.");
         cenData->window.Xdim = details->searchWin.xSpan;
         cenData->window.Ydim = details->searchWin.ySpan;
         cenData->window.Xoffset = doubleToLong(details->searchWin.xCen -
@@ -5740,6 +8586,7 @@ void CCentroidAction::ActionThread(const drama::sds::Id &Arg)
     }
     else
     {
+        MessageUser("C_CENTROID: - NORM window definition being used.");
         cenData->window.Xdim = details->normWin.xSpan;
         cenData->window.Ydim = details->normWin.ySpan;
         cenData->window.Xoffset = doubleToLong(details->normWin.xCen -
@@ -5757,11 +8604,16 @@ void CCentroidAction::ActionThread(const drama::sds::Id &Arg)
     if (cenData->window.Ydim + cenData->window.Yoffset > cenData->window.MaxY)
         cenData->window.Ydim = cenData->window.MaxY - cenData->window.Yoffset;
 
-    if (cenData->settleTime > 0.0) // this should be renamed to settletime
+    int warmUp = ThisTask->tdFgripBackIllum(1, YES);
+    if (warmUp) // this should be renamed to settletime
+    {
+        std::this_thread::sleep_for(std::chrono::seconds(int(*details->pars.backIllWarmUp)));
+    }
+
+    if (cenData->settleTime > 0)
     {
         std::this_thread::sleep_for(std::chrono::seconds(int(cenData->settleTime)));
     }
-
     ThisTask->tdFgripperPreExp();
     MessageUser("C_CENTROID: - grabbing image");
     MessageUser("C_CENTROID:  Window size -> Max %ld %ld off %ld %ld, dim %ld %ld",
@@ -5869,10 +8721,28 @@ void CImageAction::ActionThread(const drama::sds::Id &Arg)
     ThisTask->tdFgripperSetMainStruct(details);
     auto cenData = std::make_shared<tdFgrip_CENtype>();
     sprintf(cenData->saveName, "%s_%ld", "Image", (long int)time(0));
-    cenData->window.MaxX = details->freeImg.xMax;
-    cenData->window.MaxY = details->freeImg.yMax;
-    cenData->window.PixelSize = details->freeImg.PixelSize;
-    cenData->img = &details->freeImg;
+    if (strImage == "GRASP")
+    {
+        MessageUser("C_IMAGE: - GRASP image details being used.");
+        cenData->window.MaxX = details->graspImg.xMax;
+        cenData->window.MaxY = details->graspImg.yMax;
+        cenData->window.PixelSize = details->graspImg.PixelSize;
+        cenData->img = &details->graspImg;
+    }
+    else
+    {
+        MessageUser("C_IMAGE: - FREE image details being used.");
+        cenData->window.MaxX = details->freeImg.xMax;
+        cenData->window.MaxY = details->freeImg.yMax;
+        cenData->window.PixelSize = details->freeImg.PixelSize;
+        cenData->img = &details->freeImg;
+    }
+
+    int warmUp = ThisTask->tdFgripBackIllum(1, YES);
+    if (warmUp) // this should be renamed to settletime
+    {
+        std::this_thread::sleep_for(std::chrono::seconds(int(*details->pars.backIllWarmUp)));
+    }
 
     if (cenData->settleTime > 0.0) // this should be renamed to settletime
     {
@@ -5901,6 +8771,11 @@ void CImageAction::ActionThread(const drama::sds::Id &Arg)
     {
         details->inUse = NO;
         ThisTask->tdFgripperSetMainStruct(details);
+        if (!(*details->pars.backIllAlways))
+        {
+
+            ThisTask->tdFgripBackIllum(0, YES);
+        }
         DramaTHROW(TDFGRIPPERTASK__NO_IMAGE, "C_IMAGE: no image was obtained by the camera");
     }
 
@@ -5908,12 +8783,22 @@ void CImageAction::ActionThread(const drama::sds::Id &Arg)
     {
         details->inUse = NO;
         ThisTask->tdFgripperSetMainStruct(details);
+        if (!(*details->pars.backIllAlways))
+        {
+
+            ThisTask->tdFgripBackIllum(0, YES);
+        }
         DramaTHROW(TDFGRIPPERTASK__NO_IMAGE, "C_IMAGE: No image is taken, please check the camera.");
     }
     drama::sds::Id DataArray = returnedArg->Find("DATA_ARRAY");
     if (DataArray)
     {
         MessageUser("C_IMAGE: - Print out Image data.");
+        if (!(*details->pars.backIllAlways))
+        {
+
+            ThisTask->tdFgripBackIllum(0, YES);
+        }
         DataArray.List();
     }
 
@@ -5922,11 +8807,107 @@ void CImageAction::ActionThread(const drama::sds::Id &Arg)
     MessageUser("C_IMAGE: - Action complete.");
 }
 
+void CZeroCamAction::DisplayNewFit(const int points, double grid[][2], double cen[][2], double coeffs[6])
+{
+    double cal[MAX_POINTS][2]; /* points is never more then MAX_POINTS */
+    double xrms, yrms, rrms;
+    short mycounter;
+    slaPxy(points, grid, cen, coeffs, cal, &xrms, &yrms, &rrms);
+
+    MessageUser("CZeroCamAction:: DisplayNewFit results\n");
+    MessageUser("  expected             calculated           error\n");
+    MessageUser("====================================================\n");
+    for (mycounter = 0; mycounter < points; mycounter++)
+    {
+        MessageUser("%8.1f,%8.1f   %8.1f,%8.1f  %6.1f,%6.1f\n",
+                    grid[mycounter][_XI], grid[mycounter][_YI],
+                    cal[mycounter][_XI], cal[mycounter][_YI],
+                    grid[mycounter][_XI] - cal[mycounter][_XI],
+                    grid[mycounter][_YI] - cal[mycounter][_YI]);
+    }
+    MessageUser("====================================================\n");
+    MessageUser("XRMS = %g, YRMS = %g, TOTAL RMS = %g\n", xrms, yrms, rrms);
+    MessageUser("====================================================\n");
+}
+
+void CZeroCamAction::CheckCoeffs(const double *current, const double *newcoeffs)
+{
+    double cXz;     /* Current coefficients - X zero point */
+    double cYz;     /* Current coefficients - Y zero point */
+    double cXs;     /* Current coefficients - X Scale */
+    double cYs;     /* Current coefficients - X Scale */
+    double cPerp;   /* Current coefficients -  nonperpendicularity (radians) */
+    double cOrient; /* Current coefficients - orientation (radians) */
+
+    double nXz;     /* New coefficients - X zero point */
+    double nYz;     /* New coefficients - Y zero point */
+    double nXs;     /* New coefficients - X Scale */
+    double nYs;     /* New coefficients - X Scale */
+    double nPerp;   /* New coefficients -  nonperpendicularity (radians) */
+    double nOrient; /* New coefficients - orientation (radians) */
+
+    slaDcmpf((double *)current, &cXz, &cYz, &cXs, &cYs, &cPerp, &cOrient);
+    slaDcmpf((double *)newcoeffs, &nXz, &nYz, &nXs, &nYs, &nPerp, &nOrient);
+
+    MessageUser("CZeroCamAction:: CheckCoeffs results\n");
+    MessageUser("Old Coefficents array = %.1f, %f, %f, %.1f, %f, %f\n",
+                current[0], current[1], current[2],
+                current[3], current[4], current[5]);
+    MessageUser("New Coefficents array = %.1f, %f, %f, %.1f, %f, %f\n",
+                newcoeffs[0], newcoeffs[1], newcoeffs[2],
+                newcoeffs[3], newcoeffs[4], newcoeffs[5]);
+    MessageUser("Decomposition follows\n");
+    MessageUser("Which        X-Zero      Y-Zero      X-Scale    Y-Scale  Orientation Non-perp\n");
+    MessageUser("Old      %8.1f %8.1f %10.8f %10.8f %8.4f %8.4f\n", cXz, cYz, cXs, cYs, cOrient * 180.0 / PI, cPerp * 180.0 / PI);
+    MessageUser("New      %8.1f %8.1f %10.8f %10.8f %8.4f %8.4f\n", nXz, nYz, nXs, nYs, nOrient * 180.0 / PI, nPerp * 180.0 / PI);
+
+    MessageUser("Change   %8.1f %8.1f %10.8f %10.8f %8.6f\n", nXz - cXz, nYz - cYz, (nXs / cXs) - 1.0,
+                (nYs / cYs) - 1.0, nOrient - cOrient);
+}
+
+bool CZeroCamAction::DoFitAndValidate(const std::string mesString, const int fitType, const int points,
+                                      const double origCoeffs[6], double gantryOffset[][2], double centroidResult[][2], double newCoeffs[6])
+{
+    int j;
+    slaFitxy(fitType, points, gantryOffset, centroidResult, newCoeffs, &j);
+    if (j != 0)
+    {
+        std::string err;
+        std::string scratch;
+        if (j == -1)
+            err = fitErrors[FITERR_ILL_ITYPE];
+        else if (j == -2)
+            err = fitErrors[FITERR_INSUFF_DATA];
+        else if (j == -3)
+            err = fitErrors[FITERR_SINGULAR];
+        else
+        {
+            scratch = "Unexpected fit error " + std::to_string(j) " from slaFitsxy() function.";
+            err = scratch;
+        }
+
+        /*
+         * Details require to understand the error
+         */
+        MessageUser("    Array contents -\n");
+        MessageUser("      (pixels)           (microns)\n");
+        for (j = 0; j < points; j++)
+            MessageUser("      %7.3f,%7.3f    %7.3f,%7.3f\n", centroidResult[j][_XI], centroidResult[j][_YI],
+                        gantryOffset[j][_XI], gantryOffset[j][_YI]);
+
+        MessageUser("Error calculating coeffs array (%s)- %s\n", mesString, err);
+        return false;
+    }
+    DisplayNewFit(points, gantryOffset, centroidResult, newCoeffs);
+    CheckCoeffs(origCoeffs, newCoeffs);
+    return true;
+}
+
 void CZeroCamAction::ActionThread(const drama::sds::Id &)
 {
     auto ThisTask(GetTask()->TaskPtrAs<TdFGripperTask>());
     ThisTask->ClearError();
-    std::shared_ptr<tdFgripperTaskType> details = ThisTask->tdFgripperGetMainStruct();
+    details = ThisTask->tdFgripperGetMainStruct();
     if (details == nullptr)
     {
         DramaTHROW(TDFGRIPPERTASK__NOTINIT, "C_ZEROCAM: the structure pointer is null, please initialise the task!");
@@ -5942,70 +8923,20 @@ void CZeroCamAction::ActionThread(const drama::sds::Id &)
         std::cout << "C_ZEROCAM: m_tdFgripperZCStruct is nullptr\n";
         return;
     }
-    drama::ParSys parSysId(ThisTask->TaskPtr());
-#define MAX_POINTS 25
+    parSysId = drama::ParSys::ParSys(ThisTask->TaskPtr());
     GCamWindowType cenWin;
-    double grid[MAX_POINTS][2], measured[MAX_POINTS][2], settleTime, plateTheta;
-    long int cenX, cenY;
+    double grid[MAX_POINTS][2], cen[MAX_POINTS][2], settleTime, plateTheta, curTheta, okErrorSqrd;
+    double initGrid[INIT_POINTS][2], initCen[INIT_POINTS][2], initCoeffs[6];
+    int okError, freeHeight, numAttempts, maxAttempts;
+    long int cenX, cenY, curZ;
     bool atNextPoint, centroided, doneGrid, settled;
-    short curPoint;
-
-    std::vector<std::string> fitErrors = {"illegal itype",
-                                          "insufficent data", "singular solution"};
-#define FITERR_ILL_ITYPE 0
-#define FITERR_INSUFF_DATA 1
-#define FITERR_SINGULAR 2
+    short curPoint, lifted;
 
     if (m_tdFgripperZCStruct->reset == YES)
     {
-        long int i, j, k, nextX, nextY;
-        details->imagePos.enable = 1;
-        details->imagePos.displayText = YES;
-        details->imagePos.useDpr = details->dprFeedback;
-
-        ThisTask->tdFgripperUpdatePos(YES, details->dprFeedback, YES);
-        cenX = details->ideal.x;
-        cenY = details->ideal.y;
-        parSysId.Get("SETTLE_TIME", &settleTime);
-        parSysId.Get("PLATE_THETA", &plateTheta);
-        centroided = doneGrid = NO;
-        atNextPoint = NO;
-
-        if ((*details->pars.zeroCamCenWait) > 0)
-            settled = NO;
-        else
-            settled = YES;
-
-        k = nextX = nextY = 0;
-        i = j = 1;
-        for (curPoint = 0; curPoint < MAX_POINTS; curPoint++)
-        {
-            if (j > i)
-            {
-                if (k == 0)
-                {
-                    j = 1;
-                    k = 1;
-                }
-                else
-                {
-                    i++;
-                    j = 1;
-                    k = 0;
-                }
-            }
-            (k == 0) ? (nextY += (i % 2) ? GRID_SIZE : -GRID_SIZE) : (nextX += (i % 2) ? GRID_SIZE : -GRID_SIZE);
-            j++;
-            grid[curPoint][_XI] = (double)nextX;
-            grid[curPoint][_YI] = (double)nextY;
-        }
-        curPoint = 0;
-
-        cenWin.MaxX = cenWin.Xdim = details->freeImg.xMax;
-        cenWin.MaxY = cenWin.Ydim = details->freeImg.yMax;
-        cenWin.PixelSize = details->freeImg.PixelSize;
-        cenWin.Xoffset = cenWin.Yoffset = 0;
-        m_tdFgripperZCStruct->reset = NO;
+        Reset(&cenWin, initGrid, grid, &settleTime, &curTheta, &plateTheta, &okErrorSqrd, &curZ,
+              &freeHeight, &cenX, &cenY, &counter, &focus, &numAttempts, &maxAttempts, &centroided,
+              &initialCalDone, &fibreAtCentre, &lifted, &doneGrid, &atNextPoint, &settled);
     }
 
     bool flag = true;
@@ -6024,198 +8955,44 @@ void CZeroCamAction::ActionThread(const drama::sds::Id &)
         }
         else if (!centroided)
         {
-            centroided = YES;
-            if (cenWin.Xoffset < 0)
-                cenWin.Xoffset = 0;
-            if (cenWin.Yoffset < 0)
-                cenWin.Yoffset = 0;
-            if (cenWin.Xdim + cenWin.Xoffset > cenWin.MaxX)
-                cenWin.Xdim = cenWin.MaxX - cenWin.Xoffset;
-            if (cenWin.Ydim + cenWin.Yoffset > cenWin.MaxY)
-                cenWin.Ydim = cenWin.MaxY - cenWin.Yoffset;
-
-            if (settleTime > 0.0)
-            {
-                std::this_thread::sleep_for(std::chrono::seconds(int(settleTime)));
-            }
-            ThisTask->tdFgripperPreExp();
-            MessageUser("C_ZEROCAM: - grabbing image");
-            MessageUser("C_ZEROCAM:  Window size -> Max %ld %ld off %ld %ld, dim %ld %ld",
-                        cenWin.MaxX, cenWin.MaxY, cenWin.Xoffset, cenWin.Yoffset,
-                        cenWin.Xdim, cenWin.Ydim);
-
-            ThisTask->tdFGetCameraPath().GetPath(this);
-            drama::sds::Id messageArg(drama::sds::Id::CreateArgStruct());
-            drama::sds::IdPtr returnedArg;
-            std::string strWindowType;
-            strWindowType = to_string(cenWin.Xoffset) + ":" + to_string(cenWin.Yoffset) + ":" + to_string(cenWin.Xoffset + cenWin.Xdim - 1) + ":" + to_string(cenWin.Yoffset + cenWin.Ydim - 1);
-            messageArg.Put("CENTROID", strWindowType);
-            messageArg.Put("BIAS", details->freeImg.bias);
-            messageArg.Put("EXPOSURE_TIME", details->freeImg.exposureTime);
-            messageArg.Put("SHUTTER_OPEN", (int)details->freeImg.shutter);
-            messageArg.Put("UPDATE", details->freeImg.updateTime);
-            try
-            {
-                ThisTask->tdFGetCameraPath().Obey(this, "CENTRECT", messageArg, &returnedArg);
-            }
-            catch (...)
-            {
-                DramaTHROW(TDFGRIPPERTASK__CAMERA, "C_ZEROCAM: the camera failed to take centroid.");
-            }
-            if (*returnedArg)
-            {
-                double xCent, yCent, xFull, yFull, dFWHM;
-                short centroidOK = YES;
-                returnedArg->Get("XVALUE", &xCent);
-                returnedArg->Get("YVALUE", &yCent);
-                returnedArg->Get("XFULL", &xFull);
-                returnedArg->Get("YFULL", &yFull);
-                returnedArg->Get("FWHM", &dFWHM);
-                returnedArg->Get("FIBREINIMAGE", &centroidOK);
-                MessageUser("C_ZEROCAM: centroid result \nError:  %lf %lf \nWinodw Size: %lf %lf\nFull Width Half Max: %lf",
-                            xCent, yCent, xFull, yFull, dFWHM);
-                m_tdFgripperZCStruct->centroidOK = centroidOK ? YES : NO;
-                m_tdFgripperZCStruct->xFull = xFull;
-                m_tdFgripperZCStruct->yFull = yFull;
-            }
-            ThisTask->tdFgripperPostExp();
+            DoCentroid(&cenWin, focus, settleTime, &centroided);
+        }
+        else if (!initialCalDone)
+        {
+            flag = DoInitialCalibration(cenX, cenY, curZ, curTheta, plateTheta,
+                                        initCoeffs, initGrid, initCen,
+                                        &counter, &settled, &centroided, &initialCalDone);
+            if (flag == false)
+                break;
+        }
+        else if (!fibreAtCentre)
+        {
+            flag = CentreFibre(curZ, curTheta, plateTheta, okErrorSqrd,
+                               maxAttempts, initCoeffs,
+                               &cenX, &cenY, &numAttempts,
+                               &fibreAtCentre, &counter, &settled,
+                               &centroided);
+            if (flag == false)
+                break;
+        }
+        else if (!lifted)
+        {
+            RaiseGripper(freeHeight, &curZ, curTheta, plateTheta, &lifted)
         }
         else if (!doneGrid)
         {
-            if (!atNextPoint)
-            {
-                atNextPoint = YES;
-                centroided = NO;
-                long int XCoor = cenX + doubleToLong(grid[curPoint][_XI]);
-                long int YCoor = cenY + doubleToLong(grid[curPoint][_YI]);
-
-                double toXenc = 0.0, toYenc = 0.0;
-                ThisTask->tdFgripperConvertFromFP(XCoor, YCoor, plateTheta, _FULL,
-                                                  &toXenc, &toYenc);
-                details->ideal.x = XCoor;
-                details->ideal.y = YCoor;
-
-                details->toEnc.x = (int)doubleToLong(toXenc);
-                details->toEnc.y = (int)doubleToLong(toYenc);
-
-                MessageUser("C_ZEROCAM: About to move to next grid point (%ld,%ld)", toXenc, toYenc);
-                drama::Path thisTaskPath(_theTask);
-                thisTaskPath.GetPath(this);
-                drama::sds::Id messageArg(drama::sds::Id::CreateArgStruct());
-                std::string strAxis, strCoordinates, strVelocity;
-                strAxis = "X,Y";
-                strCoordinates = to_string(doubleToLong(XCoor)) + "," + to_string(doubleToLong(YCoor));
-                strVelocity = "1,1";
-                messageArg.Put("AXES", strAxis);
-                messageArg.Put("POSITIONS", strCoordinates);
-                messageArg.Put("VELOCITIES", strVelocity);
-                try
-                {
-                    thisTaskPath.Obey(this, "G_MOVE_AXIS_NT", messageArg);
-                }
-                catch (...)
-                {
-                    DramaTHROW(TDFGRIPPERTASK__NO_GANTRY_MOVEMENT, "C_ZEROCAM: the gantry failed to move to the position.");
-                }
-
-                if ((*details->pars.zeroCamCenWait) > 0)
-                    settled = NO;
-            }
-            else
-            {
-                if (m_tdFgripperZCStruct->centroidOK != YES)
-                {
-                    flag = false;
-                    break;
-                }
-                else
-                {
-                    measured[curPoint][_XI] = m_tdFgripperZCStruct->xFull;
-                    measured[curPoint][_YI] = m_tdFgripperZCStruct->yFull;
-                    MessageUser("C_ZEROCAM: Position during centroid was %ld, %ld", details->imagePos.p.x, details->imagePos.p.y);
-                    grid[curPoint][_XI] = details->imagePos.p.x - cenX;
-                    grid[curPoint][_YI] = details->imagePos.p.y - cenY;
-                }
-                if (curPoint < MAX_POINTS - 1)
-                {
-                    curPoint++;
-                    atNextPoint = NO;
-                }
-                else
-                {
-                    double coeffs[6];
-                    int i, j = 0;
-                    curPoint = 0;
-                    slaFitxy(6, MAX_POINTS, grid, measured, coeffs, &j);
-                    if (j != 0)
-                    {
-                        char *err;
-                        char scratch[40];
-                        if (j == -1)
-                            err = (char *)fitErrors[FITERR_ILL_ITYPE].c_str();
-                        else if (j == -2)
-                            err = (char *)fitErrors[FITERR_INSUFF_DATA].c_str();
-                        else if (j == -3)
-                            err = (char *)fitErrors[FITERR_SINGULAR].c_str();
-                        else
-                        {
-                            sprintf(scratch, "Unexpected fit error %d", j);
-                            err = scratch;
-                        }
-
-                        MessageUser("C_ZEROCAM: error message %s\n", err);
-                        MessageUser("    Array contents -\n");
-                        MessageUser("      (pixels)           (microns)\n");
-                        for (j = 0; j < MAX_POINTS; j++)
-                            MessageUser("      %7.3f,%7.3f    %7.3f,%7.3f\n",
-                                        measured[j][_XI], measured[j][_YI],
-                                        grid[j][_XI], grid[j][_YI]);
-
-                        flag = false;
-                        break;
-                    }
-
-                    MessageUser("Actual (micron) and Measured (pixel) arrays are:\n");
-                    for (i = 0; i < MAX_POINTS; i++)
-                        MessageUser("    %4ld,%4ld    %8.4f,%8.4f\n",
-                                    doubleToLong(grid[i][_XI]), doubleToLong(grid[i][_YI]),
-                                    measured[i][_XI], measured[i][_YI]);
-
-                    /*
-                     *  Record new transformation matrices.
-                     */
-                    for (i = 0; i < 6; i++)
-                        details->freeImg.camCoeffs[i] = coeffs[i];
-                    slaInvf(details->freeImg.camCoeffs,
-                            details->freeImg.invCoeffs, &j);
-                    if (j != 0)
-                    {
-                        for (i = 0; i < 6; i++)
-                            details->freeImg.invCoeffs[i] = details->freeImg.camCoeffs[i];
-                    }
-                    if (1)
-                    {
-                        int i;
-                        MessageUser("====================================================\n");
-                        MessageUser("  expected             calculated           error\n");
-                        MessageUser("====================================================\n");
-                        for (i = 0; i < MAX_POINTS; i++)
-                        {
-                            double calX, calY;
-                            slaXy2xy(measured[i][_XI], measured[i][_YI], coeffs, &calX, &calY);
-                            MessageUser("%8.1f,%8.1f   %8.1f,%8.1f  %6.1f,%6.1f\n",
-                                        grid[i][_XI], grid[i][_YI], calX, calY,
-                                        grid[i][_XI] - calX, grid[i][_YI] - calY);
-                        }
-                        MessageUser("====================================================\n");
-                        MessageUser("New camera coeffs array is:\n");
-                        MessageUser("    %8.4f  %8.4f  %8.4f\n", coeffs[0], coeffs[1], coeffs[2]);
-                        MessageUser("    %8.4f  %8.4f  %8.4f\n", coeffs[3], coeffs[4], coeffs[5]);
-                    }
-                    doneGrid = YES;
-                }
-            }
+            flag = DoCalibration(cenX, cenY, curZ, curTheta,
+                                 grid, cen, &counter, &settled, &centroided,
+                                 &doneGrid, &atNextPoint, &lifted, &focus);
+            if (flag == false)
+                break;
         }
+    }
+    if (flag == false)
+    {
+        ThisTask->tdFgripperSetMainStruct(details);
+        MessageUser("C_ZEROCAM: - Error occured.");
+        DramaTHROW(TDFGRIPPERTASK__IN_USE, "C_ZEROCAM: Failed to complete ZEROCAM.");
     }
     drama::sds::Id newArg;
     if (flag)
@@ -6223,23 +9000,615 @@ void CZeroCamAction::ActionThread(const drama::sds::Id &)
         newArg = drama::sds::Id::CreateArgStruct();
         std::vector<unsigned long> dims;
         dims.push_back(6);
-        drama::sds::Id coeffs(newArg.CreateChildArray("coeffs", SDS_DOUBLE, dims));
-
+        drama::sds::Id freecoeffs(newArg.CreateChildArray("freeCoeffs", SDS_DOUBLE, dims));
+        drama::sds::Id graspcoeffs(newArg.CreateChildArray("graspCoeffs", SDS_DOUBLE, dims));
         unsigned long i;
         unsigned long count;
 
-        drama::sds::ArrayWriteHelper<double> array;
-        coeffs.ArrayAccess(&array);
+        drama::sds::ArrayWriteHelper<double> freearray;
+        freecoeffs.ArrayAccess(&freearray);
 
-        count = array.Size();
+        count = freearray.Size();
         for (i = 0; i < count; ++i)
         {
-            array[i] = details->freeImg.camCoeffs[i];
+            freearray[i] = details->freeImg.camCoeffs[i];
+        }
+
+        drama::sds::ArrayWriteHelper<double> grasparray;
+        graspcoeffs.ArrayAccess(&grasparray);
+
+        count = grasparray.Size();
+        for (i = 0; i < count; ++i)
+        {
+            grasparray[i] = details->graspImg.camCoeffs[i];
         }
     }
     SetReturnArg(&newArg);
     ThisTask->tdFgripperSetMainStruct(details);
     MessageUser("C_ZEROCAM: - Action complete.");
+}
+
+void CZeroCamAction::Reset(GCamWindowType *const cenWin, double initGrid[INIT_POINTS][2],
+                           double grid[MAX_POINTS][2], double *const settleTime, double *const curTheta, double *const plateTheta, double *const okErrorSqrd,
+                           long int *const curZ, long int *const freeHeight, long int *const cenX, long int *const cenY,
+                           short *const counter, short *const focus, short *const numAttempts, short *const maxAttempts,
+                           short *const centroided, short *const initialCalDone, short *const fibreAtCentre,
+                           short *const lifted, short *const doneGrid, short *const atNextPoint, short *const settled)
+{
+    auto ThisTask(GetTask()->TaskPtrAs<TdFGripperTask>());
+    *curZ = details->ideal.z;
+    long int graspHeight, okError;
+    parSysId.Get("BUTTON_Z", &graspHeight);
+    if (*curZ != graspHeight)
+    {
+        DramaTHROW_S(TDFGRIPPERTASK__WRONG_HEIGHT, "C_ZEROCAM: Z must be at % - BUTTON_Z parameter value", graspHeight);
+    }
+
+    long int i, j, k, nextX, nextY, curPoint;
+    details->imagePos.enable = 1;
+    details->imagePos.displayText = YES;
+    details->imagePos.useDpr = details->dprFeedback;
+
+    ThisTask->tdFgripperUpdatePos(YES, details->dprFeedback, YES);
+    *curTheta = details->ideal.theta;
+    *cenX = details->ideal.x;
+    *cenY = details->ideal.y;
+
+    parSysId.Get("SETTLE_TIME", settleTime);
+    parSysId.Get("PLATE_THETA", plateTheta);
+    parSysId.Get("POS_TOL", &okError);
+    parSysId.Get("CAMERA_Z", freeHeight);
+    parSysId.Get("POS_ATTEMPTS", maxAttempts);
+
+    initGrid[0][_XI] = 0;
+    initGrid[0][_YI] = 0;
+    initGrid[1][_XI] = 50;
+    initGrid[1][_YI] = -50;
+    initGrid[2][_XI] = -50;
+    initGrid[2][_YI] = -50;
+    initGrid[3][_XI] = -50;
+    initGrid[3][_YI] = 50;
+    initGrid[4][_XI] = 50;
+    initGrid[4][_YI] = 50;
+
+    *focus = GRASPED;
+    *counter = 0;
+    *numAttempts = 0;
+    *okErrorSqrd = SQRD((double)okError);
+
+    *centroided = *doneGrid = *initialCalDone = *fibreAtCentre = *atNextPoint = NO;
+    *lifted = YES;
+
+    if ((*details->pars.zeroCamCenWait) > 0)
+        *settled = NO;
+    else
+        *settled = YES;
+
+    k = nextX = nextY = 0;
+    i = j = 1;
+    for (curPoint = 0; curPoint < MAX_POINTS; curPoint++)
+    {
+        if (j > i)
+        {
+            if (k == 0)
+            {
+                j = 1;
+                k = 1;
+            }
+            else
+            {
+                i++;
+                j = 1;
+                k = 0;
+            }
+        }
+        (k == 0) ? (nextY += (i % 2) ? GRID_SIZE : -GRID_SIZE) : (nextX += (i % 2) ? GRID_SIZE : -GRID_SIZE);
+        j++;
+        grid[curPoint][_XI] = (double)nextX;
+        grid[curPoint][_YI] = (double)nextY;
+    }
+
+    cenWin->MaxX = cenWin->Xdim = details->graspImg.xMax;
+    cenWin->MaxY = cenWin->Ydim = details->graspImg.yMax;
+    cenWin->PixelSize = details->graspImg.PixelSize;
+    cenWin->Xoffset = cenWin->Yoffset = 0;
+    m_tdFgripperZCStruct->reset = NO;
+}
+
+void CZeroCamAction::DoCentroid(const GCamWindowType *const cenWin, const short focus,
+                                const double settleTime, short *const centroided)
+{
+    *centroided = YES;
+    auto ThisTask(GetTask()->TaskPtrAs<TdFGripperTask>());
+    if (cenWin->Xoffset < 0)
+        cenWin->Xoffset = 0;
+    if (cenWin->Yoffset < 0)
+        cenWin->Yoffset = 0;
+    if (cenWin->Xdim + cenWin->Xoffset > cenWin->MaxX)
+        cenWin->Xdim = cenWin->MaxX - cenWin->Xoffset;
+    if (cenWin->Ydim + cenWin->Yoffset > cenWin->MaxY)
+        cenWin->Ydim = cenWin->MaxY - cenWin->Yoffset;
+
+    if (settleTime > 0.0)
+    {
+        std::this_thread::sleep_for(std::chrono::seconds(int(settleTime)));
+    }
+    ThisTask->tdFgripperPreExp();
+    MessageUser("C_ZEROCAM: - grabbing image");
+    MessageUser("C_ZEROCAM:  Window size -> Max %ld %ld off %ld %ld, dim %ld %ld\n",
+                cenWin->MaxX, cenWin->MaxY, cenWin->Xoffset, cenWin->Yoffset,
+                cenWin->Xdim, cenWin->Ydim);
+
+    ThisTask->tdFGetCameraPath().GetPath(this);
+    drama::sds::Id messageArg(drama::sds::Id::CreateArgStruct());
+    drama::sds::IdPtr returnedArg;
+    std::string strWindowType;
+    strWindowType = to_string(cenWin->Xoffset) + ":" + to_string(cenWin->Yoffset) + ":" + to_string(cenWin->Xoffset + cenWin->Xdim - 1) + ":" + to_string(cenWin->Yoffset + cenWin->Ydim - 1);
+    messageArg.Put("CENTROID", strWindowType);
+    if (focus == GRASPED)
+    {
+        messageArg.Put("BIAS", details->graspImg.bias);
+        messageArg.Put("EXPOSURE_TIME", details->graspImg.exposureTime);
+        messageArg.Put("SHUTTER_OPEN", (int)details->graspImg.shutter);
+        messageArg.Put("UPDATE", details->graspImg.updateTime);
+    }
+    else
+    {
+        messageArg.Put("BIAS", details->freeImg.bias);
+        messageArg.Put("EXPOSURE_TIME", details->freeImg.exposureTime);
+        messageArg.Put("SHUTTER_OPEN", (int)details->freeImg.shutter);
+        messageArg.Put("UPDATE", details->freeImg.updateTime);
+    }
+    try
+    {
+        ThisTask->tdFGetCameraPath().Obey(this, "CENTRECT", messageArg, &returnedArg);
+    }
+    catch (...)
+    {
+        DramaTHROW(TDFGRIPPERTASK__CAMERA, "C_ZEROCAM: the camera failed to take centroid.");
+    }
+    if (*returnedArg)
+    {
+        double xCent, yCent, xFull, yFull, dFWHM;
+        short centroidOK = YES;
+        returnedArg->Get("XVALUE", &xCent);
+        returnedArg->Get("YVALUE", &yCent);
+        returnedArg->Get("XFULL", &xFull);
+        returnedArg->Get("YFULL", &yFull);
+        returnedArg->Get("FWHM", &dFWHM);
+        returnedArg->Get("FIBREINIMAGE", &centroidOK);
+        MessageUser("C_ZEROCAM: centroid result \nError:  %lf %lf \nWinodw Size: %lf %lf\nFull Width Half Max: %lf",
+                    xCent, yCent, xFull, yFull, dFWHM);
+        m_tdFgripperZCStruct->centroidOK = centroidOK ? YES : NO;
+        m_tdFgripperZCStruct->xFull = xFull;
+        m_tdFgripperZCStruct->yFull = yFull;
+    }
+    ThisTask->tdFgripperPostExp();
+}
+
+bool CZeroCamAction::DoInitialCalibration(const long int cenX, const long int cenY, const long int curZ,
+                                          const double curTheta, const double plateTheta, double initCoeffs[6], double initGrid[INIT_POINTS][2], double initCen[INIT_POINTS][2],
+                                          short *const counter, short *const settled, short *const centroided, short *const initialCalDone)
+{
+    *centroided = NO;
+    bool flag = SaveLastCentroid(cenX, cenY, initGrid, initCen, counter);
+    if (flag == false)
+    {
+        return false;
+    }
+    if (*counter >= INIT_POINTS)
+    {
+        *initialCalDone = YES;
+        double cX, cY, dX, dY;
+        int j;
+        parSysId.Get("CENTRE_X_ROT", &cX);
+        parSysId.Get("CENTRE_Y_ROT", &cY);
+        dX = initCen[0][_XI] - cX;
+        dY = initCen[0][_YI] - cY;
+        for (j = 0; j < INIT_POINTS; j++)
+        {
+            initCen[j][_XI] -= dX;
+            initCen[j][_YI] -= dY;
+        }
+        flag = DoFitAndValidate("init grid", 6, INIT_POINTS, details->graspImg.camCoeffs,
+                                initGrid, initCen, initCoeffs);
+        if (flag == false)
+        {
+            return false;
+        }
+    }
+    else
+    {
+        InitialCalibrationNextPoint(cenX, cenY, curZ, curTheta, plateTheta, initGrid, counter, settled);
+    }
+    return true;
+}
+
+void CZeroCamAction::InitialCalibrationNextPoint(const long int cenX, const long int cenY, const long int curZ,
+                                                 const double curTheta, const double plateTheta, double initGrid[INIT_POINTS][2], short *const counter, short *const settled)
+{
+    MessageUser("C_ZEROCAM: About to move to next init grid point (%ld, %ld - gantry pos %ld,%ld,%ld,%.3f)",
+                doubleToLong(initGrid[*counter][_XI]), doubleToLong(initGrid[*counter][_YI]),
+                cenX + doubleToLong(initGrid[*counter][_XI]), cenY + doubleToLong(initGrid[*counter][_YI]),
+                curZ, curTheta);
+
+    drama::Path thisTaskPath(_theTask);
+    thisTaskPath.GetPath(this);
+    drama::sds::Id messageArg(drama::sds::Id::CreateArgStruct());
+
+    long int toX = cenX + doubleToLong(initGrid[*counter][_XI]);
+    long int toY = cenY + doubleToLong(initGrid[*counter][_YI]);
+    long int toJ = details->ideal.jaw;
+    double toXenc, toYenc, toZenc, toTenc, toJenc;
+
+    ThisTask->tdFgripperConvertFromFP(toX, toY, curZ, curTheta, toJ, plateTheta, _FULL, &toXenc, &toYenc, &toZenc, &toTenc, &toJenc);
+    details->ideal.x = toX;
+    details->ideal.y = toY;
+    details->ideal.z = curZ;
+    details->ideal.jaw = toJ;
+    details->ideal.theta = curTheta;
+
+    details->toEnc.x = toXenc;
+    details->toEnc.y = toYenc;
+    details->toEnc.z = toZenc;
+    details->toEnc.jaw = toJenc;
+    details->toEnc.theta = toTenc;
+
+    messageArg.Put("X", toX);
+    messageArg.Put("Y", toY);
+    messageArg.Put("Z", curZ);
+    messageArg.Put("THETA", curTheta);
+    try
+    {
+        thisTaskPath.Obey(this, "G_MOVE_AXIS_NT", messageArg);
+    }
+    catch (...)
+    {
+        DramaTHROW(TDFGRIPPERTASK__NO_GANTRY_MOVEMENT, "C_ZEROCAM: the gantry failed to move to the position.");
+    }
+
+    if ((*details->pars.zeroCamCenWait) > 0)
+        *settled = NO;
+}
+
+bool CZeroCamAction::SaveLastCentroid(const long int cenX, const long int cenY, double initGrid[INIT_POINTS][2],
+                                      double initCen[INIT_POINTS][2], short *const counter)
+{
+    if (*counter >= INIT_POINTS)
+        return true;
+
+    if (m_tdFgripperZCStruct->centroidOK != YES)
+    {
+        MessageUser("C_ZEROCAM: Invalid centroid - fibre image not in field of view.");
+        return false;
+    }
+
+    initCen[*counter][_XI] = m_tdFgripperZCStruct->xFull;
+    initCen[*counter][_YI] = m_tdFgripperZCStruct->yFull;
+    MessageUser("C_ZEROCAM: Position during init grid centroid %d was %ld, %ld, centroid was %g, %g",
+                (*counter) + 1, details->imagePos.p.x, details->imagePos.p.y, m_tdFgripperZCStruct->xFull, m_tdFgripperZCStruct->yFull);
+
+    initGrid[*counter][_XI] = details->imagePos.p.x - cenX;
+    initGrid[*counter][_YI] = details->imagePos.p.y - cenY;
+
+    (*counter)++;
+    return true;
+}
+
+bool CZeroCamAction::CentreFibre(const long int curZ, const double curTheta, const double plateTheta, const double okErrorSqrd, const short maxAttempts,
+                                 double initCoeffs[6], long int *const cenX, long int *const cenY, short *const numAttempts,
+                                 short *const fibreAtCentre, short *const counter, short *const settled, short *const centroided)
+{
+    double errorX, errorY, errorSqrd;
+    long int curX, curY;
+    slaXy2xy(m_tdFgripperZCStruct->xFull, m_tdFgripperZCStruct->yFull, initCoeffs, &errorX, &errorY);
+    errorSqrd = SQRD(errorX) + SQRD(errorY);
+    curX = details->ideal.x;
+    curY = details->ideal.y;
+    MessageUser("C_ZEROCAM: Offset between fibre-end and image centre is %.1f,%.1f mics.", errorX, errorY);
+    if (errorSqrd <= okErrorSqrd)
+    {
+        *cenX = curX;
+        *cenY = curY;
+        *fibreAtCentre = YES;
+        *counter = 0;
+        return true;
+    }
+    else if (*numAttempts >= maxAttempts)
+    {
+        return false;
+    }
+    else
+    {
+        (*numAttempts)++;
+        *centroided = NO;
+        MessageUser("C_ZEROCAM: About to move above fibre (%ld,%ld,%ld,%.3f)",
+                    curX + doubleToLong(errorX), curY + doubleToLong(errorY),
+                    curZ, curTheta);
+        drama::Path thisTaskPath(_theTask);
+        thisTaskPath.GetPath(this);
+        drama::sds::Id messageArg(drama::sds::Id::CreateArgStruct());
+
+        long int toX = curX + doubleToLong(errorX);
+        long int toY = curY + doubleToLong(errorY);
+        long int toJ = details->ideal.jaw;
+        double toXenc, toYenc, toZenc, toTenc, toJenc;
+
+        ThisTask->tdFgripperConvertFromFP(toX, toY, curZ, curTheta, toJ, plateTheta, _FULL, &toXenc, &toYenc, &toZenc, &toTenc, &toJenc);
+        details->ideal.x = toX;
+        details->ideal.y = toY;
+        details->ideal.z = curZ;
+        details->ideal.jaw = toJ;
+        details->ideal.theta = curTheta;
+
+        details->toEnc.x = toXenc;
+        details->toEnc.y = toYenc;
+        details->toEnc.z = toZenc;
+        details->toEnc.jaw = toJenc;
+        details->toEnc.theta = toTenc;
+
+        messageArg.Put("X", toX);
+        messageArg.Put("Y", toY);
+        messageArg.Put("Z", curZ);
+        messageArg.Put("THETA", curTheta);
+        try
+        {
+            thisTaskPath.Obey(this, "G_MOVE_AXIS_NT", messageArg);
+        }
+        catch (...)
+        {
+            DramaTHROW(TDFGRIPPERTASK__NO_GANTRY_MOVEMENT, "C_ZEROCAM: the gantry failed to move to the position.");
+        }
+
+        if ((*details->pars.zeroCamCenWait) > 0)
+            *settled = NO;
+    }
+    return true;
+}
+
+void CZeroCamAction::RaiseGripper(const long int freeHeight, long int *const curZ, const double curTheta, const double plateTheta, short *const lifted)
+{
+    *lifted = YES;
+    *curZ = freeHeight;
+    long int toX = details->ideal.x;
+    long int toY = details->ideal.y;
+    long int toJ = details->ideal.jaw;
+    double toXenc, toYenc, toZenc, toTenc, toJenc;
+
+    ThisTask->tdFgripperConvertFromFP(toX, toY, curZ, curTheta, toJ, plateTheta, _FULL, &toXenc, &toYenc, &toZenc, &toTenc, &toJenc);
+    details->ideal.x = toX;
+    details->ideal.y = toY;
+    details->ideal.z = curZ;
+    details->ideal.jaw = toJ;
+    details->ideal.theta = curTheta;
+
+    details->toEnc.x = toXenc;
+    details->toEnc.y = toYenc;
+    details->toEnc.z = toZenc;
+    details->toEnc.jaw = toJenc;
+    details->toEnc.theta = toTenc;
+
+    MessageUser("C_ZEROCAM: About to move to free-focus height (z=%ld)", freeHeight);
+    drama::Path thisTaskPath(_theTask);
+    thisTaskPath.GetPath(this);
+    drama::sds::Id messageArg(drama::sds::Id::CreateArgStruct());
+
+    messageArg.Put("AXES", "Z");
+    messageArg.Put("POSITIONS", curZ);
+    try
+    {
+        thisTaskPath.Obey(this, "G_MOVE_NT", messageArg);
+    }
+    catch (...)
+    {
+        DramaTHROW(TDFGRIPPERTASK__NO_GANTRY_MOVEMENT, "C_ZEROCAM: the gantry failed to move to the position.");
+    }
+}
+
+bool CZeroCamAction::DoCalibration(const long int cenX, const long int cenY,
+                                   const long int curZ, const double curTheta, const double plateTheta, double grid[MAX_POINTS][2],
+                                   double cen[MAX_POINTS][2], short *const counter, short *const settled, short *const centroided,
+                                   short *const doneGrid, short *const atNextPoint, short *const lifted, short *const focus)
+{
+    bool flag;
+    if (!*atNextPoint)
+    {
+        DoNextPoint(cenX, cenY, curZ, curTheta, plateTheta, grid, *counter, settled, centroided,
+                    atNextPoint);
+    }
+    else
+    {
+        flag = RecordLastPoint(cenX, cenY, *counter, *focus, grid, cen);
+        if (flag == false)
+        {
+            return false;
+        }
+        if (*counter < MAX_POINTS - 1)
+        {
+            (*counter)++;
+            *atNextPoint = NO;
+        }
+        else
+        {
+            GridComplete(grid, cen, counter, centroided, doneGrid, atNextPoint,
+                         lifted, focus);
+        }
+    }
+    return true;
+}
+
+void CZeroCamAction::DoNextPoint(const long int cenX, const long int cenY, const long int curZ, const double curTheta, const double plateTheta,
+                                 double grid[MAX_POINTS][2], const short counter, short *const settled,
+                                 short *const centroided, short *const atNextPoint)
+{
+    *atNextPoint = YES;
+    *centroided = NO;
+
+    long int toX = cenX + doubleToLong(grid[counter][_XI]);
+    long int toY = cenY + doubleToLong(grid[counter][_YI]);
+    long int toJ = details->ideal.jaw;
+    double toXenc, toYenc, toZenc, toTenc, toJenc;
+
+    ThisTask->tdFgripperConvertFromFP(toX, toY, curZ, curTheta, toJ, plateTheta, _FULL, &toXenc, &toYenc, &toZenc, &toTenc, &toJenc);
+    details->ideal.x = toX;
+    details->ideal.y = toY;
+    details->ideal.z = curZ;
+    details->ideal.jaw = toJ;
+    details->ideal.theta = curTheta;
+
+    details->toEnc.x = toXenc;
+    details->toEnc.y = toYenc;
+    details->toEnc.z = toZenc;
+    details->toEnc.jaw = toJenc;
+    details->toEnc.theta = toTenc;
+
+    MessageUser("C_ZEROCAM: About to move to next grid point (%ld,%ld)", toXenc, toYenc);
+    drama::Path thisTaskPath(_theTask);
+    thisTaskPath.GetPath(this);
+    drama::sds::Id messageArg(drama::sds::Id::CreateArgStruct());
+
+    messageArg.Put("X", toX);
+    messageArg.Put("Y", toY);
+    messageArg.Put("Z", curZ);
+    messageArg.Put("THETA", curTheta);
+    try
+    {
+        thisTaskPath.Obey(this, "G_MOVE_AXIS_NT", messageArg);
+    }
+    catch (...)
+    {
+        DramaTHROW(TDFGRIPPERTASK__NO_GANTRY_MOVEMENT, "C_ZEROCAM: the gantry failed to move to the position.");
+    }
+
+    if ((*details->pars.zeroCamCenWait) > 0)
+        *settled = NO;
+}
+
+bool CZeroCamAction::RecordLastPoint(const long int cenX, const long int cenY, const short counter,
+                                     const short focus, double grid[MAX_POINTS][2], double cen[MAX_POINTS][2])
+{
+    if (m_tdFgripperZCStruct->centroidOK != YES)
+    {
+        MessageUser("C_ZEROCAM: Invalid centroid - fibre image not in field of view");
+        return false;
+    }
+
+    cen[counter][_XI] = m_tdFgripperZCStruct->xFull;
+    cen[counter][_YI] = m_tdFgripperZCStruct->yFull;
+    MessageUser("C_ZEROCAM: Position during centroid was %ld, %ld", details->imagePos.p.x, details->imagePos.p.y);
+    grid[counter][_XI] = details->imagePos.p.x - cenX;
+    grid[counter][_YI] = details->imagePos.p.y - cenY;
+
+    return true;
+}
+
+void CZeroCamAction::GridComplete(double grid[MAX_POINTS][2], double cen[MAX_POINTS][2], short *const counter,
+                                  short *const centroided, short *const doneGrid, short *const atNextPoint, short *const lifted, short *const focus)
+{
+    double coeffs[6];
+    if (*focus == GRASPED)
+    {
+        flag = DoFitAndValidate("Grasp Image", 6, MAX_POINTS,
+                                details->graspImg.camCoeffs,
+                                grid, cen, coeffs);
+        if (flag == false)
+        {
+            break;
+        }
+        ProcessGraspCalibration(counter, centroided, atNextPoint,
+                                lifted, focus, coeffs);
+        ChangeGridState(grid);
+    }
+    else
+    {
+        flag = DoFitAndValidate("Free Image", 6, MAX_POINTS,
+                                details->freeImg.camCoeffs,
+                                grid, cen, coeffs);
+        if (flag == false)
+            break;
+        ProcessFreeCalibration(doneGrid, coeffs);
+    }
+}
+
+void CZeroCamAction::ProcessFreeCalibration(short *const doneGrid, double coeffs[6])
+{
+    int j;
+    short mycounter;
+    for (mycounter = 0; mycounter < 6; mycounter++)
+        details->freeImg.camCoeffs[mycounter] = coeffs[mycounter];
+    slaInvf(details->freeImg.camCoeffs,
+            details->freeImg.invCoeffs, &j);
+    if (j != 0)
+    {
+        for (mycounter = 0; mycounter < 6; mycounter++)
+            details->freeImg.invCoeffs[mycounter] =
+                details->freeImg.camCoeffs[mycounter];
+    }
+    slaXy2xy(0.0, 0.0,
+             details->freeImg.invCoeffs,
+             &details->searchWin.xCen, &details->searchWin.yCen);
+    MessageUser("C_ZEROCAM: New SEARCH window centre is %.3f,%.3f",
+                details->searchWin.xCen, details->searchWin.yCen);
+
+    *doneGrid = YES;
+}
+
+void CZeroCamAction::ProcessGraspCalibration(short *const counter, short *const centroided, short *const atNextPoint,
+                                             short *const lifted, short *const focus, double coeffs[6])
+{
+    {
+        int j;
+        long mycounter;
+        for (mycounter = 0; mycounter < 6; mycounter++)
+            details->graspImg.camCoeffs[mycounter] = coeffs[mycounter];
+        slaInvf(details->graspImg.camCoeffs,
+                details->graspImg.invCoeffs, &j);
+        if (j != 0)
+        {
+            for (mycounter = 0; mycounter < 6; mycounter++)
+                details->graspImg.invCoeffs[mycounter] =
+                    details->graspImg.camCoeffs[mycounter];
+        }
+        slaXy2xy(0.0, 0.0,
+                 details->graspImg.invCoeffs,
+                 &details->normWin.xCen, &details->normWin.yCen);
+
+        focus = FREE;
+        counter = 0;
+        lifted = atNextPoint = centroided = NO;
+
+        MessageUser("C_ZEROCAM: New NORM window centre is %.3f,%.3f",
+                    details->normWin.xCen, details->normWin.yCen);
+    }
+}
+void CZeroCamAction::ChangeGridState(double grid[MAX_POINTS][2])
+{
+    long int i, k, nextX, nextY, c;
+    int j;
+
+    k = nextX = nextY = 0;
+    i = j = 1;
+    for (c = 0; c < MAX_POINTS; c++)
+    {
+        if (j > i)
+        {
+            if (k == 0)
+            {
+                j = 1;
+                k = 1;
+            }
+            else
+            {
+                i++;
+                j = 1;
+                k = 0;
+            }
+        }
+        (k == 0) ? (nextY += (i % 2) ? FREE_GRID_SIZE : -FREE_GRID_SIZE) : (nextX += (i % 2) ? FREE_GRID_SIZE : -FREE_GRID_SIZE);
+        j++;
+        grid[c][_XI] = (double)nextX;
+        grid[c][_YI] = (double)nextY;
+    }
 }
 
 void CShiftCoAction::ActionThread(const drama::sds::Id &Arg)
@@ -6270,10 +9639,39 @@ void CShiftCoAction::ActionThread(const drama::sds::Id &Arg)
     drama::gitarg::Int<YMIN, YMAX> YFArg(this, Arg, "expY", 2, 0, NoFlags);
     expY = YFArg;
     m_tdFgripperSHStruct->expY = expY;
+    drama::gitarg::String TypeArg(this, Arg, "type", 3, "", NoFlags);
+    if (TypeArg != "F" && TypeArg != "P")
+    {
+        DramaTHROW(TDFGRIPPERTASK__INV_INPUT_ARGUMENT, "C_SHIFT_COEFFS: The input argument is invalid. The type is either \"F\" or \"P\".");
+    }
 
+    if (TypeArg == "F")
+    {
+        parSysId.Get("CAMERA_Z_FID", &m_tdFgripperSHStruct->focusZ);
+    }
+    else
+    {
+        parSysId.Get("CAMERA_Z", &m_tdFgripperSHStruct->focusZ);
+    }
     short doneSearch;
     if (m_tdFgripperSHStruct->reset == YES)
     {
+        int inside, outside, forbidden;
+        std::string inJaws;
+        forbidden = ThisTask->tdFforbidden(m_tdFgripperSHStruct->expX, m_tdFgripperSHStruct->expY,
+                                           details->ideal.theta, QUADRANT_RADIUS, INSIDE_RADIUS,
+                                           OUTSIDE_RADIUS, HALF_GUIDE_EXPAN,
+                                           JAW_HWP, JAW_HWM, JAW_LENGTH, 0, &inside, &outside);
+        if (forbidden || outside)
+        {
+            DramaTHROW_S(TDFGRIPPERTASK__INV_INPUT_ARGUMENT, "C_SHIFT_COEFFS:  Shift coeffs position(% ld, % ld) invalid ",
+                         m_tdFgripperSHStruct->expX, m_tdFgripperSHStruct->expY);
+        }
+        parSysId.Get("CARRYING_BUTTON", &inJaws);
+        if (inJaws == "YES")
+        {
+            DramaTHROW(TDFGRIPPERTASK__BUTT_IN_JAWS, "C_SHIFT_COEFFS: The button is in jaws.");
+        }
         doneSearch = NO;
         m_tdFgripperSHStruct->reset = NO;
         m_tdFgripperSHStruct->found = NO;
@@ -6285,8 +9683,15 @@ void CShiftCoAction::ActionThread(const drama::sds::Id &Arg)
         drama::Path thisTaskPath(_theTask);
         thisTaskPath.GetPath(this);
         drama::sds::Id messageArg(drama::sds::Id::CreateArgStruct());
+        long int maxError;
+        parSysId.Get("MAX_ERROR", &maxError);
+        maxError = 200;
         messageArg.Put("XF", expX);
         messageArg.Put("YF", expY);
+        messageArg.Put("TYPE", TypeArg);
+        messageArg.Put("STAT_CHECK", false);
+        messageArg.Put("PLT1_IGNORE", false);
+        messageArg.Put("MaxDistance", maxError);
         drama::sds::IdPtr returnedArg;
         try
         {
@@ -6305,18 +9710,18 @@ void CShiftCoAction::ActionThread(const drama::sds::Id &Arg)
     }
     if (doneSearch)
     {
-        double expXenc, expYenc, atXenc, atYenc,
+        double expXenc, expYenc, atXenc, atYenc, tmpZ, tmpT, tmpJ,
             plateTheta, dx, dy;
 
         parSysId.Get("PLATE_THETA", &plateTheta);
-        ThisTask->tdFgripperConvertFromFP(m_tdFgripperSHStruct->expX, m_tdFgripperSHStruct->expY,
-                                          plateTheta, _FULL,
-                                          &expXenc, &expYenc);
+        ThisTask->tdFgripperConvertFromFP(m_tdFgripperSHStruct->expX, m_tdFgripperSHStruct->expY, details->ideal.z,
+                                          0.0, 0, plateTheta, _FULL,
+                                          &expXenc, &expYenc, &tmpZ, &tmpT, &tmpJ);
         // expXenc = m_tdFgripperSHStruct->expX;
         // expYenc = m_tdFgripperSHStruct->expY;
-        ThisTask->tdFgripperConvertFromFP(m_tdFgripperSHStruct->measuredX, m_tdFgripperSHStruct->measuredY,
-                                          plateTheta, _FULL,
-                                          &atXenc, &atYenc);
+        ThisTask->tdFgripperConvertFromFP(m_tdFgripperSHStruct->measuredX, m_tdFgripperSHStruct->measuredY, details->ideal.z,
+                                          0.0, 0, plateTheta, _FULL,
+                                          &atXenc, &atYenc, &tmpZ, &tmpT, &tmpJ);
         // atXenc = m_tdFgripperSHStruct->measuredX;
         // atYenc = m_tdFgripperSHStruct->measuredY;
         dx = atXenc - expXenc;
@@ -6373,28 +9778,31 @@ void CShiftCoAction::ActionThread(const drama::sds::Id &Arg)
 bool CSurveyAction::FidNotFound(double *const expectedX, double *const expectedY,
                                 const short curFid, short *const atFid, short *const recordedFid)
 {
-    DEBUG("C_SURVEY: Search for fiducial index %d, at %ld,%ld failed\n", curFid,
-          m_tdFgripperSStruct->x[curFid], m_tdFgripperSStruct->y[curFid]);
+    MessageUser("C_SURVEY: Search for fiducial index %d, at %ld,%ld failed\n", curFid,
+                m_tdFgripperSStruct->x[curFid], m_tdFgripperSStruct->y[curFid]);
 
     --m_tdFgripperSStruct->numMarks;
     if ((m_tdFgripperSStruct->numMarks) < MIN_MARKS)
     {
-        DEBUG("C_SURVEY: Insufficent marks found to do a survey, have %d, need %d\n",
-              m_tdFgripperSStruct->numMarks, MIN_MARKS);
+        MessageUser("C_SURVEY: Insufficent marks found to do a survey, have %d, need %d\n",
+                    m_tdFgripperSStruct->numMarks, MIN_MARKS);
         return false;
     }
 
-    drama::ParSys parSysId(_theTask);
+    MessageUser("C_SURVEY: Will process survey without missing fiduical (indicies reset to remove it)");
     if (curFid == m_tdFgripperSStruct->numMarks)
     {
         *recordedFid = YES;
         parSysId.Put("SURVEY_PROG", 100.0);
+        parSysId.Put("CUR_FID", 0);
         return true;
     }
     for (int i = curFid; i < m_tdFgripperSStruct->numMarks; ++i) /// why is no larger than numMarks here?
     {
         m_tdFgripperSStruct->x[i] = m_tdFgripperSStruct->x[i + 1];
         m_tdFgripperSStruct->y[i] = m_tdFgripperSStruct->y[i + 1];
+        m_tdFgripperSStruct->z[i] = m_tdFgripperSStruct->z[i + 1];
+        m_tdFgripperSStruct->fidNum[i] = m_tdFgripperSStruct->fidNum[i + 1];
         expectedX[i] = expectedX[i + 1];
         expectedY[i] = expectedY[i + 1];
     }
@@ -6402,6 +9810,7 @@ bool CSurveyAction::FidNotFound(double *const expectedX, double *const expectedY
     parSysId.Put("SURVEY_PROG",
                  100.0 * (curFid + 1.0) / (double)m_tdFgripperSStruct->numMarks);
     *atFid = NO;
+    parSysId.Put("CUR_FID", m_tdFgripperSStruct->fidNum[curFid]);
     return true;
 }
 
@@ -6409,20 +9818,23 @@ void CSurveyAction::RecordFid(double *const expectedX, double *const expectedY, 
                               double *const measuredY, long *const offsetX, long *const offsetY,
                               short *const curFid, short *const atFid, short *const recordedFid)
 {
-    double plateTheta;
-    drama::ParSys parSysId(_theTask);
+    double plateTheta, zEnc, tEnc, jEnc, zFp, jFp, tFp;
     parSysId.Get("PLATE_THETA", &plateTheta);
-
     auto thisTask = _theTask.lock()->TaskPtrAs<TdFGripperTask>();
+
     thisTask->tdFgripperConvertFromFP(m_tdFgripperSStruct->x[*curFid], m_tdFgripperSStruct->y[*curFid],
+                                      m_tdFgripperSStruct->z[*curFid], details->ideal.theta, details->ideal.jaw,
                                       plateTheta, m_tdFgripperSStruct->area,
-                                      &expectedX[*curFid], &expectedY[*curFid]);
+                                      &expectedX[*curFid], &expectedY[*curFid], &zEnc,
+                                      &tEnc, &jEnc);
     // expectedX[*curFid] = m_tdFgripperSStruct->x[*curFid];
     // expectedY[*curFid] = m_tdFgripperSStruct->y[*curFid];
 
     thisTask->tdFgripperConvertFromEnc(m_tdFgripperSStruct->xEnc, m_tdFgripperSStruct->yEnc,
+                                       details->atEnc.z, details->atEnc.theta, details->atEnc.jaw,
                                        plateTheta, m_tdFgripperSStruct->area,
-                                       &measuredX[*curFid], &measuredY[*curFid]);
+                                       &measuredX[*curFid], &measuredY[*curFid], &zFp,
+                                       &tFp, &jFp);
     // measuredX[*curFid] = m_tdFgripperSStruct->xEnc;
     // measuredY[*curFid] = m_tdFgripperSStruct->yEnc;
     if (m_tdFgripperSStruct->area == _COEFFS)
@@ -6430,15 +9842,15 @@ void CSurveyAction::RecordFid(double *const expectedX, double *const expectedY, 
         double xErr, yErr, absErr;
         double expEncX, expEncY;
         thisTask->tdFgripperConvertFromFP(m_tdFgripperSStruct->x[*curFid], m_tdFgripperSStruct->y[*curFid],
-                                          plateTheta, _FULL,
-                                          &expEncX, &expEncY);
+                                          m_tdFgripperSStruct->z[*curFid], details->ideal.theta, details->ideal.jaw,
+                                          plateTheta, _FULL, &expEncX, &expEncY, &zEnc, &tEnc, &jEnc);
         // expEncX = m_tdFgripperSStruct->x[*curFid];
         // expEncY = m_tdFgripperSStruct->y[*curFid];
 
         xErr = expEncX - m_tdFgripperSStruct->xEnc;
         yErr = expEncY - m_tdFgripperSStruct->yEnc;
         absErr = sqrt(SQRD(xErr) + SQRD(yErr));
-        DEBUG("C_SURVEY: Fiducial index %d found %.1f (x:%.1f, y:%.1f) microns from the expected position\n", *curFid, absErr, xErr, yErr);
+        MessageUser("C_SURVEY: Fiducial %ld (index %d) found %.1f (x:%.1f, y:%.1f) microns from the expected position\n", m_tdFgripperSStruct->fidNum[*curFid], *curFid, absErr, xErr, yErr);
     }
 
     *offsetX += m_tdFgripperSStruct->dx;
@@ -6448,6 +9860,7 @@ void CSurveyAction::RecordFid(double *const expectedX, double *const expectedY, 
     {
         *recordedFid = YES;
         parSysId.Put("SURVEY_PROG", 100.0);
+        parSysId.Put("CUR_FID", 0);
     }
     else
     {
@@ -6455,32 +9868,39 @@ void CSurveyAction::RecordFid(double *const expectedX, double *const expectedY, 
                      100.0 * (*curFid + 1.0) / (double)m_tdFgripperSStruct->numMarks);
         *atFid = NO;
         (*curFid)++;
+        parSysId.Put("CUR_FID", m_tdFgripperSStruct->fidNum[*curFid]);
     }
 }
 
-bool CSurveyAction::SearchForFid(const long offsetX, const long offsetY,
+bool CSurveyAction::SearchForFid(const long offsetX, const long offsetY, const long stepSize,
+                                 const long maxError, const long tolerance, const short attempts,
                                  const short curFid, short *const atFid)
 {
     *atFid = YES;
     drama::Path thisTaskPath(_theTask);
     thisTaskPath.GetPath(this);
     drama::sds::Id messageArg(drama::sds::Id::CreateArgStruct());
-    long int startX, startY;
+    long int startX, startY, fiducialZ;
+    parSysId.Get("CAMERA_Z_FID", &fiducialZ);
     startX = m_tdFgripperSStruct->x[curFid] + offsetX;
     startY = m_tdFgripperSStruct->y[curFid] + offsetY;
     messageArg.Put("XF", startX);
     messageArg.Put("YF", startY);
+    messageArg.Put("TYPE", (m_tdFgripperSStruct->z[curFid] == fiducialZ ? "F" : "P"));
+    messageArg.Put("STAT_CHECK", true);
+    messageArg.Put("PLT1_IGNORE", true);
+    messageArg.Put("MaxDistance", maxError);
     drama::sds::IdPtr returnedArg;
 
-    DEBUG("C_SURVEY: Will search for fiducial index %d at %7ld, %7ld - search at %7ld, %7ld\n",
-          curFid, m_tdFgripperSStruct->x[curFid], m_tdFgripperSStruct->y[curFid], startX, startY);
+    MessageUser("C_SURVEY: Will search for fiducial %2ld (index %d) at %7ld, %7ld - search at %7ld, %7ld\n",
+                m_tdFgripperSStruct->fidNum[curFid], curFid, m_tdFgripperSStruct->x[curFid], m_tdFgripperSStruct->y[curFid], startX, startY);
     try
     {
         thisTaskPath.Obey(this, "C_SEARCH", messageArg, &returnedArg);
     }
     catch (...)
     {
-        DramaTHROW(TdFGripperTask__SEARCH, "C_SURVEY: errors occured during the search.\n");
+        DramaTHROW(TDFGRIPPERTASK__SEARCH, "C_SURVEY: errors occured during the search.\n");
     }
     if (*returnedArg)
     {
@@ -6578,34 +9998,35 @@ void CSurveyAction::DisplayResultsBasic(const int newmodel, double fiducialArray
         paramId->ShallowCopy(&id, true);
     }
 
-    DEBUG("========================================================\n");
+    MessageUser("========================================================\n");
     if (newmodel == 10)
     {
-        DEBUG("C_SURVEY: Field Plate units - new model first pass\n");
+        MessageUser("C_SURVEY: Field Plate units - new model first pass\n");
     }
     else
     {
-        DEBUG("C_SURVEY: Field Plate units - %s\n", newmodel ? "new model" : "old model");
+        MessageUser("C_SURVEY: Field Plate units - %s\n", newmodel ? "new model" : "old model");
     }
-    DEBUG("#################\n");
-    DEBUG("  Error between specified fiducial position and what we\n");
-    DEBUG("  get by converting the encoder position we found it at\n");
-    DEBUG("  back to field plate units using the %s\n", newmodel ? "new model" : "old model");
-    DEBUG("expected             calculated                 error (x/y/t)\n");
-    DEBUG("===================================================================\n");
+    MessageUser("#################\n");
+    MessageUser("  Error between specified fiducial position and what we\n");
+    MessageUser("  get by converting the encoder position we found it at\n");
+    MessageUser("  back to field plate units using the %s\n", newmodel ? "new model" : "old model");
+    MessageUser("expected             calculated                 error (x/y/t)\n");
+    MessageUser("===================================================================\n");
     for (counter = 0; counter < m_tdFgripperSStruct->numMarks; counter++)
     {
-        DEBUG("%9.1f,%9.1f   %9.1f,%9.1f  %6.1f,%6.1f %6.2f\n",
-              fiducialArray[counter][_XI],
-              fiducialArray[counter][_YI],
-              cal[counter][_XI],
-              cal[counter][_YI],
-              xErr[counter], yErr[counter],
-              sqrt(xErr[counter] * xErr[counter] +
-                   yErr[counter] * yErr[counter]));
+        MessageUser("%.2ld  %9.1f,%9.1f   %9.1f,%9.1f  %6.1f,%6.1f %6.2f\n",
+                    m_tdFgripperSStruct->fidNum[counter],
+                    fiducialArray[counter][_XI],
+                    fiducialArray[counter][_YI],
+                    cal[counter][_XI],
+                    cal[counter][_YI],
+                    xErr[counter], yErr[counter],
+                    sqrt(xErr[counter] * xErr[counter] +
+                         yErr[counter] * yErr[counter]));
     }
-    DEBUG("RMS                                            %6.1f,%6.1f %6.2f\n", xrms, yrms, rrms);
-    DEBUG("===================================================================\n");
+    MessageUser("RMS                                            %6.1f,%6.1f %6.2f\n", xrms, yrms, rrms);
+    MessageUser("===================================================================\n");
 }
 
 void CSurveyAction::tdFgripperSurveyCheckCoeffs(const double *current, const double *newcoeffs,
@@ -6628,28 +10049,28 @@ void CSurveyAction::tdFgripperSurveyCheckCoeffs(const double *current, const dou
     slaDcmpf((double *)current, &cXz, &cYz, &cXs, &cYs, &cPerp, &cOrient);
     slaDcmpf((double *)newcoeffs, &nXz, &nYz, &nXs, &nYs, &nPerp, &nOrient);
 
-    DEBUG("C_SURVEY: Old Coefficents array = %.1f, %f, %f, %.1f, %f, %f\n",
-          current[0], current[1], current[2], current[3], current[4], current[5]);
-    DEBUG("C_SURVEY: New Coefficents array = %.1f, %f, %f, %.1f, %f, %f\n",
-          newcoeffs[0], newcoeffs[1], newcoeffs[2],
-          newcoeffs[3], newcoeffs[4], newcoeffs[5]);
-    DEBUG("C_SURVEY: Decomposition follows\n");
-    DEBUG("Which        X-Zero      Y-Zero      X-Scale    Y-Scale  Orientation Non-perp \n");
-    DEBUG("Current      %8.1f %8.1f %10.8f %10.8f %8.4f %8.4f\n",
-          cXz, cYz, cXs, cYs, cOrient * 180.0 / PI, cPerp * 180.0 / PI);
-    DEBUG("New          %8.1f %8.1f %10.8f %10.8f %8.4f %8.4f\n",
-          nXz, nYz, nXs, nYs, nOrient * 180.0 / PI, nPerp * 180.0 / PI);
-    DEBUG("Change       %8.1f %8.1f %10.8f %10.8f %8.6f %8.6f\n",
-          nXz - cXz,
-          nYz - cYz,
-          fabs(nXs / cXs) - 1.0,
-          fabs(nYs / cYs) - 1.0,
-          (nOrient - cOrient) * 180.0 / PI,
-          (nPerp - cPerp) * 180.0 / PI);
-    DEBUG("Rotation: Applied=%8.4f, Apparent = %8.4f (milli-degrees), Plate %d\n",
-          (plateTheta / PI * 180.0 * 1000.0),
-          ((plateTheta + nOrient) / PI * 180.0 * 1000.0),
-          plate);
+    MessageUser("C_SURVEY: Old Coefficents array = %.1f, %f, %f, %.1f, %f, %f\n",
+                current[0], current[1], current[2], current[3], current[4], current[5]);
+    MessageUser("C_SURVEY: New Coefficents array = %.1f, %f, %f, %.1f, %f, %f\n",
+                newcoeffs[0], newcoeffs[1], newcoeffs[2],
+                newcoeffs[3], newcoeffs[4], newcoeffs[5]);
+    MessageUser("C_SURVEY: Decomposition follows\n");
+    MessageUser("Which        X-Zero      Y-Zero      X-Scale    Y-Scale  Orientation Non-perp \n");
+    MessageUser("Current      %8.1f %8.1f %10.8f %10.8f %8.4f %8.4f\n",
+                cXz, cYz, cXs, cYs, cOrient * 180.0 / PI, cPerp * 180.0 / PI);
+    MessageUser("New          %8.1f %8.1f %10.8f %10.8f %8.4f %8.4f\n",
+                nXz, nYz, nXs, nYs, nOrient * 180.0 / PI, nPerp * 180.0 / PI);
+    MessageUser("Change       %8.1f %8.1f %10.8f %10.8f %8.6f %8.6f\n",
+                nXz - cXz,
+                nYz - cYz,
+                fabs(nXs / cXs) - 1.0,
+                fabs(nYs / cYs) - 1.0,
+                (nOrient - cOrient) * 180.0 / PI,
+                (nPerp - cPerp) * 180.0 / PI);
+    MessageUser("Rotation: Applied=%8.4f, Apparent = %8.4f (milli-degrees), Plate %d\n",
+                (plateTheta / PI * 180.0 * 1000.0),
+                ((plateTheta + nOrient) / PI * 180.0 * 1000.0),
+                plate);
 
     if (paramId)
     {
@@ -6741,14 +10162,14 @@ bool CSurveyAction::OffsetAndDisplayResults(const double platetheta, const short
             double xErr, yErr;
             adjustedCenter = 1;
 
-            DEBUG("C_SURVEY: Adjusting offset by %.1f %.1f to center the center fiducial (index %d)\n",
-                  xCen, yCen, centerFid);
-            DEBUG("C_SURVEY: Original RMS error is %6.1f,%6.1f %6.2f\n", xrms, yrms, rrms);
+            MessageUser("C_SURVEY: Adjusting offset by %.1f %.1f to center the center fiducial (index %d)\n",
+                        xCen, yCen, centerFid);
+            MessageUser("C_SURVEY: Original RMS error is %6.1f,%6.1f %6.2f\n", xrms, yrms, rrms);
 
             slaXy2xy(0, 0, coeffs, &x, &y);
             xErr = x - measuredArray[centerFid][_XI];
             yErr = y - measuredArray[centerFid][_YI];
-            DEBUG("C_SURVEY: Without adjusted coeffs, 0,0 -> %6.1f, %6.1f (error %3.1f, %3.1f)\n", x, y, xErr, yErr);
+            MessageUser("C_SURVEY: Without adjusted coeffs, 0,0 -> %6.1f, %6.1f (error %3.1f, %3.1f)\n", x, y, xErr, yErr);
 
             diffCoeffs[0] -= xCen;
             diffCoeffs[3] -= yCen;
@@ -6757,7 +10178,7 @@ bool CSurveyAction::OffsetAndDisplayResults(const double platetheta, const short
             slaXy2xy(0, 0, coeffs, &x, &y);
             xErr = x - measuredArray[centerFid][_XI];
             yErr = y - measuredArray[centerFid][_YI];
-            DEBUG("C_SURVEY: With zero adjusted coeffs, 0,0 -> %6.1f, %6.1f (error %3.1f, %3.1f)\n", x, y, xErr, yErr);
+            MessageUser("C_SURVEY: With zero adjusted coeffs, 0,0 -> %6.1f, %6.1f (error %3.1f, %3.1f)\n", x, y, xErr, yErr);
 
             /*
              *  Recalculate the new positions with the adjusted offset.
@@ -6767,15 +10188,15 @@ bool CSurveyAction::OffsetAndDisplayResults(const double platetheta, const short
         }
         else
         {
-            DEBUG("C_SURVEY: Center fiducial (index %d) is centered - no adjustment needed.\n", centerFid);
+            MessageUser("C_SURVEY: Center fiducial (index %d) is centered - no adjustment needed.\n", centerFid);
         }
     }
     else
     {
-        DEBUG("C_SURVEY: Don't have center fiducial so can't ensure offset is correct.\n");
+        MessageUser("C_SURVEY: Don't have center fiducial so can't ensure offset is correct.\n");
     }
 
-    DEBUG("C_SURVEY: Survey did a %d component fit.\n", fitType);
+    MessageUser("C_SURVEY: Survey did a %d component fit.\n", fitType);
 
     DisplayResultsBasic(0, fiducialArray, calculatedOrigModel,
                         xrms2, yrms2, rrms2, paramId);
@@ -6799,14 +10220,14 @@ bool CSurveyAction::OffsetAndDisplayResults(const double platetheta, const short
     tdFgripperSurveyCheckCoeffs(details->convert.coeffs, coeffs,
                                 details->currentPlate, platetheta, paramId);
 
-    DEBUG("C_SURVEY: With old model:XRMS = %5.2f, YRMS = %5.2f, TOTAL RMS = %5.2f\n",
-          xrms2, yrms2, rrms2);
-    DEBUG("With new model:XRMS = %5.2f, YRMS = %5.2f, TOTAL RMS = %5.2f\n",
-          xrms, yrms, rrms);
+    MessageUser("C_SURVEY: With old model:XRMS = %5.2f, YRMS = %5.2f, TOTAL RMS = %5.2f\n",
+                xrms2, yrms2, rrms2);
+    MessageUser("With new model:XRMS = %5.2f, YRMS = %5.2f, TOTAL RMS = %5.2f\n",
+                xrms, yrms, rrms);
 
     if (rrms > RMS_WARNING)
     {
-        DEBUG("C_SURVEY: Warning - the SURVEY RMS of %6.1f microns seems too large\n", rrms);
+        MessageUser("C_SURVEY: Warning - the SURVEY RMS of %6.1f microns seems too large\n", rrms);
         return false;
     }
     return true;
@@ -6816,6 +10237,7 @@ void CSurveyAction::DisplayResultsInEncoderUnits(const double plateTheta,
                                                  const int newmodel, const double *const coeffs, double measuredArray[][2])
 {
     int counter;
+    double zEnc, tEnc, jEnc;
     double savedCoeffs[6];
     int j;
     auto thisTask = _theTask.lock()->TaskPtrAs<TdFGripperTask>();
@@ -6826,13 +10248,13 @@ void CSurveyAction::DisplayResultsInEncoderUnits(const double plateTheta,
     }
 
     if (newmodel == 10)
-        DEBUG("C_SURVEY: Encoder units - original new model\n");
+        MessageUser("C_SURVEY: Encoder units - original new model\n");
     else
-        DEBUG("C_SURVEY: Encoder units - %s\n", newmodel ? "new model" : "old model");
-    DEBUG("#########################\n");
-    DEBUG("    The encoder positions the fiducials were expected and found at.\n");
-    DEBUG("expected             found                  error (x/y/t)\n");
-    DEBUG("===================================================================\n");
+        MessageUser("C_SURVEY: Encoder units - %s\n", newmodel ? "new model" : "old model");
+    MessageUser("#########################\n");
+    MessageUser("    The encoder positions the fiducials were expected and found at.\n");
+    MessageUser("expected             found                  error (x/y/t)\n");
+    MessageUser("===================================================================\n");
     for (counter = 0; counter < m_tdFgripperSStruct->numMarks; counter++)
     {
         double encExpX, encExpY;
@@ -6840,20 +10262,23 @@ void CSurveyAction::DisplayResultsInEncoderUnits(const double plateTheta,
         /* Convert original positions to the encoder value we
            would have searched at */
         thisTask->tdFgripperConvertFromFP(m_tdFgripperSStruct->x[counter], m_tdFgripperSStruct->y[counter],
-                                          plateTheta, _FULL, &encExpX, &encExpY);
+                                          m_tdFgripperSStruct->z[counter], details->ideal.theta, details->ideal.jaw,
+                                          plateTheta, _FULL, &encExpX, &encExpY, &zEnc,
+                                          &tEnc, &jEnc);
         // encExpX = m_tdFgripperSStruct->x[counter];
         // encExpY = m_tdFgripperSStruct->y[counter];
 
         xErr = encExpX - measuredArray[counter][_XI];
         yErr = encExpY - measuredArray[counter][_YI];
 
-        DEBUG("%9.1f,%9.1f   %9.1f,%9.1f  %6.1f,%6.1f %6.2f\n",
-              encExpX, encExpY,
-              measuredArray[counter][_XI],
-              measuredArray[counter][_YI],
-              xErr, yErr, sqrt(xErr * xErr + yErr * yErr));
+        MessageUser("%.2ld  %9.1f,%9.1f   %9.1f,%9.1f  %6.1f,%6.1f %6.2f\n",
+                    m_tdFgripperSStruct->fidNum[counter],
+                    encExpX, encExpY,
+                    measuredArray[counter][_XI],
+                    measuredArray[counter][_YI],
+                    xErr, yErr, sqrt(xErr * xErr + yErr * yErr));
     }
-    DEBUG("==============================================================\n");
+    MessageUser("==============================================================\n");
     /*
      * Revert the coefficents.
      */
@@ -6872,7 +10297,7 @@ void CSurveyAction::SetCoeffs(const double *const expectedX, const double *const
     double(*measuredArray)[2] = new double[m_tdFgripperSStruct->numMarks][2];
     double(*fiducialArray)[2] = new double[m_tdFgripperSStruct->numMarks][2];
 
-    DEBUG("C_SURVEY: Updating gantry field-plate/encoder transformation matrix...\n");
+    MessageUser("C_SURVEY: Updating gantry field-plate/encoder transformation matrix...\n");
     int j;
     for (j = 0; j < m_tdFgripperSStruct->numMarks; j++)
     {
@@ -6897,12 +10322,12 @@ void CSurveyAction::SetCoeffs(const double *const expectedX, const double *const
 
     if (j != 0)
     {
-        DEBUG("C_SURVEY: Error calculating coeffs array.\n");
+        MessageUser("C_SURVEY: Error calculating coeffs array.\n");
         return;
     }
 
-    DEBUG("C_SURVEY: First pass array = %.1f, %.6f, %.6f, %.1f, %.6f, %.6f\n",
-          coeffs[0], coeffs[1], coeffs[2], coeffs[3], coeffs[4], coeffs[5]);
+    MessageUser("C_SURVEY: First pass array = %.1f, %.6f, %.6f, %.1f, %.6f, %.6f\n",
+                coeffs[0], coeffs[1], coeffs[2], coeffs[3], coeffs[4], coeffs[5]);
 
     if (m_tdFgripperSStruct->area == _COEFFS)
         *paramId = (drama::sds::Id::CreateArgStruct("COEFFS"));
@@ -6925,15 +10350,15 @@ void CSurveyAction::SetCoeffs(const double *const expectedX, const double *const
             details->convert.invCoeffs[i] = details->convert.coeffs[i];
     }
 
-    DEBUG("C_SURVEY: Actual New array = %.1f, %.6f, %.6f, %.1f, %.6f, %.6f\n",
-          coeffs[0], coeffs[1], coeffs[2], coeffs[3], coeffs[4], coeffs[5]);
-    DEBUG("C_SURVEY: Diff array = %.1f, %.6f, %.6f, %.1f, %.6f, %.6f\n",
-          details->convert.invCoeffs[0],
-          details->convert.invCoeffs[1],
-          details->convert.invCoeffs[2],
-          details->convert.invCoeffs[3],
-          details->convert.invCoeffs[4],
-          details->convert.invCoeffs[5]);
+    MessageUser("C_SURVEY: Actual New array = %.1f, %.6f, %.6f, %.1f, %.6f, %.6f\n",
+                coeffs[0], coeffs[1], coeffs[2], coeffs[3], coeffs[4], coeffs[5]);
+    MessageUser("C_SURVEY: Diff array = %.1f, %.6f, %.6f, %.1f, %.6f, %.6f\n",
+                details->convert.invCoeffs[0],
+                details->convert.invCoeffs[1],
+                details->convert.invCoeffs[2],
+                details->convert.invCoeffs[3],
+                details->convert.invCoeffs[4],
+                details->convert.invCoeffs[5]);
 
     delete[] expectedArray;
     delete[] measuredArray;
@@ -6958,12 +10383,11 @@ void CSurveyAction::ConstructReturnValue(const double *const expectedX, const do
     else if (!paramId) /* _COEFFS */
         id = (drama::sds::Id::CreateArgStruct("COEFFS"));
 
+    id.Put("numMarks", m_tdFgripperSStruct->numMarks);
     id.Put("fitTime", (INT32)(now));
     id.Put("plate", details->currentPlate);
     id.Put("instrument", "2dF");
     id.Put("gantry", "GRIPPER");
-
-    id.Put("numMarks", m_tdFgripperSStruct->numMarks);
 
     drama::sds::Id tmpId = id.CreateChildArray("expectedX", SDS_DOUBLE, dims);
     drama::sds::ArrayWriteHelper<double> arrayHelper;
@@ -7067,9 +10491,9 @@ void CSurveyAction::ActionThread(const drama::sds::Id &Arg)
     for (int index = 0; index < iNum; index++)
     {
         m_tdFgripperSStruct->x[index] = stol(XCoordinates[index]);
-        DEBUG("%ld ", m_tdFgripperSStruct->x[index]);
+        MessageUser("%ld ", m_tdFgripperSStruct->x[index]);
     }
-    DEBUG("\n");
+    MessageUser("\n");
 
     drama::gitarg::String YStr(this, Arg, "y", 4, "", NoFlags);
     std::vector<std::string> YCoordinates = SplitString(YStr);
@@ -7080,21 +10504,52 @@ void CSurveyAction::ActionThread(const drama::sds::Id &Arg)
     for (int index = 0; index < iNum; index++)
     {
         m_tdFgripperSStruct->y[index] = stol(YCoordinates[index]);
-        DEBUG("%ld ", m_tdFgripperSStruct->y[index]);
+        MessageUser("%ld ", m_tdFgripperSStruct->y[index]);
     }
-    DEBUG("\n");
+    MessageUser("\n");
 
-    drama::gitarg::Real<-30, 40> TempArg(this, Arg, "temp", 5, 0.0, NoFlags);
+    parSysId = drama::ParSys::ParSys(ThisTask->TaskPtr());
+    long int fiducialZ, probeZ;
+    parSysId.Get("CAMERA_Z_FID", &fiducialZ);
+    parSysId.Get("CAMERA_Z", &probeZ);
+
+    drama::gitarg::String ZStr(this, Arg, "type", 5, "", NoFlags);
+    std::vector<std::string> ZTypes = SplitString(ZStr);
+    if (iNum != (int)ZTypes.size())
+    {
+        DramaTHROW_S(TDFGRIPPERTASK__INV_INPUT_ARGUMENT, "C_SURVEY: the input of ZTypes is invalid. The number of fidual is %d and the number of ZTypes is %d.\n", iNum, (int)(ZTypes.size()));
+    }
+    for (int index = 0; index < iNum; index++)
+    {
+        m_tdFgripperSStruct->z[index] = (ZTypes[index] == "F") ? fiducialZ : probeZ;
+        MessageUser("%ld ", m_tdFgripperSStruct->z[index]);
+    }
+    MessageUser("\n");
+
+    drama::gitarg::String fidNumStr(this, Arg, "fidNum", 6, "", NoFlags);
+    std::vector<std::string> fidNums = SplitString(fidNumStr);
+    if (iNum != (int)fidNums.size())
+    {
+        DramaTHROW_S(TDFGRIPPERTASK__INV_INPUT_ARGUMENT, "C_SURVEY: the input of fidNums is invalid. The number of fidual is %d and the number of fidNums is %d.\n", iNum, (int)(fidNums.size()));
+    }
+    for (int index = 0; index < iNum; index++)
+    {
+        m_tdFgripperSStruct->fidNum[index] = stol(fidNums[index]);
+        MessageUser("%ld ", m_tdFgripperSStruct->fidNum[index]);
+    }
+    MessageUser("\n");
+
+    drama::gitarg::Real<-30, 40> TempArg(this, Arg, "temp", 7, 0.0, NoFlags);
     double temp = TempArg;
     m_tdFgripperSStruct->temp = temp;
+    details->plateOneDontRemove = 1;
 
     double expectedX[NUM_FIDUCIALS], expectedY[NUM_FIDUCIALS];
     double measuredX[NUM_FIDUCIALS], measuredY[NUM_FIDUCIALS];
-    long int offsetX, offsetY;
+    long int offsetX, offsetY, stepSize, maxError, tolerance;
 
-    short curFid, atFid, recordedFid, fitType;
+    short curFid, atFid, recordedFid, fitType, attempts, fitTypeFlag;
     int nFailures;
-    drama::ParSys parSysId(ThisTask->TaskPtr());
 
     double ha, dec;
     double plateTheta;
@@ -7106,7 +10561,7 @@ void CSurveyAction::ActionThread(const drama::sds::Id &Arg)
             DramaTHROW(TDFGRIPPERTASK__INV_INPUT_ARGUMENT, "C_SURVEY: The survey code currently only supports the COEFFS flag");
         }
         MessageUser("C_SURVEY: Starting Gripper Survey of %d marks", m_tdFgripperSStruct->numMarks);
-        fitType = 6;
+
         nFailures = 0;
         curFid = 0;
         atFid = recordedFid = NO;
@@ -7114,7 +10569,31 @@ void CSurveyAction::ActionThread(const drama::sds::Id &Arg)
         parSysId.Get("HA", &ha);
         parSysId.Get("DEC", &dec);
         parSysId.Get("PLATE_THETA", &plateTheta);
+        parSysId.Get("STEP_SIZE", &stepSize);
+        stepSize = 10;
+        parSysId.Get("POS_TOL", &tolerance);
+        tolerance = 10;
+        parSysId.Get("POS_ATTEMPTS", &attempts);
+        parSysId.Get("MAX_ERROR", &maxError);
+        maxError = 10;
+        parSysId.Get("SURVEY_4COMP_FT", &fitTypeFlag);
+        if (fitTypeFlag)
+        {
+            fitType = 4;
+        }
+        else
+        {
+            fitType = 6;
+        }
         parSysId.Put("SURVEY_PROG", 0.0);
+        parSysId.Put(("CUR_FID", m_tdFgripperSStruct->fidNum[0]);
+#define NORMAL_DIST_CORR_MODE 100
+        if ((*(details->pars.distRemEnable) != NORMAL_DIST_CORR_MODE))
+        {
+            MessageUser("C_SURVEY: Warning, the Gripper task DIST_REM_ENABLE parameter is set to %d, rather then the normal value of %d",
+                        *(details->pars.distRemEnable), NORMAL_DIST_CORR_MODE);
+            MessageUser("C_SURVEY: Please ensure this is right before observing");
+        }
         m_tdFgripperSStruct->reset = NO;
     }
     bool flag = true;
@@ -7123,7 +10602,8 @@ void CSurveyAction::ActionThread(const drama::sds::Id &Arg)
     {
         if (!atFid)
         {
-            bool checkFound = SearchForFid(offsetX, offsetY, curFid, &atFid);
+            bool checkFound = SearchForFid(offsetX, offsetY, stepSize, maxError,
+                                           tolerance, attempts, curFid, &atFid);
             if (!checkFound)
             {
                 flag = false;
@@ -7168,6 +10648,127 @@ void CSurveyAction::ActionThread(const drama::sds::Id &Arg)
     SetReturnArg(&newArg);
     ThisTask->tdFgripperSetMainStruct(details);
     MessageUser("C_SURVEY: - Action complete.");
+}
+
+void GMeasureZHeightAction::ActionThread(const drama::sds::Id &Arg)
+{
+    auto ThisTask(GetTask()->TaskPtrAs<TdFGripperTask>());
+    ThisTask->ClearError();
+    details = ThisTask->tdFgripperGetMainStruct();
+    if (details == nullptr)
+    {
+        DramaTHROW(TDFGRIPPERTASK__NOTINIT, "G_MEASUREZHEIGHT: the structure pointer is null, please initialise the task!");
+    }
+    if (details->inUse)
+    {
+        DramaTHROW(TDFGRIPPERTASK__IN_USE, "G_MEASUREZHEIGHT: TdFGripperTask is running other actions.");
+    }
+    if (!Arg)
+    {
+        DramaTHROW(TDFGRIPPERTASK__NO_ARGUMENTS, "G_MEASUREZHEIGHT: No input argument is provided.");
+    }
+    drama::gitarg::Flags NoFlags = drama::gitarg::Flags::NoFlagSet;
+    drama::gitarg::Int<XMIN, XMAX> XArg(this, Arg, "x", 1, 0, NoFlags);
+    drama::gitarg::Int<YMIN, YMAX> YArg(this, Arg, "y", 2, 0, NoFlags);
+    drama::gitarg::Real<THETAMIN, THETAMAX> ThetaArg(this, Arg, "theta", 3, 0, NoFlags);
+    long int xCoord = XArg, yCoord = YArg, zCoord;
+    double thetaCoord = ThetaArg;
+    parSysId = drama::ParSys::ParSys(ThisTask->TaskPtr());
+    std::string inJaws;
+    parSysId.Get("CARRYING_BUTTON", &inJaws);
+    parSysId.Get("CROSS_RETRACT_Z", &zCoord);
+    if (inJaws == "YES")
+    {
+        DramaTHROW(TDFGRIPPERTASK__BUTT_IN_JAWS, "G_MEASUREZHEIGHT: The button is in jaws.");
+    }
+    drama::Path thisTaskPath(_theTask);
+    thisTaskPath.GetPath(this);
+    if (!ThisTask->tdFgripperCheckXYZTmove(xCoord, yCoord, zCoord, thetaCoord))
+    {
+        drama::sds::Id messageArg(drama::sds::Id::CreateArgStruct());
+        messageArg.Put("AXES", "Z");
+        messageArg.Put("POSITIONS", zCoord);
+
+        MessageUser("G_MEASUREZHEIGHT: Will raise the z axis, %7ld\n", zCoord);
+        try
+        {
+            thisTaskPath.Obey(this, "G_MOVE_NT", messageArg);
+        }
+        catch (...)
+        {
+            DramaTHROW(TDFGRIPPERTASK__PROG_ERROR, "G_MEASUREZHEIGHT: errors occured during the raising the z axis.\n");
+        }
+        if (!ThisTask->tdFgripperCheckXYZTmove(xCoord, yCoord, zCoord, thetaCoord))
+        {
+            DramaTHROW(TDFGRIPPERTASK_NOT_SAFEMOVE, "G_MEASUREZHEIGHT: the movement is not safe. Unable to execute MeasureZHeight Action.");
+        }
+    }
+    details->inUse = YES;
+    m_tdFgripperMEASStruct = std::make_shared<tdFgrip_MEAS_Ztype>();
+    m_tdFgripperMEASStruct->x = xCoord;
+    m_tdFgripperMEASStruct->y = yCoord;
+    m_tdFgripperMEASStruct->theta = thetaCoord;
+
+    short atPosition, measured;
+    long int z;
+    if (m_tdFgripperMEASStruct->reset == YES)
+    {
+        m_tdFgripperMEASStruct->height = 0;
+        atPosition = measured = NO;
+        parSysId.Get("CROSS_RETRACT_Z", &z);
+        m_tdFgripperMEASStruct->reset = NO;
+    }
+
+    while (!atPosition || !measured)
+    {
+        if (!atPosition)
+        {
+            atPosition = YES;
+            MessageUser("G_MEASUREZHEIGHT: About to move to the target position (%ld, %ld, %ld, %d)\n",
+                        m_tdFgripperMEASStruct->x, m_tdFgripperMEASStruct->y, z, m_tdFgripperMEASStruct->theta);
+            drama::sds::Id messageArg(drama::sds::Id::CreateArgStruct());
+            messageArg.Put("X", m_tdFgripperMEASStruct->x);
+            messageArg.Put("Y", m_tdFgripperMEASStruct->y);
+            messageArg.Put("Z", z);
+            messageArg.Put("Theta", m_tdFgripperMEASStruct->theta);
+            try
+            {
+                thisTaskPath.Obey(this, "G_MOVE_AXIS_NT", messageArg);
+            }
+            catch (...)
+            {
+                DramaTHROW_S(TDFGRIPPERTASK__PROG_ERROR, "G_MEASUREZHEIGHT: errors occured during the moving to the target position (%ld, %ld, %ld, %d).\n",
+                             m_tdFgripperMEASStruct->x, m_tdFgripperMEASStruct->y, z, m_tdFgripperMEASStruct->theta);
+            }
+        }
+        else if (!measured)
+        {
+            measured = YES;
+            atPosition = NO;
+            details->toEnc.z = 0;
+            MessageUser("G_MEASUREZHEIGHT: About to move to the target position (%ld, %ld, %ld, %d)\n",
+                        m_tdFgripperMEASStruct->x, m_tdFgripperMEASStruct->y, z, m_tdFgripperMEASStruct->theta);
+            drama::sds::Id messageArg(drama::sds::Id::CreateArgStruct());
+            messageArg.Put("AXES", "Z");
+            messageArg.Put("POSITIONS", 100);
+            try
+            {
+                thisTaskPath.Obey(this, "G_MOVE_NT", messageArg);
+            }
+            catch (...)
+            {
+                DramaTHROW(TDFGRIPPERTASK__PROG_ERROR, "G_MEASUREZHEIGHT: errors occured during the moving to the Z axis position.\n");
+            }
+            std::this_thread::sleep_for(2000ms);
+            ThisTask->tdFgripperUpdatePos(NO, details->dprFeedback, YES);
+            m_tdFgripperMEASStruct->z = details->atEnc.z;
+        }
+    }
+    drama::sds::Id newArg = drama::sds::Id::CreateArgStruct();
+    newArg.Put("Height", m_tdFgripperMEASStruct->z);
+    SetReturnArg(&newArg);
+    ThisTask->tdFgripperSetMainStruct(details);
+    MessageUser("G_MEASUREZHEIGHT: - Measure of Z Action complete.");
 }
 
 int main()
