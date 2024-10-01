@@ -35,6 +35,9 @@
 #endif
 
 #define MAX_TDF_AMPS 6
+#define NUM_PIVOTS_2DF 400 /* Number of pivots in 2dF */
+#define NUM_FIDS_2DF 21    /* Number of fiducials on each 2dF field */
+#define NUM_FIELDS_2DF 2   /* Number of 2dF fields */
 
 enum AmpId
 {
@@ -90,6 +93,7 @@ typedef struct
 #define OSET 2 /* ... between abs and relative coordinates   */
 #define NO_POLL 0
 #define POLL 1
+#define WIN_UPSIZE 2.0
 
 #define GRIP_CAM_NUM "/grabber/0" /* Gripper camera device name                 */
 #define CAM_X_SPAN 1456           /* Pixels along the gripper camera x axis     */
