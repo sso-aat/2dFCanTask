@@ -1,10 +1,11 @@
+*
+!*.*
+!*/
 *.a
 *.log
 *.bak
 *.d
 .vscode
-TdFCanTask
-build-2dFCanTask
 TdFCanTask_err*.h
 Makefile
 .dmakefile_rebuilt
