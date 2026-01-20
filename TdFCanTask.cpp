@@ -3146,6 +3146,7 @@ bool CSearchAction::MoveToSearchPosition(const long searchX, const long searchY,
    return true;
 }
 
+/*
 char *Dul___FitsImgErrStr(int status)
 {
    static char errorMessage[80];
@@ -3153,6 +3154,7 @@ char *Dul___FitsImgErrStr(int status)
 
    return (errorMessage);
 }
+*/
 
 bool CSearchAction::PerformCentroid(const shared_ptr<tdFfpiCENtype> &cenWin, const double settletime, short *const centroided)
 {

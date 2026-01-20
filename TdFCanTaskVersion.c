@@ -1,3 +1,11 @@
+/*
+ * @Description:
+ * @Author: lliu
+ * @version:
+ * @Date: 2024-06-03 09:43:41
+ * @LastEditors: lliu
+ * @LastEditTime: 2024-10-08 14:07:09
+ */
 /*+		2 D F C A N T A S K V E R S I O N
 
  * Module name:
@@ -29,13 +37,10 @@
 /*
  * RCS id
  */
-static const char *rcsId="@(#) $Id: ACMM:2dFCanTask/2dFCanTaskVersion.c,v 1.6 23-Aug-2021 10:48:18+10 tjf $";
-static void *use_rcsId = (0 ? (void *)(&use_rcsId) : (void *) &rcsId);
+static const char *rcsId = "@(#) $Id: ACMM:tdFCanTask/TdFCanTaskVersion.c,v 1.6 23-Aug-2021 10:48:18+10 tjf $";
+static void *use_rcsId = (0 ? (void *)(&use_rcsId) : (void *)&rcsId);
 /*
  * Variables defining the version and date.
  */
-const char * const TdFCanTaskVersion= TDFCANTASK_VER;
-const char * const TdFCanTaskDate   = TDFCANTASK_DATE;
-
-
-
+const char *const TdFCanTaskVersion = TDFCANTASK_VER;
+const char *const TdFCanTaskDate = TDFCANTASK_DATE;

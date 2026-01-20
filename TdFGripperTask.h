@@ -4,11 +4,12 @@
 #include "sds.h"
 #include "Git.h"
 #include "gcam.h"
+#include "mess.h"
 #include "slalib.h"
 #include <math.h>
 #include "fitsio.h"
 #include "dul.h"
-#include "drama.hh"
+
 #include <exception>
 #include "CanAccess.h"
 #include "CML.h"
@@ -20,13 +21,12 @@
 #include <iostream>
 #include <sstream>
 #include <stdlib.h>
+#include <thread>
+#include <chrono>
 
 // to check if a directory exists
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
-
-#include "TdFGripperTask_err.h"
-#include "TdFGripperTask_err_msgt.h"
 
 #ifdef USE_CAN_ANAGATE
 #include <can_anagate.h>
@@ -34,11 +34,24 @@
 #define AnaGateCan SimCanInterface
 #endif
 
+#ifdef VxWorks
+#include <vxWorks.h>
+#include "vmeIOSys.h"
+#include "vmeIOPos.h"
+#endif
+
 #define MAX_TDF_AMPS 6
 #define NUM_PIVOTS_2DF 400 /* Number of pivots in 2dF */
 #define NUM_FIDS_2DF 21    /* Number of fiducials on each 2dF field */
 #define NUM_FIELDS_2DF 2   /* Number of 2dF fields */
 
+/* dsign(A,B) - magnitude of A with sign of B (double) */
+#define dsign(A, B) ((B) < 0.0 ? -(A) : (A))
+
+/* dmod(A,B) - A modulo B (double) */
+#define dmod(A, B) ((B) != 0.0 ? ((A) * (B) > 0.0 ? (A) - (B) * floor((A) / (B))   \
+                                                  : (A) + (B) * floor(-(A) / (B))) \
+                               : (A))
 enum AmpId
 {
     X1_AMP = 0,
@@ -139,6 +152,11 @@ typedef struct
 #define IMAGE 1    /* Used when returning image                  */
 #define CENTROID 2 /* Only centroid                              */
 
+#define PARKED 1    /* Gantry parked, tumbler at 0 or 180, plates zeroed */
+#define SAFE 2      /* Gantry won't interfere with observations	     */
+#define LAMPS_ON 4  /* Gantry lamps on				     */
+#define BACKILLAL 8 /* Backillumination always on                       */
+
 #define _ALL 1    /* Identify the area for the SURVEY action    */
 #define _COEFFS 2 /*  These are passed to conversion ops        */
 #define _TEMP 3
@@ -228,7 +246,7 @@ double distP16 = 0.00;     /* dY = cosine(angle) */
 #define OUTSIDE_RADIUS 347300 /* Radius of smallest circule which is 	*/
 /* outside the retractor ring		*/
 #define HALF_GUIDE_EXPAN 2250 /* The amount added between the four quadrants*/
-#define BACKILLAL
+
 /* to account for the guide fibres	*/
 
 /*
@@ -273,13 +291,11 @@ double distP16 = 0.00;     /* dY = cosine(angle) */
 #define SIN4P5 0.0784590957
 #define COS4P5 0.9969173337
 #define CLEARANCE 500.0
-#define PI 3.1415926535
 #define D2PI (2 * PI)
 #define MILLION 1000000.0
 #define D2PI_MRADS (D2PI * MILLION)
 #define DPI_MRADS (PI * MILLION)
 #define TWOPI 6.283185308
-#define PION2 1.570796327
 #define R4P5 0.07853981634
 #define R9 0.1570796327
 #define SF_IMAGES 10
@@ -698,7 +714,7 @@ public:
 /*
  *  The tdFgrip main task structure.
  */
-typedef struct tdFgripTaskType
+typedef struct tdFgripperTaskType
 {
 public:
     GitSimulationType Simulation; /* Simulation level                */
@@ -727,7 +743,7 @@ public:
                                   /* access				 */
     tdFgripDistMap distMap;       /* Cannon distortion map           */
 public:
-    tdFgripTaskType()
+    tdFgripperTaskType()
     {
         Initialised = NO;
         cameraInit = NO;
@@ -739,8 +755,8 @@ public:
         plateOneDontRemove = 0;
         distMap.loaded = NO;
     }
-    ~tdFgripTaskType() {}
-} tdFgripTaskType;
+    ~tdFgripperTaskType() {}
+} tdFgripperTaskType;
 
 /*
  *  Structure definitions for action parameters (handled by DitsPutActData() and
@@ -1297,7 +1313,7 @@ public:
     tdFgrip_Stype()
     {
         temp = 0;
-        for (i = 0; i < NUM_FIDUCIALS; i++)
+        for (int i = 0; i < NUM_FIDUCIALS; i++)
             x[i] = y[i] = z[i] = fidNum[i] = 0;
         xEnc = yEnc = 0;
         dx = dy = 0;

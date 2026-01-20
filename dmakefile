@@ -69,7 +69,7 @@ TCS_UTIL_DIR = ../TcsUtil
 */
 INCLUDES =  -I. DramaIncl IDir(DRAMA2_DIR) $(CAN_INCLUDES) IDir(GCAM_DIR) IDir(GCAM2_DIR) $(SLA_INCL) -I$(VIMBASDK_DIR)
 
-
+USERCCOPTIONS = AnsiCFull()  /* Enable Full Ansi C           */
 /*
  * Enable Ansi C++ V11/V14 full warnings.  If we have C++14, then we
  * use it, otherwise we presume we have C++11
@@ -97,7 +97,8 @@ LOCAL_LDFLAGS=-lrt
 
 
 #EndConfig
-LIBS=LinkLib(TdFCanTask) LinkLibDir(DRAMA2_LIB,drama2) $(CAN_LIBRARIES) -L$(VIMBASDK_LIBS) LinkLibDir(GCAM2_LIB,gcam2) LinkLibDir(GCAM_LIB,gcam)  $(SLA_LIB) $(FITS_LIB) -lboost_filesystem
+LIBS=LinkLib(TdFCanTask)  LinkLibDir(DRAMA2_LIB,drama2) $(CAN_LIBRARIES) -L$(VIMBASDK_LIBS) LinkLibDir(GCAM2_LIB,gcam2) LinkLibDir(GCAM_LIB,gcam)  $(SLA_LIB) $(FITS_LIB) -lboost_filesystem
+GRIP_LIBS=LinkLib(TdFGripperTask)  LinkLibDir(DRAMA2_LIB,drama2) $(CAN_LIBRARIES) -L$(VIMBASDK_LIBS) LinkLibDir(GCAM2_LIB,gcam2) LinkLibDir(GCAM_LIB,gcam)  $(SLA_LIB) $(FITS_LIB) -lboost_filesystem
 
 NormalCRules()			/* Include normal c rules	*/
 
@@ -106,25 +107,32 @@ NormalCRules()			/* Include normal c rules	*/
  * in the definition of OBJECTS and SRC1 convert these names
  * to .o and .cpp files respectively.
  */
-OBJECTS_BASE=CanAccess TdFCanTask_$(RELEASE)
+
+OBJECTS_BASE=CanAccess TdFCanTask_$(RELEASE) 
+
+GIRPPER_OBJECTS_BASE=CanAccess TdFGripperTask_$(RELEASE)
 
 /*
  *	Objects to be put in the 2DFCANTASK library.
  */
 OBJECTS =  $(addsuffix .o,$(OBJECTS_BASE)) 
 
+GRIPPER_OBJECTS =  $(addsuffix .o,$(GIRPPER_OBJECTS_BASE)) 
 /*
  *	Sources for makedepend.  
  *
  * We need to add 2dFCanTask.cpp to those from OBJECTS_BASE.
  */
-SRC1=   $(addsuffix .cpp,$(OBJECTS_BASE)) TdFCanTask.cpp 
 
+SRC1=   $(addsuffix .cpp,$(OBJECTS_BASE))  TdFCanTaskVersion.c TdFCanTask.cpp 
+
+SRC2=  $(addsuffix .cpp,$(GIRPPER_OBJECTS_BASE)) TdFGripperTaskVersion.c TdFGripperTask.cpp
 /*
  * The target All will build the 2DFCANTASK library and program.
  */
-DummyTarget(All,  NotVms(checktarget) CML_LIB_CHECK includes Lib(TdFCanTask) Exe(TdFCanTask))
 
+DummyTarget(All,  NotVms(checktarget) CML_LIB_CHECK includes Lib(TdFCanTask) Exe(TdFCanTask))
+DummyTarget(All,  NotVms(checktarget) CML_LIB_CHECK includes Lib(TdFGripperTask) Exe(TdFGripperTask))
 DramaCheckTarget()
 
 /*
@@ -153,36 +161,49 @@ release :: CML_LIB_CHECK
  * We use an includes target for include files which need to be built.  This
  * is only really necessary if makedepnds has not been run.
  */
-DummyTarget(includes, TdFCanTask.h TdFCanTask_err.h TdFCanTask_err_msgt.h)
+
+DummyTarget(includes, TdFCanTask.h TdFCanTask_err.h TdFCanTask_err_msgt.h )
+DummyTarget(includes, TdFGripperTask.h TdFGripperTask_err.h TdFGripperTask_err_msgt.h)
 /*
 * Generate the error code include file.
- */
+*/
+
 ErrorIncludeFiles(TdFCanTask_err)
+ErrorIncludeFiles(TdFGripperTask_err)
+
 
 TdFCanTask_$(RELEASE).o : TdFCanTaskVersion.c
 	@ echo Compiling TdFCanTaskVersion to $@
-	$(CC) -c $(CFLAGS) StringDefine(TDFCANTASK_VER,$(RELEASE)) -DTDFCANTASK_DATE=$(DATE_CMD) TdFCanTaskVersion.c
+	$(CC) -c $(CFLAGS) StringDefine(TDFCANTASK_VER,$(RELEASE)) -DTDFCANTASK_DATE=$(DATE_CMD) TdFCanTaskVersion.c 
 	mv TdFCanTaskVersion.o $@
+
+TdFGripperTask_$(RELEASE).o : TdFGripperTaskVersion.c
+	@ echo Compiling TdFGripperTaskVersion to $@
+	$(CC) -c $(CFLAGS) StringDefine(TDFGRIPPERTASK_VER,$(RELEASE)) -DTDFGRIPPERTASK_DATE=$(DATE_CMD) TdFGripperTaskVersion.c 
+	mv TdFGripperTaskVersion.o $@
 
 CanAccess.o : CanAccess.cpp CanAccess.h
 
 /*
  * The 2DFCANTASK object library
  */
-ObjectLibraryTarget(TdFCanTask, $(OBJECTS),)
 
+ObjectLibraryTarget(TdFCanTask, $(OBJECTS),)
+ObjectLibraryTarget(TdFGripperTask, $(GRIPPER_OBJECTS),)
 
 /*
  * The 2DFCANTASK program itself
  */
+
 DramaCPPProgramTarget(TdFCanTask, Obj(TdFCanTask), Lib(TdFCanTask), $(LIBS),)
+DramaCPPProgramTarget(TdFGripperTask, Obj(TdFGripperTask), Lib(TdFGripperTask), $(GRIP_LIBS),)
 
 /*
  * Release targets
  */
 DramaReleaseCheck()
-DramaReleaseCommon(TdFCanTask.h TdFCanTask_err.h TdFCanTask_err_msgt.h CanAccess.h)
-DramaReleaseTarget(TdFCanTask,Lib(TdFCanTask),,)
+DramaReleaseCommon(TdFCanTask.h TdFCanTask_err.h TdFCanTask_err_msgt.h CanAccess.h TdFGripperTask.h TdFGripperTask_err.h TdFGripperTask_err_msgt.h)
+DramaReleaseTarget(TdFCanTask TdFGripperTask, Lib(TdFCanTask) Lib(TdFGripperTask),,)
 DramaReleaseDramaStart()
 
 /*
