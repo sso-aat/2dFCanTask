@@ -32,7 +32,7 @@
  */
  
 #BeginConfig 
-ACMM_RELEASE=1_6$(ACMMBUILDVER)
+ACMM_RELEASE=1_7$(ACMMBUILDVER)
 RELEASE=r$(ACMM_RELEASE)
 SYSTEM=tdFCanTask			/* System name (for release	*/
 
